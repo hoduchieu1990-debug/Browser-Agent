@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import type { WorkflowAction } from '../types';
 import { actionSelectorText, actionValueText } from '../utils/action-display';
+
+const CONFIRM_TIMEOUT_MS = 4000;
 
 interface Props {
   recording: boolean;
@@ -11,6 +14,15 @@ interface Props {
 }
 
 export function RecordTab({ recording, actions, error, onToggleRecording, onRemoveAction, onReset }: Props) {
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
+  // an armed Reset should not stay armed forever waiting for a stray click
+  useEffect(() => {
+    if (!confirmingReset) return;
+    const timer = window.setTimeout(() => setConfirmingReset(false), CONFIRM_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [confirmingReset]);
+
   return (
     <div>
       <div className="recording-controls">
@@ -40,9 +52,27 @@ export function RecordTab({ recording, actions, error, onToggleRecording, onRemo
         <span>
           {actions.length} action{actions.length === 1 ? '' : 's'}
         </span>
-        <button className="reset-btn" disabled={actions.length === 0} onClick={onReset}>
-          ↺ Reset
-        </button>
+        {confirmingReset ? (
+          <span className="reset-confirm">
+            Discard {actions.length}?
+            <button
+              className="reset-btn danger"
+              onClick={() => {
+                setConfirmingReset(false);
+                onReset();
+              }}
+            >
+              Yes
+            </button>
+            <button className="reset-btn" onClick={() => setConfirmingReset(false)}>
+              No
+            </button>
+          </span>
+        ) : (
+          <button className="reset-btn" disabled={actions.length === 0} onClick={() => setConfirmingReset(true)}>
+            ↺ Reset
+          </button>
+        )}
       </div>
 
       {actions.length === 0 ? (

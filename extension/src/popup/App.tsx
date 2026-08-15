@@ -77,8 +77,9 @@ export function App() {
     chrome.runtime.sendMessage({ type: 'REMOVE_ACTION', index } satisfies RuntimeMessage);
   };
 
+  // confirmation lives in RecordTab: a native confirm() dialog is a full browser
+  // modal, far too heavy next to a 400px popup
   const resetActions = () => {
-    if (actions.length > 0 && !window.confirm(`Discard all ${actions.length} recorded action(s)?`)) return;
     chrome.runtime.sendMessage({ type: 'RESET' } satisfies RuntimeMessage, (state: RecorderState) => {
       setActions(state.actions);
     });
