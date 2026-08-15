@@ -7,6 +7,7 @@ import { generateSelectorCandidates } from './utils/selector-utils';
 import { showToast, clearToasts } from './utils/toast';
 import { describeAction } from './utils/action-display';
 import { executeStep } from './utils/replay-executor';
+import { attachRecordingBubble, type BubbleHandle } from './utils/recording-bubble';
 
 declare global {
   interface Window {
@@ -17,6 +18,7 @@ declare global {
 let recorder: RecorderHandle | null = null;
 let detachHighlighter: (() => void) | null = null;
 let detachBadge: (() => void) | null = null;
+let bubble: BubbleHandle | null = null;
 let tableCount = 0;
 let textCount = 0;
 let imageCount = 0;
@@ -66,11 +68,20 @@ function setRecording(value: boolean, highlightElements: boolean): void {
       onAddText: recordText,
       onAddImage: recordImage,
     });
+
+    // only the outermost frame owns the on-page bubble
+    if (window.top === window) {
+      bubble = attachRecordingBubble({
+        onStop: () => chrome.runtime.sendMessage({ type: 'STOP_RECORDING' } satisfies RuntimeMessage),
+      });
+    }
   } else if (!value && recorder) {
     recorder.detach();
     recorder = null;
     detachBadge?.();
     detachBadge = null;
+    bubble?.detach();
+    bubble = null;
     clearToasts();
   }
 
@@ -90,6 +101,7 @@ if (!window.__browserAgentAttached) {
   chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
     if (message.type === 'SET_RECORDING') setRecording(message.value, message.highlightElements);
     if (message.type === 'SHOW_TOAST') showToast(message.step, describeAction(message.action));
+    if (message.type === 'RECORDING_PROGRESS') bubble?.update(message.count, message.label);
 
     if (message.type === 'REPLAY_STEP') {
       executeStep(message.action).then(

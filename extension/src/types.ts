@@ -36,6 +36,7 @@ export type RuntimeMessage =
   | { type: 'RECORDED_ACTION'; action: RecordedActionPayload }
   | { type: 'ACTIONS_UPDATED'; actions: WorkflowAction[] }
   | { type: 'SHOW_TOAST'; step: number; action: WorkflowAction }
+  | { type: 'RECORDING_PROGRESS'; count: number; label: string }
   | { type: 'REPLAY_START'; background: boolean }
   | { type: 'REPLAY_STEP'; action: WorkflowAction }
   | { type: 'REPLAY_UPDATED'; state: ReplayState }

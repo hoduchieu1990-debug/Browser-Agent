@@ -20,6 +20,7 @@ import {
   loadReplayState,
 } from './utils/storage-manager';
 import { captureElement, captureElementViaDebugger, type CaptureRect } from './utils/capture';
+import { describeAction } from './utils/action-display';
 
 const STEP_SETTLE_MS = 300;
 const NAVIGATION_TIMEOUT_MS = 30000;
@@ -97,6 +98,18 @@ function pushAction(action: WorkflowAction, tabId?: number): void {
   actions.push(action);
   saveSession(actions);
   notifyActionsUpdated();
+
+  if (tabId) {
+    // the bubble is the only recorder UI left on screen mid-session, so it is
+    // told about every step regardless of the toast setting
+    chrome.tabs
+      .sendMessage(tabId, {
+        type: 'RECORDING_PROGRESS',
+        count: actions.length,
+        label: describeAction(action),
+      } satisfies RuntimeMessage)
+      .catch(() => {});
+  }
 
   if (settings.onPageConfirmation && tabId) {
     chrome.tabs
