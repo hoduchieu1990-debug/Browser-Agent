@@ -3,7 +3,7 @@ import { attachListeners, type RecorderHandle } from './utils/action-recorder';
 import { attachHighlighter } from './utils/highlighter';
 import { attachExtractBadge } from './utils/extract-badge';
 import { extractTableHeaders } from './utils/table-utils';
-import { generateSelector } from './utils/selector-utils';
+import { generateSelectorCandidates } from './utils/selector-utils';
 import { showToast, clearToasts } from './utils/toast';
 import { describeAction } from './utils/action-display';
 import { executeStep } from './utils/replay-executor';
@@ -21,12 +21,17 @@ let tableCount = 0;
 let textCount = 0;
 let imageCount = 0;
 
+function locate(el: Element): { selector: string; selectorFallbacks?: string[] } {
+  const [selector, ...rest] = generateSelectorCandidates(el);
+  return rest.length ? { selector, selectorFallbacks: rest } : { selector };
+}
+
 function recordTable(table: HTMLTableElement): void {
   chrome.runtime.sendMessage({
     type: 'RECORDED_ACTION',
     action: {
       type: 'extractTable',
-      selector: generateSelector(table),
+      ...locate(table),
       headers: extractTableHeaders(table),
       output: `table${++tableCount}`,
     },
@@ -36,7 +41,7 @@ function recordTable(table: HTMLTableElement): void {
 function recordText(el: HTMLElement): void {
   chrome.runtime.sendMessage({
     type: 'RECORDED_ACTION',
-    action: { type: 'extractText', selector: generateSelector(el), output: `text${++textCount}` },
+    action: { type: 'extractText', ...locate(el), output: `text${++textCount}` },
   } satisfies RuntimeMessage);
 }
 
@@ -44,7 +49,7 @@ function recordImage(el: HTMLElement): void {
   const name = `image${++imageCount}`;
   chrome.runtime.sendMessage({
     type: 'RECORDED_ACTION',
-    action: { type: 'screenshot', selector: generateSelector(el), filename: `${name}.png`, output: name },
+    action: { type: 'screenshot', ...locate(el), filename: `${name}.png`, output: name },
   } satisfies RuntimeMessage);
 }
 

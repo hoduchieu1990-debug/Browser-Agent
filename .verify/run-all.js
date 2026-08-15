@@ -5,6 +5,7 @@ const path = require('path');
 const execFileAsync = promisify(execFile);
 
 const CHECKS = [
+  'selector-resilience-check.js',
   'reset-confirm-check.js',
   'player-reuse-check.js',
   'batch-check.js',

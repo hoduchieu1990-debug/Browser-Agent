@@ -39,19 +39,29 @@ function query(selector: string): HTMLElement | null {
 }
 
 // Pages rarely have the element ready the instant the previous step finished,
-// so every selector-based step polls instead of failing on the first miss.
-function waitForElement(selector: string, timeout = ELEMENT_TIMEOUT_MS): Promise<HTMLElement> {
+// so every selector-based step polls instead of failing on the first miss, and
+// tries the selectors recorded as backups before giving up.
+function waitForElement(
+  selector: string,
+  fallbacks: string[] = [],
+  timeout = ELEMENT_TIMEOUT_MS,
+): Promise<HTMLElement> {
+  const all = [selector, ...fallbacks];
+
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeout;
 
     const attempt = () => {
-      const el = query(selector);
-      if (el) {
-        resolve(el);
-        return;
+      for (const candidate of all) {
+        const el = query(candidate);
+        if (el) {
+          resolve(el);
+          return;
+        }
       }
       if (Date.now() >= deadline) {
-        reject(new Error(`Element not found: ${selector}`));
+        const tried = all.length > 1 ? ` (tried ${all.length} selectors)` : '';
+        reject(new Error(`Element not found: ${selector}${tried}`));
         return;
       }
       setTimeout(attempt, POLL_INTERVAL_MS);
@@ -59,6 +69,10 @@ function waitForElement(selector: string, timeout = ELEMENT_TIMEOUT_MS): Promise
 
     attempt();
   });
+}
+
+function locateFor(action: { selector: string; selectorFallbacks?: string[] }): Promise<HTMLElement> {
+  return waitForElement(action.selector, action.selectorFallbacks ?? []);
 }
 
 function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string): void {
@@ -93,19 +107,19 @@ function readTable(table: HTMLTableElement, headers?: string[]): Record<string, 
 export async function executeStep(action: WorkflowAction): Promise<StepResult> {
   switch (action.type) {
     case 'click': {
-      const el = await waitForElement(action.selector);
+      const el = await locateFor(action);
       el.click();
       return {};
     }
 
     case 'input': {
-      const el = await waitForElement(action.selector);
+      const el = await locateFor(action);
       setNativeValue(el as HTMLInputElement, action.value);
       return {};
     }
 
     case 'select': {
-      const el = (await waitForElement(action.selector)) as HTMLSelectElement;
+      const el = (await locateFor(action)) as HTMLSelectElement;
       setNativeValue(el, action.value);
       return {};
     }
@@ -115,21 +129,23 @@ export async function executeStep(action: WorkflowAction): Promise<StepResult> {
       return {};
 
     case 'waitForSelector':
-      await waitForElement(action.selector, action.timeout ?? ELEMENT_TIMEOUT_MS);
+      await waitForElement(action.selector, action.selectorFallbacks ?? [], action.timeout ?? ELEMENT_TIMEOUT_MS);
       return {};
 
     case 'extractText': {
-      const el = await waitForElement(action.selector);
+      const el = await locateFor(action);
       return { output: { key: action.output, value: el.textContent?.trim() ?? '' } };
     }
 
     case 'extractTable': {
-      const el = (await waitForElement(action.selector)) as HTMLTableElement;
+      const el = (await locateFor(action)) as HTMLTableElement;
       return { output: { key: action.output, value: readTable(el, action.headers) } };
     }
 
     case 'extractJson': {
-      const el = action.selector ? await waitForElement(action.selector) : document.body;
+      const el = action.selector
+        ? await locateFor({ selector: action.selector, selectorFallbacks: action.selectorFallbacks })
+        : document.body;
       return { output: { key: action.output, value: JSON.parse(el.textContent ?? 'null') } };
     }
 
@@ -155,7 +171,7 @@ export async function executeStep(action: WorkflowAction): Promise<StepResult> {
         return { skipped: 'full-page screenshots are only saved when running through the CLI' };
       }
 
-      const el = await waitForElement(action.selector);
+      const el = await locateFor({ selector: action.selector, selectorFallbacks: action.selectorFallbacks });
       el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
       await new Promise((resolve) => setTimeout(resolve, 150)); // let the scroll settle before the capture
 

@@ -1,11 +1,18 @@
 import type { RecordedActionPayload } from '../types';
-import { generateSelector } from './selector-utils';
+import { generateSelectorCandidates } from './selector-utils';
 import { findClickableAncestor } from './clickable-element';
 import { isExtensionUi } from './ui-marker';
 
 export interface RecorderHandle {
   detach: () => void;
   setPaused: (paused: boolean) => void;
+}
+
+// Pages change between recording and replay; keeping the runner-up selectors
+// lets a step survive the one it was recorded with going stale.
+function selectorWithFallbacks(el: Element): { selector: string; selectorFallbacks?: string[] } {
+  const [selector, ...rest] = generateSelectorCandidates(el);
+  return rest.length ? { selector, selectorFallbacks: rest } : { selector };
 }
 
 export function attachListeners(onAction: (action: RecordedActionPayload) => void): RecorderHandle {
@@ -29,11 +36,11 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
       // selector plus a ${paramN} placeholder the user fills in at run time
       // (browser-agent run ... --param file1=./data.xlsx) instead of skipping.
       const paramName = `file${++fileParamCount}`;
-      onAction({ type: 'uploadFile', selector: generateSelector(target), value: `\${${paramName}}` });
+      onAction({ type: 'uploadFile', ...selectorWithFallbacks(target), value: `\${${paramName}}` });
       return;
     }
 
-    onAction({ type: 'click', selector: generateSelector(target) });
+    onAction({ type: 'click', ...selectorWithFallbacks(target) });
   };
 
   const handleChange = (event: Event) => {
@@ -42,19 +49,19 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
     const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
     if (target instanceof HTMLInputElement && target.type === 'file') return; // handled on click, above
 
-    const selector = generateSelector(target);
+    const located = selectorWithFallbacks(target);
 
     if (target instanceof HTMLSelectElement) {
-      onAction({ type: 'select', selector, value: target.value });
+      onAction({ type: 'select', ...located, value: target.value });
       return;
     }
 
     if (target instanceof HTMLInputElement && target.type === 'password') {
-      onAction({ type: 'input', selector, value: '${password}' }); // never capture the real password
+      onAction({ type: 'input', ...located, value: '${password}' }); // never capture the real password
       return;
     }
 
-    onAction({ type: 'input', selector, value: target.value });
+    onAction({ type: 'input', ...located, value: target.value });
   };
 
   document.addEventListener('click', handleClick, true);

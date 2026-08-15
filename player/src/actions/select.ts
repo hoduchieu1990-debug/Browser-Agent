@@ -1,7 +1,8 @@
 import type { Page } from 'playwright';
 import type { SelectAction } from '@browser-agent/shared';
-import { locate } from '../utils/selector-engine';
+import { resolve } from '../utils/selector-engine';
 
 export async function select(page: Page, action: SelectAction): Promise<void> {
-  await locate(page, action.selector).selectOption(action.value);
+  const el = await resolve(page, action.selector, action.selectorFallbacks);
+  await el.selectOption(action.value);
 }

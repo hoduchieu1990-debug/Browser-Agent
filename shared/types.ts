@@ -94,6 +94,8 @@ export interface BaseAction {
   waitAfter?: number;
   retry?: RetryConfig;
   onError?: 'fail' | 'skip' | 'ignore';
+  /** Alternative selectors, tried in order when `selector` no longer matches. */
+  selectorFallbacks?: string[];
 }
 
 export interface RetryConfig {

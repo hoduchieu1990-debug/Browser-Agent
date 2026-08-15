@@ -20,7 +20,9 @@ let serveBrokenPage = false;
 (async () => {
   const server = http.createServer((_req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(serveBrokenPage ? PAGE.replace('<span id="total">1,284</span>', '<span>gone</span>') : PAGE);
+    // drop the element entirely: merely removing its id is no longer a failure,
+    // because the recorded fallback selectors still find it
+    res.end(serveBrokenPage ? PAGE.replace('<div>Total: <span id="total">1,284</span></div>', '') : PAGE);
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
