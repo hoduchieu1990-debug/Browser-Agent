@@ -9,13 +9,12 @@ import type {
 } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import { Header } from './Header';
-import { Tabs, type TabKey } from './Tabs';
+import { Sidebar, type TabKey } from './Sidebar';
 import { RecordTab } from './RecordTab';
 import { PreviewTab } from './PreviewTab';
 import { SavedTab } from './SavedTab';
 import { ExportTab } from './ExportTab';
 import { SettingsTab } from './SettingsTab';
-import { Footer } from './Footer';
 
 export function App() {
   const [recording, setRecording] = useState(false);
@@ -113,35 +112,36 @@ export function App() {
 
   return (
     <div className="popup">
-      <Header onOpenSettings={() => setActiveTab('settings')} />
-      <Tabs active={activeTab} onChange={setActiveTab} />
-      <div className="popup-content">
-        {activeTab === 'recording' && (
-          <RecordTab
-            recording={recording}
-            actions={actions}
-            error={error}
-            onToggleRecording={toggleRecording}
-            onRemoveAction={removeAction}
-            onReset={resetActions}
-          />
-        )}
-        {activeTab === 'preview' && (
-          <PreviewTab
-            actions={actions}
-            state={replayState}
-            background={replayInBackground}
-            onBackgroundChange={setReplayInBackground}
-            onReplay={startReplay}
-          />
-        )}
-        {activeTab === 'saved' && (
-          <SavedTab recordings={recordings} onLoad={loadRecording} onDelete={removeRecording} />
-        )}
-        {activeTab === 'export' && <ExportTab actions={actions} recordings={recordings} settings={settings} />}
-        {activeTab === 'settings' && <SettingsTab settings={settings} onChange={updateSetting} />}
+      <Sidebar active={activeTab} onChange={setActiveTab} />
+      <div className="popup-main">
+        <Header active={activeTab} actionCount={actions.length} />
+        <div className="popup-content">
+          {activeTab === 'recording' && (
+            <RecordTab
+              recording={recording}
+              actions={actions}
+              error={error}
+              onToggleRecording={toggleRecording}
+              onRemoveAction={removeAction}
+              onReset={resetActions}
+            />
+          )}
+          {activeTab === 'preview' && (
+            <PreviewTab
+              actions={actions}
+              state={replayState}
+              background={replayInBackground}
+              onBackgroundChange={setReplayInBackground}
+              onReplay={startReplay}
+            />
+          )}
+          {activeTab === 'saved' && (
+            <SavedTab recordings={recordings} onLoad={loadRecording} onDelete={removeRecording} />
+          )}
+          {activeTab === 'export' && <ExportTab actions={actions} recordings={recordings} settings={settings} />}
+          {activeTab === 'settings' && <SettingsTab settings={settings} onChange={updateSetting} />}
+        </div>
       </div>
-      <Footer actionCount={actions.length} />
     </div>
   );
 }

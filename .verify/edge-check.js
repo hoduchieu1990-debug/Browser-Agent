@@ -55,7 +55,7 @@ const check = (name, passed, detail = '') => {
 
     const popup = await context.newPage();
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
-    check('popup renders', (await popup.locator('.popup-header h2').textContent()) === 'Browser Agent');
+    check('popup renders', (await popup.locator('.breadcrumb-parent').textContent()) === 'Browser Agent');
 
     // ---------- recording ----------
     await testPage.bringToFront();

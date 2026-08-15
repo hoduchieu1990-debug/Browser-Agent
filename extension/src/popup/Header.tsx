@@ -1,22 +1,27 @@
+import type { TabKey } from './Sidebar';
+
+const TITLES: Record<TabKey, string> = {
+  recording: 'Record',
+  preview: 'Preview',
+  saved: 'Saved',
+  export: 'Export',
+  settings: 'Settings',
+};
+
 interface Props {
-  onOpenSettings: () => void;
+  active: TabKey;
+  actionCount: number;
 }
 
-export function Header({ onOpenSettings }: Props) {
+export function Header({ active, actionCount }: Props) {
   return (
-    <div className="popup-header">
-      <div className="popup-header-content">
-        <div className="logo-badge">BA</div>
-        <h2>Browser Agent</h2>
-      </div>
-      <div className="popup-header-buttons">
-        <button className="header-btn" title="Settings" onClick={onOpenSettings}>
-          ⚙️
-        </button>
-        <button className="header-btn" title="docs/WORKFLOW_GUIDE.md">
-          ❓
-        </button>
-      </div>
-    </div>
+    <header className="popup-header">
+      <nav className="breadcrumb">
+        <span className="breadcrumb-parent">Browser Agent</span>
+        <span className="breadcrumb-separator">/</span>
+        <span className="breadcrumb-current">{TITLES[active]}</span>
+      </nav>
+      <span className="action-count">{actionCount}</span>
+    </header>
   );
 }

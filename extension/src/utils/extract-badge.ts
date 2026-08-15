@@ -35,13 +35,13 @@ function styleMenuItem(btn: HTMLButtonElement): void {
   btn.style.padding = '7px 12px';
   btn.style.border = 'none';
   btn.style.background = 'transparent';
-  btn.style.color = '#f1eefc';
+  btn.style.color = '#09090b';
   btn.style.font = '500 12px "Segoe UI", Tahoma, sans-serif';
   btn.style.textAlign = 'left';
   btn.style.cursor = 'pointer';
   btn.style.whiteSpace = 'nowrap';
 
-  btn.addEventListener('mouseenter', () => (btn.style.background = 'rgba(139, 92, 246, 0.25)'));
+  btn.addEventListener('mouseenter', () => (btn.style.background = '#f4f4f5'));
   btn.addEventListener('mouseleave', () => (btn.style.background = 'transparent'));
 }
 
@@ -74,11 +74,11 @@ function createBadge(): BadgeElements {
   trigger.style.border = 'none';
   trigger.style.borderRadius = '999px';
   trigger.style.padding = '5px 14px';
-  trigger.style.background = 'linear-gradient(135deg, #8b5cf6 0%, #22d3ee 100%)';
+  trigger.style.background = '#18181b';
   trigger.style.color = '#fff';
   trigger.style.font = '600 11px "Segoe UI", Tahoma, sans-serif';
   trigger.style.cursor = 'pointer';
-  trigger.style.boxShadow = '0 2px 10px rgba(139, 92, 246, 0.6)';
+  trigger.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.25)';
 
   const menu = document.createElement('div');
   menu.style.display = 'none';
@@ -86,9 +86,9 @@ function createBadge(): BadgeElements {
   menu.style.minWidth = '168px';
   menu.style.padding = '4px 0';
   menu.style.borderRadius = '8px';
-  menu.style.background = '#1c1830';
-  menu.style.border = '1px solid #322b52';
-  menu.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.5)';
+  menu.style.background = '#ffffff';
+  menu.style.border = '1px solid #e4e4e7';
+  menu.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)';
 
   const tableItem = document.createElement('button');
   tableItem.textContent = '📊  Table data';

@@ -2,7 +2,7 @@ import { findClickableAncestor } from './clickable-element';
 import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 
 const OVERLAY_ID = '__browser_agent_highlight__';
-const DEFAULT_COLOR = '#3498db';
+const DEFAULT_COLOR = '#18181b';
 
 // Draws an independent overlay box instead of mutating the target's own
 // inline style — SPA frameworks (React/Vue/Angular) reconcile the DOM on

@@ -73,7 +73,7 @@ const PAGE = `<!doctype html>
     // ---- load the older (second in list) recording back ----
     await popup.locator('.saved-item').nth(1).locator('.saved-load').click();
     await popup.waitForTimeout(400);
-    console.log('active tab after load is Preview:', await popup.locator('.tab.active').textContent());
+    console.log('active tab after load is Preview:', await popup.locator('.sidebar-item.active').textContent());
 
     await popup.click('text=Record');
     await popup.waitForTimeout(200);
