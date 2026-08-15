@@ -70,7 +70,9 @@ function StepLog({ steps, total }: { steps: ReplayStepLog[]; total: number }) {
             {step.index}/{total}
           </span>
           <span className="step-body">
-            <span className="step-type">{step.type}</span>
+            <span className="step-type action-type" data-type={step.type}>
+              {step.type}
+            </span>
             {step.target && <span className="step-target">{step.target}</span>}
             {step.message && <span className="step-message">{step.message}</span>}
           </span>

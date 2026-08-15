@@ -87,7 +87,9 @@ export function RecordTab({ recording, actions, error, onToggleRecording, onRemo
             <div className="action-item" key={action.id}>
               <div className="action-step">{index + 1}</div>
               <div className="action-info">
-                <div className="action-type">{action.type}</div>
+                <div className="action-type" data-type={action.type}>
+                  {action.type}
+                </div>
                 <div className="action-selector">{actionSelectorText(action)}</div>
                 {actionValueText(action) && <div className="action-value">{actionValueText(action)}</div>}
               </div>

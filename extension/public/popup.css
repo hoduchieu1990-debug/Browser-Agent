@@ -1,20 +1,32 @@
-/* shadcn/ui zinc palette, dimmed: no pure white surfaces or pure black text */
+/* Slate neutrals with an indigo accent — colour carries meaning here, so the
+   action types and step states are hued rather than uniformly grey. */
 :root {
-  --background: #f2f2f4; /* canvas */
-  --surface: #fbfbfc; /* cards sit just above the canvas */
-  --foreground: #27272a;
-  --muted: #e9e9ed;
-  --muted-foreground: #6f6f78;
-  --border: #dcdce1;
-  --input: #dcdce1;
-  --ring: #a1a1aa;
-  --primary: #3f3f46;
-  --primary-foreground: #fafafa;
-  --accent: #e9e9ed;
-  --accent-foreground: #27272a;
-  --destructive: #dc2626;
+  --background: #eef1f7; /* canvas */
+  --surface: #fbfcfe; /* cards sit just above the canvas */
+  --surface-raised: #ffffff;
+  --foreground: #1e293b;
+  --muted: #e3e8f0;
+  --muted-foreground: #64748b;
+  --border: #d5dde8;
+  --input: #cbd5e1;
+  --ring: #818cf8;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-foreground: #ffffff;
+  --primary-soft: #e0e7ff;
+
+  --accent: #e3e8f0;
+  --accent-foreground: #1e293b;
+
   --success: #15803d;
-  --sidebar: #eaeaee;
+  --success-soft: #dcfce7;
+  --warning: #b45309;
+  --warning-soft: #fef3c7;
+  --destructive: #dc2626;
+  --destructive-soft: #fee2e2;
+
+  --sidebar: #e6ebf3;
 
   --radius: 8px;
   --radius-sm: 6px;
@@ -50,7 +62,7 @@ body {
   align-items: center;
   gap: 2px;
   padding: 10px 6px;
-  background: var(--sidebar);
+  background: linear-gradient(180deg, #e8edf6 0%, #e1e8f2 100%);
   border-right: 1px solid var(--border);
 }
 
@@ -59,7 +71,8 @@ body {
   height: 32px;
   margin-bottom: 8px;
   border-radius: var(--radius-sm);
-  background: var(--primary);
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
   color: var(--primary-foreground);
   display: flex;
   align-items: center;
@@ -92,13 +105,14 @@ body {
 }
 
 .sidebar-item:hover {
-  background: var(--accent);
-  color: var(--accent-foreground);
+  background: rgba(79, 70, 229, 0.09);
+  color: var(--primary);
 }
 
 .sidebar-item.active {
   background: var(--primary);
   color: var(--primary-foreground);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
 }
 
 /* ---------- Main column ---------- */
@@ -118,7 +132,7 @@ body {
   height: 48px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-raised);
 }
 
 .breadcrumb {
@@ -144,8 +158,8 @@ body {
   min-width: 20px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: var(--muted);
-  color: var(--muted-foreground);
+  background: var(--primary-soft);
+  color: var(--primary);
   font-size: 11px;
   font-weight: 500;
   text-align: center;
@@ -186,14 +200,15 @@ body {
 }
 
 .record-btn.start {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--success);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(21, 128, 61, 0.3);
 }
 
 .record-btn.stop {
-  background: var(--surface);
-  color: var(--destructive);
-  border-color: var(--border);
+  background: var(--destructive-soft);
+  color: #b91c1c;
+  border-color: #f4b8b8;
 }
 
 .record-btn:disabled,
@@ -217,9 +232,16 @@ body {
   margin-bottom: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--muted);
+  background: var(--surface-raised);
   font-size: 12px;
   color: var(--muted-foreground);
+}
+
+/* while recording, the whole status bar goes red rather than just the dot */
+.recording-status:has(.live) {
+  border-color: #f4b8b8;
+  background: var(--destructive-soft);
+  color: #b91c1c;
 }
 
 .recording-dot {
@@ -232,6 +254,7 @@ body {
 
 .recording-dot.live {
   background: var(--destructive);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
   animation: pulse 1.5s infinite;
 }
 
@@ -258,21 +281,22 @@ body {
 }
 
 .error-banner {
-  border-color: #efc9c9;
-  background: #fbeaea;
-  color: #b02525;
+  border-color: #f4b8b8;
+  background: var(--destructive-soft);
+  color: #b91c1c;
 }
 
 .note-banner {
-  border-color: #e8d59a;
-  background: #f8f2e2;
-  color: #96601a;
+  border-color: #edd08a;
+  background: var(--warning-soft);
+  color: var(--warning);
   font-size: 10px;
 }
 
 .extract-hint {
-  background: var(--muted);
-  color: var(--muted-foreground);
+  border-color: #c7d2fe;
+  background: var(--primary-soft);
+  color: #4338ca;
 }
 
 /* ---------- Action list ---------- */
@@ -289,7 +313,7 @@ body {
   padding: 3px 9px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--muted-foreground);
   font-family: inherit;
   font-size: 11px;
@@ -320,7 +344,7 @@ body {
 }
 
 .reset-btn.danger:hover:not(:disabled) {
-  background: #fbeaea;
+  background: var(--destructive-soft);
   color: var(--destructive);
 }
 
@@ -336,11 +360,12 @@ body {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--surface-raised);
 }
 
 .action-item:hover {
-  background: var(--muted);
+  border-color: #c7d2fe;
+  background: #f7f8ff;
 }
 
 .action-step {
@@ -349,8 +374,8 @@ body {
   flex-shrink: 0;
   margin-right: 9px;
   border-radius: 50%;
-  background: var(--muted);
-  color: var(--muted-foreground);
+  background: var(--primary-soft);
+  color: var(--primary);
   font-size: 10px;
   font-weight: 600;
   display: flex;
@@ -366,9 +391,37 @@ body {
 
 .action-type {
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--foreground);
   margin-bottom: 2px;
+}
+
+/* a hue per kind of step, so a long list is scannable without reading it */
+.action-type[data-type="navigate"] {
+  color: #0369a1;
+}
+
+.action-type[data-type="click"] {
+  color: #4f46e5;
+}
+
+.action-type[data-type="input"],
+.action-type[data-type="select"] {
+  color: #b45309;
+}
+
+.action-type[data-type="uploadFile"] {
+  color: #c2410c;
+}
+
+.action-type[data-type="extractText"],
+.action-type[data-type="extractTable"],
+.action-type[data-type="extractJson"] {
+  color: #15803d;
+}
+
+.action-type[data-type="screenshot"] {
+  color: #a21caf;
 }
 
 .action-selector {
@@ -382,6 +435,7 @@ body {
 
 .action-value {
   font-size: 11px;
+  font-weight: 500;
   color: var(--success);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -395,7 +449,7 @@ body {
   height: 22px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--muted-foreground);
   font-size: 11px;
   cursor: pointer;
@@ -404,7 +458,7 @@ body {
 .action-delete:hover {
   border-color: var(--destructive);
   color: var(--destructive);
-  background: #fbeaea;
+  background: var(--destructive-soft);
 }
 
 /* ---------- Empty state ---------- */
@@ -450,7 +504,7 @@ body {
 .job-item {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--surface-raised);
   padding: 10px;
 }
 
@@ -473,12 +527,13 @@ body {
 
 .saved-item:hover,
 .job-item:hover {
-  background: var(--muted);
+  border-color: #c7d2fe;
+  background: #f7f8ff;
 }
 
 .job-item.selected {
   border-color: var(--primary);
-  background: var(--muted);
+  background: var(--primary-soft);
 }
 
 .saved-info {
@@ -513,7 +568,7 @@ body {
   padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--foreground);
   font-family: inherit;
   font-size: 11px;
@@ -529,8 +584,9 @@ body {
 .replay-btn {
   width: 100%;
   padding: 9px;
-  background: var(--primary);
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   color: var(--primary-foreground);
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
 }
 
 .replay-option {
@@ -566,7 +622,7 @@ body {
 .step-log {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--surface-raised);
   margin-bottom: 12px;
   max-height: 190px;
   overflow-y: auto;
@@ -640,12 +696,12 @@ body {
 }
 
 .step-failed {
-  background: #fbeaea;
+  background: var(--destructive-soft);
 }
 
 .step-failed .step-icon,
 .step-failed .step-message {
-  color: #b02525;
+  color: #b91c1c;
 }
 
 /* ---------- Results ---------- */
@@ -655,8 +711,8 @@ body {
 
 .result-name {
   font-size: 11px;
-  font-weight: 500;
-  color: var(--muted-foreground);
+  font-weight: 600;
+  color: var(--primary);
   margin-bottom: 6px;
 }
 
@@ -692,7 +748,7 @@ body {
   border-radius: var(--radius);
   overflow: auto;
   max-height: 240px;
-  background: var(--surface);
+  background: var(--surface-raised);
 }
 
 .result-table {
@@ -716,8 +772,8 @@ body {
 .result-table th {
   position: sticky;
   top: 0;
-  background: var(--muted);
-  color: var(--muted-foreground);
+  background: var(--primary-soft);
+  color: #4338ca;
   font-size: 11px;
   font-weight: 500;
 }
@@ -761,7 +817,7 @@ body {
   padding: 8px 10px;
   border: 1px solid var(--input);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--foreground);
   font-family: inherit;
   font-size: 12px;
@@ -773,8 +829,8 @@ body {
 
 .form-input:focus {
   outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px rgba(161, 161, 170, 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
 }
 
 .form-hint {
@@ -790,8 +846,9 @@ body {
 
 .export-btn {
   padding: 9px;
-  background: var(--primary);
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   color: var(--primary-foreground);
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
 }
 
 /* ---------- Settings ---------- */
@@ -809,11 +866,12 @@ body {
   padding: 11px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--surface-raised);
 }
 
 .setting-item:hover {
-  background: var(--muted);
+  border-color: #c7d2fe;
+  background: #f7f8ff;
 }
 
 .setting-label {
@@ -847,7 +905,7 @@ body {
 }
 
 .toggle.on {
-  background: var(--primary);
+  background: var(--success);
 }
 
 .toggle-circle {
