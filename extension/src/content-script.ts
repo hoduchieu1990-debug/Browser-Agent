@@ -1,6 +1,6 @@
 import type { RuntimeMessage, RecorderState } from './types';
 import { attachListeners, type RecorderHandle } from './utils/action-recorder';
-import { attachHighlighter } from './utils/highlighter';
+import { attachHighlighter, type HighlighterHandle } from './utils/highlighter';
 import { attachExtractBadge } from './utils/extract-badge';
 import { extractTableHeaders } from './utils/table-utils';
 import { generateSelectorCandidates } from './utils/selector-utils';
@@ -16,7 +16,7 @@ declare global {
 }
 
 let recorder: RecorderHandle | null = null;
-let detachHighlighter: (() => void) | null = null;
+let highlighter: HighlighterHandle | null = null;
 let detachBadge: (() => void) | null = null;
 let bubble: BubbleHandle | null = null;
 let tableCount = 0;
@@ -67,6 +67,8 @@ function setRecording(value: boolean, highlightElements: boolean): void {
       onAddTable: recordTable,
       onAddText: recordText,
       onAddImage: recordImage,
+      // two outlines on screen at once is noise; the badge's is the precise one
+      onTargetChange: (hasTarget) => highlighter?.setPaused(hasTarget),
     });
 
     // only the outermost frame owns the on-page bubble
@@ -85,11 +87,11 @@ function setRecording(value: boolean, highlightElements: boolean): void {
     clearToasts();
   }
 
-  if (value && highlightElements && !detachHighlighter) {
-    detachHighlighter = attachHighlighter();
-  } else if ((!value || !highlightElements) && detachHighlighter) {
-    detachHighlighter();
-    detachHighlighter = null;
+  if (value && highlightElements && !highlighter) {
+    highlighter = attachHighlighter();
+  } else if ((!value || !highlightElements) && highlighter) {
+    highlighter.detach();
+    highlighter = null;
   }
 }
 

@@ -7,6 +7,7 @@ const execFileAsync = promisify(execFile);
 const CHECKS = [
   'bubble-check.js',
   'badge-follow-check.js',
+  'target-frame-check.js',
   'selector-resilience-check.js',
   'reset-confirm-check.js',
   'player-reuse-check.js',

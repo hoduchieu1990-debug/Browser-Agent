@@ -14,6 +14,8 @@ export interface BadgeCallbacks {
   onAddTable: (table: HTMLTableElement) => void;
   onAddText: (el: HTMLElement) => void;
   onAddImage: (el: HTMLElement) => void;
+  /** Fires when the badge takes over (or releases) showing the outline. */
+  onTargetChange?: (hasTarget: boolean) => void;
 }
 
 // An element is worth offering "Add text" for when it holds a short, concrete
@@ -47,6 +49,64 @@ function styleMenuItem(btn: HTMLButtonElement): void {
 
   btn.addEventListener('mouseenter', () => (btn.style.background = '#eef1f7'));
   btn.addEventListener('mouseleave', () => (btn.style.background = 'transparent'));
+}
+
+const FRAME_ID = '__browser_agent_target_frame__';
+
+interface TargetFrame {
+  show: (el: Element, label: string) => void;
+  hide: () => void;
+  remove: () => void;
+}
+
+// Answers "what exactly am I adding?" — the badge sits next to the cursor, so
+// without this the element it is aimed at is guesswork.
+function createTargetFrame(): TargetFrame {
+  document.getElementById(FRAME_ID)?.remove();
+
+  const box = document.createElement('div');
+  box.id = FRAME_ID;
+  markAsExtensionUi(box);
+  box.style.position = 'fixed';
+  box.style.pointerEvents = 'none';
+  box.style.boxSizing = 'border-box';
+  box.style.border = '2px solid #4f46e5';
+  box.style.background = 'rgba(79, 70, 229, 0.10)';
+  box.style.borderRadius = '3px';
+  box.style.zIndex = '2147483646';
+  box.style.display = 'none';
+
+  const tag = document.createElement('span');
+  tag.style.position = 'absolute';
+  tag.style.left = '0';
+  tag.style.top = '-19px';
+  tag.style.padding = '1px 7px';
+  tag.style.borderRadius = '4px';
+  tag.style.background = '#4f46e5';
+  tag.style.color = '#fff';
+  tag.style.font = '600 10px system-ui, "Segoe UI", sans-serif';
+  tag.style.whiteSpace = 'nowrap';
+  box.appendChild(tag);
+
+  document.documentElement.appendChild(box);
+
+  return {
+    show: (el, label) => {
+      const rect = el.getBoundingClientRect();
+      box.style.display = 'block';
+      box.style.top = `${rect.top}px`;
+      box.style.left = `${rect.left}px`;
+      box.style.width = `${rect.width}px`;
+      box.style.height = `${rect.height}px`;
+      tag.textContent = label;
+      // a frame hugging the top of the viewport would push its label off-screen
+      tag.style.top = rect.top < 22 ? '100%' : '-19px';
+    },
+    hide: () => {
+      box.style.display = 'none';
+    },
+    remove: () => box.remove(),
+  };
 }
 
 interface BadgeElements {
@@ -113,8 +173,9 @@ function createBadge(): BadgeElements {
 
 // Rides along with the pointer during recording and offers to capture whatever
 // is under it, so extracting data never requires leaving the page.
-export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeCallbacks): () => void {
+export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTargetChange }: BadgeCallbacks): () => void {
   const { root, trigger, menu, tableItem, textItem, imageItem } = createBadge();
+  const frame = createTargetFrame();
 
   let currentTable: HTMLTableElement | null = null;
   let currentText: HTMLElement | null = null;
@@ -140,16 +201,26 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeC
     return Math.hypot(dx, dy);
   };
 
+  const defaultTarget = () => currentText ?? currentTable;
+
+  const frameDefault = () => {
+    const el = defaultTarget();
+    if (el) frame.show(el, currentTable && !currentText ? 'table' : 'this will be added');
+  };
+
   const closeMenu = () => {
     menuOpen = false;
     menu.style.display = 'none';
+    frameDefault();
   };
 
   const hide = () => {
     closeMenu();
     root.style.display = 'none';
+    frame.hide();
     currentTable = null;
     currentText = null;
+    onTargetChange?.(false);
   };
 
   const cancelHide = () => {
@@ -198,6 +269,8 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeC
     currentText = text;
     root.style.display = 'flex';
     moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
+    frameDefault();
+    onTargetChange?.(true);
   };
 
   const handleScroll = () => {
@@ -249,6 +322,18 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeC
     if (menuOpen && !root.contains(event.target as Node)) hide();
   };
 
+  const previewOnHover = (item: HTMLButtonElement, pick: () => Element | null, label: string) => {
+    item.addEventListener('mouseenter', () => {
+      const el = pick();
+      if (el) frame.show(el, label);
+    });
+    item.addEventListener('mouseleave', frameDefault);
+  };
+
+  previewOnHover(tableItem, () => currentTable, 'table');
+  previewOnHover(textItem, () => currentText ?? currentTable, 'text');
+  previewOnHover(imageItem, () => currentTable ?? currentText, 'image');
+
   trigger.addEventListener('click', handleTriggerClick, true);
   tableItem.addEventListener('click', handleTable, true);
   textItem.addEventListener('click', handleText, true);
@@ -260,6 +345,7 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeC
 
   return () => {
     cancelHide();
+    frame.remove();
     document.removeEventListener('mousemove', handleMove, true);
     document.removeEventListener('keydown', handleKeydown, true);
     document.removeEventListener('click', handleOutsideClick, true);

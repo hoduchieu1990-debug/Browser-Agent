@@ -37,12 +37,19 @@ function hexToRgba(hex: string, alpha: number): string {
 
 type Resolver = (el: Element | null) => HTMLElement | null;
 
+export interface HighlighterHandle {
+  detach: () => void;
+  /** Stand down while the Add badge is drawing its own, more specific frame. */
+  setPaused: (paused: boolean) => void;
+}
+
 export function attachHighlighter(
   resolveTarget: Resolver = findClickableAncestor,
   color: string = DEFAULT_COLOR,
-): () => void {
+): HighlighterHandle {
   const overlay = createOverlay(color);
   let current: HTMLElement | null = null;
+  let paused = false;
 
   const position = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
@@ -59,6 +66,10 @@ export function attachHighlighter(
   };
 
   const handleOver = (event: MouseEvent) => {
+    if (paused) {
+      hide();
+      return;
+    }
     if (isExtensionUi(event.target as Element | null)) {
       hide(); // our own panel and controls are not page content
       return;
@@ -77,10 +88,16 @@ export function attachHighlighter(
   document.addEventListener('mouseleave', hide, true);
   window.addEventListener('scroll', handleScroll, true);
 
-  return () => {
-    document.removeEventListener('mouseover', handleOver, true);
-    document.removeEventListener('mouseleave', hide, true);
-    window.removeEventListener('scroll', handleScroll, true);
-    overlay.remove();
+  return {
+    detach: () => {
+      document.removeEventListener('mouseover', handleOver, true);
+      document.removeEventListener('mouseleave', hide, true);
+      window.removeEventListener('scroll', handleScroll, true);
+      overlay.remove();
+    },
+    setPaused: (value: boolean) => {
+      paused = value;
+      if (paused) hide();
+    },
   };
 }
