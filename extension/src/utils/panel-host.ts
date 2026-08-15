@@ -21,7 +21,7 @@ function build(): { host: HTMLDivElement; frame: HTMLIFrameElement; handle: HTML
 
   const handle = document.createElement('button');
   handle.type = 'button';
-  handle.title = 'Hide/show Browser Agent (Alt+Shift+B)';
+  handle.title = 'Hide/show Browser Agent';
   handle.style.pointerEvents = 'auto';
   handle.style.marginTop = '12px';
   handle.style.padding = '10px 4px';
