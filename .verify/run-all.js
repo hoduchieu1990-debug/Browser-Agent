@@ -9,6 +9,8 @@ const CHECKS = [
   'badge-follow-check.js',
   'target-frame-check.js',
   'tailwind-selector-check.js',
+  'code-block-check.js',
+  'nth-match-cli-check.js',
   'selector-resilience-check.js',
   'reset-confirm-check.js',
   'player-reuse-check.js',

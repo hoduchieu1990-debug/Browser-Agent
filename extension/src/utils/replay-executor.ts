@@ -1,5 +1,6 @@
 import type { WorkflowAction } from '../types';
 import { extractTableHeaders } from './table-utils';
+import { resolveOne } from './selector-utils';
 
 const ELEMENT_TIMEOUT_MS = 5000;
 const POLL_INTERVAL_MS = 100;
@@ -35,7 +36,7 @@ function query(selector: string): HTMLElement | null {
     const result = document.evaluate(expr, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
     return result.singleNodeValue as HTMLElement | null;
   }
-  return document.querySelector<HTMLElement>(selector);
+  return resolveOne(document, selector) as HTMLElement | null;
 }
 
 // Pages rarely have the element ready the instant the previous step finished,

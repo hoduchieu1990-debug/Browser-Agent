@@ -25,8 +25,21 @@ function isStableId(id: string): boolean {
   return id.length >= 1 && id.length <= 40 && !GENERATED_TOKEN.test(id) && !/^\d+$/.test(id);
 }
 
+// Playwright's own syntax for "the Nth element matching this selector". CSS has
+// no way to say it, and it is the only way to address one of many identical
+// blocks without a brittle positional path. Playwright understands it natively;
+// resolveOne teaches the in-browser replay the same trick.
+const NTH_MATCH = /^:nth-match\((.+),\s*(\d+)\)$/;
+
+export function resolveOne(doc: Document, selector: string): Element | null {
+  const nth = NTH_MATCH.exec(selector);
+  if (nth) return doc.querySelectorAll(nth[1])[Number(nth[2]) - 1] ?? null;
+  return doc.querySelector(selector);
+}
+
 function matchesOnly(selector: string, el: Element): boolean {
   try {
+    if (NTH_MATCH.test(selector)) return resolveOne(el.ownerDocument, selector) === el;
     const found = el.ownerDocument.querySelectorAll(selector);
     return found.length === 1 && found[0] === el;
   } catch {
@@ -149,6 +162,26 @@ function looseDescendantPath(el: Element): string | null {
   return null;
 }
 
+// When several elements share the best available selector — one code block of
+// many — pin the right one by index instead of falling back to a positional
+// path that breaks as soon as a wrapper div appears.
+function nthMatchSelector(el: Element): string | null {
+  const tag = el.tagName.toLowerCase();
+
+  let scope: string | null = null;
+  let current: Element | null = el.parentElement;
+  for (let depth = 0; current && depth < MAX_PATH_DEPTH; depth++) {
+    scope = anchorSelector(current);
+    if (scope) break;
+    current = current.parentElement;
+  }
+
+  const base = scope ? `${scope} ${tag}` : tag;
+  const matches = Array.from(el.ownerDocument.querySelectorAll(base));
+  const index = matches.indexOf(el);
+  return index === -1 ? null : `:nth-match(${base}, ${index + 1})`;
+}
+
 // Ordered best-first, every one verified to match this element and nothing else.
 export function generateSelectorCandidates(el: Element): string[] {
   const candidates: string[] = [];
@@ -168,6 +201,7 @@ export function generateSelectorCandidates(el: Element): string[] {
   add(stableClassSelector(el));
   add(looseDescendantPath(el));
   add(el.tagName.toLowerCase()); // rare, but "the only <pre> on the page" is solid
+  add(nthMatchSelector(el));
   add(anchoredPath(el));
   add(absolutePath(el));
 

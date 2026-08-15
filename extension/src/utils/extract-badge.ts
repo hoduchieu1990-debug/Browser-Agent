@@ -1,4 +1,5 @@
 import { findTableAncestor } from './clickable-element';
+import { generateSelectorCandidates } from './selector-utils';
 import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 
 const BADGE_ID = '__browser_agent_add_badge__';
@@ -18,6 +19,37 @@ export interface BadgeCallbacks {
   onTargetChange?: (hasTarget: boolean) => void;
 }
 
+// Syntax highlighters and rich text shred a value into anonymous <span>s. The
+// pointer lands on one of those fragments, which cannot be located again on the
+// next visit — the block that contains it can.
+const INLINE_TAGS = new Set([
+  'SPAN', 'CODE', 'B', 'I', 'EM', 'STRONG', 'SMALL', 'MARK', 'U', 'S',
+  'SUB', 'SUP', 'FONT', 'ABBR', 'CITE', 'KBD', 'SAMP', 'VAR', 'TIME',
+]);
+
+// Index- and position-based selectors locate an element by where it sits, not
+// by what it is — good enough to replay, but a sign the element itself is
+// anonymous and its container is the better thing to capture.
+function isPositionOnly(el: Element): boolean {
+  const best = generateSelectorCandidates(el)[0];
+  return best.startsWith('body >') || best.startsWith(':nth-match(') || best.includes(':nth-of-type(');
+}
+
+function preferLocatable(el: HTMLElement): HTMLElement {
+  let current = el;
+
+  for (let depth = 0; depth < 5; depth++) {
+    if (!isPositionOnly(current)) return current;
+
+    const parent = current.parentElement;
+    if (!parent || !INLINE_TAGS.has(current.tagName)) break;
+    if ((parent.textContent?.trim().length ?? 0) > MAX_TEXT_LENGTH) break;
+    current = parent;
+  }
+
+  return current;
+}
+
 // An element is worth offering "Add text" for when it holds a short, concrete
 // value (a price, a status, a cell) rather than a whole page section.
 function findTextTarget(el: Element | null): HTMLElement | null {
@@ -29,7 +61,7 @@ function findTextTarget(el: Element | null): HTMLElement | null {
   if (!text || text.length > MAX_TEXT_LENGTH) return null;
   if (el.querySelector('table')) return null;
 
-  return el;
+  return preferLocatable(el);
 }
 
 function styleMenuItem(btn: HTMLButtonElement): void {
