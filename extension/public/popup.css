@@ -1,19 +1,20 @@
-/* shadcn/ui light theme, zinc palette */
+/* shadcn/ui zinc palette, dimmed: no pure white surfaces or pure black text */
 :root {
-  --background: #ffffff;
-  --foreground: #09090b;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
-  --border: #e4e4e7;
-  --input: #e4e4e7;
+  --background: #f2f2f4; /* canvas */
+  --surface: #fbfbfc; /* cards sit just above the canvas */
+  --foreground: #27272a;
+  --muted: #e9e9ed;
+  --muted-foreground: #6f6f78;
+  --border: #dcdce1;
+  --input: #dcdce1;
   --ring: #a1a1aa;
-  --primary: #18181b;
+  --primary: #3f3f46;
   --primary-foreground: #fafafa;
-  --accent: #f4f4f5;
-  --accent-foreground: #18181b;
-  --destructive: #ef4444;
-  --success: #16a34a;
-  --sidebar: #fafafa;
+  --accent: #e9e9ed;
+  --accent-foreground: #27272a;
+  --destructive: #dc2626;
+  --success: #15803d;
+  --sidebar: #eaeaee;
 
   --radius: 8px;
   --radius-sm: 6px;
@@ -34,9 +35,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Chrome caps extension popups at 600px tall; take all of it */
 .popup {
   display: flex;
-  max-height: 580px;
+  height: 600px;
 }
 
 /* ---------- Sidebar ---------- */
@@ -116,7 +118,7 @@ body {
   height: 48px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
-  background: var(--background);
+  background: var(--surface);
 }
 
 .breadcrumb {
@@ -189,7 +191,7 @@ body {
 }
 
 .record-btn.stop {
-  background: var(--background);
+  background: var(--surface);
   color: var(--destructive);
   border-color: var(--border);
 }
@@ -256,15 +258,15 @@ body {
 }
 
 .error-banner {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
+  border-color: #efc9c9;
+  background: #fbeaea;
+  color: #b02525;
 }
 
 .note-banner {
-  border-color: #fde68a;
-  background: #fffbeb;
-  color: #b45309;
+  border-color: #e8d59a;
+  background: #f8f2e2;
+  color: #96601a;
   font-size: 10px;
 }
 
@@ -287,7 +289,7 @@ body {
   padding: 3px 9px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--background);
+  background: var(--surface);
   color: var(--muted-foreground);
   font-family: inherit;
   font-size: 11px;
@@ -318,7 +320,7 @@ body {
 }
 
 .reset-btn.danger:hover:not(:disabled) {
-  background: #fef2f2;
+  background: #fbeaea;
   color: var(--destructive);
 }
 
@@ -334,7 +336,7 @@ body {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--background);
+  background: var(--surface);
 }
 
 .action-item:hover {
@@ -393,7 +395,7 @@ body {
   height: 22px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--background);
+  background: var(--surface);
   color: var(--muted-foreground);
   font-size: 11px;
   cursor: pointer;
@@ -402,7 +404,7 @@ body {
 .action-delete:hover {
   border-color: var(--destructive);
   color: var(--destructive);
-  background: #fef2f2;
+  background: #fbeaea;
 }
 
 /* ---------- Empty state ---------- */
@@ -448,7 +450,7 @@ body {
 .job-item {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--background);
+  background: var(--surface);
   padding: 10px;
 }
 
@@ -511,7 +513,7 @@ body {
   padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--background);
+  background: var(--surface);
   color: var(--foreground);
   font-family: inherit;
   font-size: 11px;
@@ -564,7 +566,7 @@ body {
 .step-log {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--background);
+  background: var(--surface);
   margin-bottom: 12px;
   max-height: 190px;
   overflow-y: auto;
@@ -638,12 +640,12 @@ body {
 }
 
 .step-failed {
-  background: #fef2f2;
+  background: #fbeaea;
 }
 
 .step-failed .step-icon,
 .step-failed .step-message {
-  color: #b91c1c;
+  color: #b02525;
 }
 
 /* ---------- Results ---------- */
@@ -690,7 +692,7 @@ body {
   border-radius: var(--radius);
   overflow: auto;
   max-height: 240px;
-  background: var(--background);
+  background: var(--surface);
 }
 
 .result-table {
@@ -759,7 +761,7 @@ body {
   padding: 8px 10px;
   border: 1px solid var(--input);
   border-radius: var(--radius-sm);
-  background: var(--background);
+  background: var(--surface);
   color: var(--foreground);
   font-family: inherit;
   font-size: 12px;
@@ -807,7 +809,7 @@ body {
   padding: 11px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--background);
+  background: var(--surface);
 }
 
 .setting-item:hover {
@@ -855,8 +857,8 @@ body {
   width: 17px;
   height: 17px;
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  background: #fbfbfc;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
   transition: left 0.15s;
 }
 
