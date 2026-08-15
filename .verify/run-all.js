@@ -10,6 +10,7 @@ const CHECKS = [
   'target-frame-check.js',
   'tailwind-selector-check.js',
   'code-block-check.js',
+  'variant-class-check.js',
   'nth-match-cli-check.js',
   'selector-resilience-check.js',
   'reset-confirm-check.js',

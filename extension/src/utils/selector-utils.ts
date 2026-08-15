@@ -13,10 +13,33 @@ const UTILITY_CLASS =
 
 // Classes that describe the moment rather than the element: present while
 // hovered/open/selected and gone a second later.
-const STATE_CLASS = /^(?:is-|has-)?(?:active|selected|open|closed|focus(?:ed)?|hover|disabled|checked|expanded|collapsed|show|shown|hidden|visible|current|loading|dragging|sticky|pressed)$/i;
+const STATE_CLASS =
+  /^(?:is-|has-)?(?:active|selected|open|closed|focus(?:ed)?|hover|disabled|checked|expanded|collapsed|show|shown|hidden|visible|current|loading|dragging|sticky|pressed)$/i;
+
+// `page-has-toc`, `is-scrolled`, `no-sidebar`, `layout-default` — these track
+// what the page happens to look like right now, so a selector built on them
+// breaks on the next page of the same site.
+const VARIANT_CLASS = /^(?:is|has|no|js|layout|theme|mode|variant|state)-|-(?:has|is)-/i;
+
+// `@container`, `md:flex`, `[&>*+*]:mt-5`, `2xl:p-4` — anything that has to be
+// escaped to appear in a selector came from a framework, not from someone
+// naming this element.
+function needsEscaping(token: string): boolean {
+  try {
+    return CSS.escape(token) !== token;
+  } catch {
+    return true;
+  }
+}
 
 function isStableToken(token: string): boolean {
-  return token.length >= 2 && token.length <= 40 && !GENERATED_TOKEN.test(token) && !/^\d+$/.test(token);
+  return (
+    token.length >= 2 &&
+    token.length <= 40 &&
+    !needsEscaping(token) &&
+    !GENERATED_TOKEN.test(token) &&
+    !/^\d+$/.test(token)
+  );
 }
 
 // The two-character floor above is aimed at minified class noise; an id may
@@ -59,6 +82,7 @@ const SHARED_CLASS_LIMIT = 4;
 
 function isIdentifyingClass(el: Element, className: string): boolean {
   if (!isStableToken(className) || STATE_CLASS.test(className) || UTILITY_CLASS.test(className)) return false;
+  if (VARIANT_CLASS.test(className)) return false;
   return el.ownerDocument.getElementsByClassName(className).length <= SHARED_CLASS_LIMIT;
 }
 
@@ -122,13 +146,15 @@ function anchorSelector(el: Element): string | null {
     if (candidate && matchesOnly(candidate, el)) return candidate;
   }
 
+  // before the class list: a landmark is structural, its classes are cosmetic
+  const landmark = landmarkSelector(el);
+  if (landmark) return landmark;
+
   const byClass = stableClassSelector(el);
   if (byClass && matchesOnly(byClass, el)) return byClass;
 
   const byRole = attributeSelector(el, 'role');
-  if (byRole && matchesOnly(byRole, el)) return byRole;
-
-  return landmarkSelector(el);
+  return byRole && matchesOnly(byRole, el) ? byRole : null;
 }
 
 function absolutePath(el: Element): string {

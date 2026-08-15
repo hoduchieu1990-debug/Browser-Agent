@@ -2,7 +2,9 @@ import type { WorkflowAction } from '../types';
 import { extractTableHeaders } from './table-utils';
 import { resolveOne } from './selector-utils';
 
-const ELEMENT_TIMEOUT_MS = 5000;
+// Client-rendered pages finish well after load, and a background window is
+// timer-throttled on top of that.
+const ELEMENT_TIMEOUT_MS = 12000;
 const POLL_INTERVAL_MS = 100;
 
 export interface StepOutput {

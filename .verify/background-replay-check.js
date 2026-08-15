@@ -101,7 +101,7 @@ const OTHER = `<!doctype html><html><body style="padding:40px"><h1>Unrelated pag
       }
     })();
 
-    await popup.locator('.result-block').first().waitFor({ timeout: 40000 });
+    await popup.locator('.replay-btn:not([disabled])').waitFor({ timeout: 60000 });
     await watcher;
     console.log('devtools capture path used:', sawDebuggerAttached);
     await popup.waitForTimeout(1200); // let the hidden tab close

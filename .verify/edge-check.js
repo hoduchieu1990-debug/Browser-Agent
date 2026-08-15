@@ -135,8 +135,10 @@ const check = (name, passed, detail = '') => {
 
     await popup.check('.replay-option input');
     await popup.click('.replay-btn');
-    await popup.locator('.result-block').first().waitFor({ timeout: 45000 });
-    await popup.waitForTimeout(1500);
+    // the Replay button re-enables only when the run is over; results appear
+    // mid-run, so waiting on them checks cleanup too early
+    await popup.locator('.replay-btn:not([disabled])').waitFor({ timeout: 60000 });
+    await popup.waitForTimeout(700);
 
     check('user tab untouched by background replay', testPage.url().endsWith('/other'));
     check('hidden tab closed afterwards', context.pages().length === tabsBefore, `${context.pages().length} vs ${tabsBefore}`);
