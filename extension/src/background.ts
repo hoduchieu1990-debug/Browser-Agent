@@ -306,9 +306,15 @@ async function runReplay(inBackground: boolean): Promise<void> {
         if (result?.error) throw new Error(result.error);
 
         if (result?.capture) {
-          const dataUrl = await captureForStep(result.capture, tabId, windowId, inBackground);
-          state.variables = { ...state.variables, [result.capture.key]: dataUrl };
-          settle({ status: 'done', message: `→ ${result.capture.key}` });
+          // A screenshot is a nice-to-have; losing it must not throw away the
+          // text and tables the run already collected.
+          try {
+            const dataUrl = await captureForStep(result.capture, tabId, windowId, inBackground);
+            state.variables = { ...state.variables, [result.capture.key]: dataUrl };
+            settle({ status: 'done', message: `→ ${result.capture.key}` });
+          } catch (captureError) {
+            settle({ status: 'skipped', message: `no image: ${(captureError as Error).message}` });
+          }
         } else if (result?.skipped) {
           settle({ status: 'skipped', message: result.skipped });
         } else if (result?.output) {

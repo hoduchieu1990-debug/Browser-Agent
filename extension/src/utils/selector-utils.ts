@@ -5,6 +5,12 @@ const MAX_PATH_DEPTH = 8;
 // selector built on them looks specific but breaks on the next visit.
 const GENERATED_TOKEN = /(^|[-_])(?:[0-9a-f]{6,}|[a-z0-9]{9,})($|[-_])|^(?:css|sc|jss|emotion|mui|ng|_ngcontent|ember)[-_]/i;
 
+// Utility-first frameworks (Tailwind and friends) put styling in the class
+// list: `flex`, `mt-5`, `md:grid`, `[&>*+*]:mt-5`. They say nothing about which
+// element this is, appear on hundreds of others, and churn with every redesign.
+const UTILITY_CLASS =
+  /[:[\]]|^(?:flex|grid|block|contents|container|hidden|visible|relative|absolute|fixed|sticky|static|truncate|grow|shrink|transform|transition|antialiased|italic|underline|uppercase|lowercase|capitalize|resize|group|peer|rounded|border|shadow|ring|outline|prose|isolate|filter|blur)$|^(?:flex|inline|items|justify|self|content|place|gap|space|order|basis|col|row|[mp][trblxy]?|w|h|min|max|text|font|leading|tracking|indent|align|whitespace|break|list|bg|from|via|to|border|rounded|divide|ring|outline|shadow|opacity|mix|blur|backdrop|filter|z|overflow|overscroll|object|aspect|cursor|pointer|select|scroll|snap|touch|will|duration|delay|ease|animate|scale|rotate|translate|skew|origin|placeholder|caret|accent|decoration|underline|sr|not)-/i;
+
 // Classes that describe the moment rather than the element: present while
 // hovered/open/selected and gone a second later.
 const STATE_CLASS = /^(?:is-|has-)?(?:active|selected|open|closed|focus(?:ed)?|hover|disabled|checked|expanded|collapsed|show|shown|hidden|visible|current|loading|dragging|sticky|pressed)$/i;
@@ -34,10 +40,29 @@ function attributeSelector(el: Element, attribute: string): string | null {
   return `${el.tagName.toLowerCase()}[${attribute}="${CSS.escape(value).replace(/\\/g, '')}"]`;
 }
 
+// A class shared by many elements describes how something looks, not which one
+// it is. Counting beats maintaining a list of every framework's vocabulary.
+const SHARED_CLASS_LIMIT = 4;
+
+function isIdentifyingClass(el: Element, className: string): boolean {
+  if (!isStableToken(className) || STATE_CLASS.test(className) || UTILITY_CLASS.test(className)) return false;
+  return el.ownerDocument.getElementsByClassName(className).length <= SHARED_CLASS_LIMIT;
+}
+
 function stableClassSelector(el: Element): string | null {
-  const classes = Array.from(el.classList).filter((c) => isStableToken(c) && !STATE_CLASS.test(c));
+  const classes = Array.from(el.classList).filter((c) => isIdentifyingClass(el, c));
   if (classes.length === 0) return null;
   return `${el.tagName.toLowerCase()}${classes.map((c) => `.${CSS.escape(c)}`).join('')}`;
+}
+
+// Landmarks are part of the page's structure rather than its styling, so they
+// outlast redesigns that shuffle the wrapper divs around them.
+const LANDMARK_TAGS = ['MAIN', 'ARTICLE', 'NAV', 'HEADER', 'FOOTER', 'ASIDE', 'FORM', 'TABLE'];
+
+function landmarkSelector(el: Element): string | null {
+  if (!LANDMARK_TAGS.includes(el.tagName)) return null;
+  const tag = el.tagName.toLowerCase();
+  return matchesOnly(tag, el) ? tag : null;
 }
 
 function nthOfType(el: Element): string {
@@ -87,6 +112,40 @@ function anchorSelector(el: Element): string | null {
   const byClass = stableClassSelector(el);
   if (byClass && matchesOnly(byClass, el)) return byClass;
 
+  const byRole = attributeSelector(el, 'role');
+  if (byRole && matchesOnly(byRole, el)) return byRole;
+
+  return landmarkSelector(el);
+}
+
+function absolutePath(el: Element): string {
+  const parts: string[] = [];
+  let current: Element | null = el;
+
+  while (current && current.tagName !== 'BODY' && current.tagName !== 'HTML') {
+    parts.unshift(nthOfType(current));
+    current = current.parentElement;
+  }
+
+  return `body > ${parts.join(' > ')}`;
+}
+
+// "main pre" instead of "main > div > div:nth-of-type(2) > div > pre": the
+// wrapper divs a layout adds or removes are exactly what breaks a child chain,
+// and a descendant selector simply does not care about them.
+function looseDescendantPath(el: Element): string | null {
+  const tag = el.tagName.toLowerCase();
+  let current: Element | null = el.parentElement;
+
+  for (let depth = 0; current && depth < MAX_PATH_DEPTH; depth++) {
+    const anchor = anchorSelector(current);
+    if (anchor) {
+      const candidate = `${anchor} ${tag}`;
+      if (matchesOnly(candidate, el)) return candidate;
+    }
+    current = current.parentElement;
+  }
+
   return null;
 }
 
@@ -107,18 +166,14 @@ export function generateSelectorCandidates(el: Element): string[] {
   add(attributeSelector(el, 'alt'));
   if (el.tagName === 'A') add(attributeSelector(el, 'href'));
   add(stableClassSelector(el));
+  add(looseDescendantPath(el));
+  add(el.tagName.toLowerCase()); // rare, but "the only <pre> on the page" is solid
   add(anchoredPath(el));
+  add(absolutePath(el));
 
-  // last resort: a positional path, which at least resolves today
-  if (candidates.length === 0) {
-    const parts: string[] = [];
-    let current: Element | null = el;
-    while (current && current.tagName !== 'BODY' && parts.length < MAX_PATH_DEPTH) {
-      parts.unshift(nthOfType(current));
-      current = current.parentElement;
-    }
-    candidates.push(`body > ${parts.join(' > ')}`);
-  }
+  // nothing matched uniquely (duplicate ids, repeated markup): the raw path at
+  // least resolves today, and having it beats having no step at all
+  if (candidates.length === 0) candidates.push(absolutePath(el));
 
   return candidates;
 }
