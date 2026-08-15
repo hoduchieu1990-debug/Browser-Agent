@@ -1,5 +1,5 @@
 import { findClickableAncestor } from './clickable-element';
-import { markAsExtensionUi } from './ui-marker';
+import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 
 const OVERLAY_ID = '__browser_agent_highlight__';
 const DEFAULT_COLOR = '#3498db';
@@ -59,6 +59,10 @@ export function attachHighlighter(
   };
 
   const handleOver = (event: MouseEvent) => {
+    if (isExtensionUi(event.target as Element | null)) {
+      hide(); // our own panel and controls are not page content
+      return;
+    }
     const target = resolveTarget(event.target as Element | null);
     current = target;
     if (target) position(target);

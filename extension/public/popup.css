@@ -30,10 +30,11 @@ body {
   color: var(--text-primary);
 }
 
+/* Fills the docked panel's iframe; as a standalone page it just fills the view */
 .popup {
   display: flex;
   flex-direction: column;
-  max-height: 560px;
+  height: 100vh;
 }
 
 /* Header */

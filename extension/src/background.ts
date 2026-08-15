@@ -451,3 +451,32 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   const tab = await getActiveTab();
   if (tab?.id === details.tabId) await attachToActiveTab(settings.highlightElements);
 });
+
+// The panel lives in the page, so opening it means injecting into the page —
+// clicking the toolbar icon and the keyboard shortcut both land here.
+async function togglePanelOnActiveTab(): Promise<void> {
+  const tab = await getActiveTab();
+  if (!tab?.id) return;
+
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content-script.js'] });
+    await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_PANEL' } satisfies RuntimeMessage);
+  } catch (error) {
+    log('cannot open panel here', (error as Error).message);
+  }
+}
+
+chrome.action.onClicked.addListener(() => {
+  togglePanelOnActiveTab();
+});
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'toggle-panel') togglePanelOnActiveTab();
+});
+
+// A recorded page reload wipes the panel; put it back so the user keeps the
+// controls in front of them while teaching.
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  if (!recording || details.frameId !== 0) return;
+  chrome.tabs.sendMessage(details.tabId, { type: 'SHOW_PANEL' } satisfies RuntimeMessage).catch(() => {});
+});

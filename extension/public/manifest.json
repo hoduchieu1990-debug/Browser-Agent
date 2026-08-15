@@ -4,11 +4,17 @@
   "version": "0.1.0",
   "description": "Record browser actions and export them as a Browser Agent workflow.",
   "action": {
-    "default_popup": "popup.html",
+    "default_title": "Browser Agent — dock the panel on this page",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
+    }
+  },
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": { "default": "Alt+Shift+B" },
+      "description": "Hide or show the Browser Agent panel"
     }
   },
   "icons": {
@@ -28,5 +34,11 @@
     }
   ],
   "permissions": ["storage", "activeTab", "scripting", "webNavigation", "downloads", "debugger"],
-  "host_permissions": ["<all_urls>"]
+  "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

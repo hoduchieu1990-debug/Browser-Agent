@@ -7,6 +7,7 @@ import { generateSelector } from './utils/selector-utils';
 import { showToast, clearToasts } from './utils/toast';
 import { describeAction } from './utils/action-display';
 import { executeStep } from './utils/replay-executor';
+import { togglePanel, setPanelVisible } from './utils/panel-host';
 
 declare global {
   interface Window {
@@ -85,6 +86,9 @@ if (!window.__browserAgentAttached) {
   chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
     if (message.type === 'SET_RECORDING') setRecording(message.value, message.highlightElements);
     if (message.type === 'SHOW_TOAST') showToast(message.step, describeAction(message.action));
+    // this script runs in every frame; only the outermost one owns the panel
+    if (message.type === 'TOGGLE_PANEL' && window.top === window) togglePanel();
+    if (message.type === 'SHOW_PANEL' && window.top === window) setPanelVisible(true);
 
     if (message.type === 'REPLAY_STEP') {
       executeStep(message.action).then(

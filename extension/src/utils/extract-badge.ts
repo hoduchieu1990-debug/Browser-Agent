@@ -1,5 +1,5 @@
 import { findTableAncestor } from './clickable-element';
-import { markAsExtensionUi } from './ui-marker';
+import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 
 const BADGE_ID = '__browser_agent_add_badge__';
 const MAX_TEXT_LENGTH = 300;
@@ -17,6 +17,7 @@ export interface BadgeCallbacks {
 function findTextTarget(el: Element | null): HTMLElement | null {
   if (!(el instanceof HTMLElement)) return null;
   if (el === document.body || el === document.documentElement) return null;
+  if (isExtensionUi(el)) return null; // never offer to capture our own panel
 
   const text = el.textContent?.trim() ?? '';
   if (!text || text.length > MAX_TEXT_LENGTH) return null;
