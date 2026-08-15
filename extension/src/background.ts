@@ -347,12 +347,6 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       sendResponse({ recording, actions });
       return;
 
-    case 'TOGGLE_PANEL':
-      // from an extension page (the panel itself); the tab-directed copy of this
-      // message is handled by the content script instead
-      togglePanelOnActiveTab();
-      return;
-
     case 'GET_RECORDINGS':
       loadRecordings().then((recordings) => sendResponse(recordings));
       return true; // async sendResponse
@@ -456,57 +450,4 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   if (!recording || details.frameId !== 0) return;
   const tab = await getActiveTab();
   if (tab?.id === details.tabId) await attachToActiveTab(settings.highlightElements);
-});
-
-// The panel lives in the page, so opening it means injecting into the page —
-// clicking the toolbar icon and the keyboard shortcut both land here.
-// Clicking the icon must never look like nothing happened: pages the browser
-// keeps off-limits (chrome://, the Web Store, the new-tab page) cannot host the
-// panel, and the only channel left to say so is the icon itself.
-async function reportPanelProblem(reason: string): Promise<void> {
-  await chrome.action.setBadgeText({ text: '!' });
-  await chrome.action.setBadgeBackgroundColor({ color: '#e74c3c' });
-  await chrome.action.setTitle({ title: `Browser Agent — ${reason}` });
-
-  setTimeout(() => {
-    chrome.action.setBadgeText({ text: '' });
-    chrome.action.setTitle({ title: 'Browser Agent — dock the panel on this page' });
-  }, 6000);
-}
-
-async function togglePanelOnActiveTab(): Promise<void> {
-  const tab = await getActiveTab();
-  if (!tab?.id) {
-    await reportPanelProblem('no active tab to open the panel in');
-    return;
-  }
-
-  try {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content-script.js'] });
-    await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_PANEL' } satisfies RuntimeMessage);
-    await chrome.action.setBadgeText({ text: '' });
-  } catch (error) {
-    const message = (error as Error).message;
-    log('cannot open panel here', message);
-    await reportPanelProblem(
-      /chrome:\/\/|edge:\/\/|extension|cannot access/i.test(message)
-        ? 'this browser page cannot host the panel — open a normal website'
-        : message,
-    );
-  }
-}
-
-chrome.action.onClicked.addListener(() => {
-  togglePanelOnActiveTab();
-});
-
-chrome.commands.onCommand.addListener((command) => {
-  if (command === 'toggle-panel') togglePanelOnActiveTab();
-});
-
-// A recorded page reload wipes the panel; put it back so the user keeps the
-// controls in front of them while teaching.
-chrome.webNavigation.onCompleted.addListener(async (details) => {
-  if (!recording || details.frameId !== 0) return;
-  chrome.tabs.sendMessage(details.tabId, { type: 'SHOW_PANEL' } satisfies RuntimeMessage).catch(() => {});
 });
