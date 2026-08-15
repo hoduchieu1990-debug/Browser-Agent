@@ -1,0 +1,120 @@
+{
+  "version": "1.0.0",
+  "name": "Login, Upload & Extract",
+  "description": "Login to website, upload Excel file, and extract results",
+  
+  "metadata": {
+    "creator": "browser-agent@1.0",
+    "createdAt": "2024-01-15T10:30:00Z",
+    "tags": ["login", "excel", "upload"]
+  },
+  
+  "params": [
+    {
+      "name": "username",
+      "type": "string",
+      "required": true,
+      "description": "Username for login"
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "required": true,
+      "description": "Password for login"
+    },
+    {
+      "name": "excelFile",
+      "type": "file",
+      "required": true,
+      "description": "Excel file to upload",
+      "fileType": "xlsx"
+    }
+  ],
+  
+  "globalSettings": {
+    "autoDismissPopup": {
+      "enabled": true,
+      "mode": "smart",
+      "timeout": 2000
+    },
+    "defaultTimeout": 10000
+  },
+  
+  "actions": [
+    {
+      "id": "step-1-navigate-login",
+      "type": "navigate",
+      "url": "https://example.com/login"
+    },
+    {
+      "id": "step-2-input-username",
+      "type": "input",
+      "selector": "input#username",
+      "value": "${username}",
+      "waitAfter": 500
+    },
+    {
+      "id": "step-3-input-password",
+      "type": "input",
+      "selector": "input#password",
+      "value": "${password}",
+      "waitAfter": 500
+    },
+    {
+      "id": "step-4-click-login",
+      "type": "click",
+      "selector": "button.login-btn",
+      "waitAfter": 2000
+    },
+    {
+      "id": "step-5-wait-dashboard",
+      "type": "waitForSelector",
+      "selector": "div.dashboard",
+      "timeout": 5000
+    },
+    {
+      "id": "step-6-navigate-upload",
+      "type": "navigate",
+      "url": "https://example.com/upload"
+    },
+    {
+      "id": "step-7-upload-file",
+      "type": "uploadFile",
+      "selector": "input#file-input",
+      "value": "${excelFile}",
+      "waitAfter": 1000
+    },
+    {
+      "id": "step-8-click-process",
+      "type": "click",
+      "selector": "button#process-btn",
+      "waitAfter": 500
+    },
+    {
+      "id": "step-9-wait-results",
+      "type": "waitForSelector",
+      "selector": "div.results-container",
+      "timeout": 10000
+    },
+    {
+      "id": "step-10-extract-results",
+      "type": "extractTable",
+      "selector": "table.processed-results",
+      "headers": ["ID", "Input", "Output", "Status"],
+      "output": "results"
+    }
+  ],
+  
+  "exportFormats": [
+    {
+      "type": "excel",
+      "output": "results.xlsx",
+      "dataKey": "results"
+    },
+    {
+      "type": "csv",
+      "output": "results.csv",
+      "dataKey": "results"
+    }
+  ]
+}

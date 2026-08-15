@@ -1,0 +1,79 @@
+{
+  "version": "1.0.0",
+  "name": "Upload Excel & Extract Results",
+  "description": "Upload an Excel file to a website and extract results from a table",
+  
+  "metadata": {
+    "creator": "browser-agent@1.0",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "tags": ["excel", "upload", "extraction"],
+    "minBrowserAgentVersion": "1.0.0"
+  },
+  
+  "params": [
+    {
+      "name": "excelFile",
+      "type": "file",
+      "required": true,
+      "description": "Excel file to upload",
+      "fileType": "xlsx"
+    },
+    {
+      "name": "outputFormat",
+      "type": "string",
+      "required": false,
+      "default": "xlsx",
+      "description": "Output format",
+      "options": ["xlsx", "csv", "json"]
+    }
+  ],
+  
+  "globalSettings": {
+    "autoDismissPopup": {
+      "enabled": true,
+      "mode": "smart",
+      "timeout": 2000,
+      "retryCount": 2
+    },
+    "handleBrowserAlerts": {
+      "alert": "accept",
+      "confirm": "accept"
+    },
+    "defaultTimeout": 10000
+  },
+  
+  "actions": [
+    {
+      "id": "step-1-navigate",
+      "type": "navigate",
+      "url": "https://example.com/upload"
+    },
+    {
+      "id": "step-2-upload-file",
+      "type": "uploadFile",
+      "selector": "input#excel-file",
+      "value": "${excelFile}",
+      "waitAfter": 1000
+    },
+    {
+      "id": "step-3-wait-processing",
+      "type": "wait",
+      "duration": 3000
+    },
+    {
+      "id": "step-4-extract-table",
+      "type": "extractTable",
+      "selector": "table.results",
+      "headers": ["ID", "Name", "Email", "Status"],
+      "output": "results"
+    }
+  ],
+  
+  "exportFormats": [
+    {
+      "type": "excel",
+      "output": "results.xlsx",
+      "dataKey": "results"
+    }
+  ]
+}

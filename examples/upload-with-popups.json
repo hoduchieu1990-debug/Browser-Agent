@@ -1,0 +1,93 @@
+{
+  "version": "1.0.0",
+  "name": "Upload Excel with Popup Handling",
+  "description": "Upload Excel file while handling cookie banners and popups",
+  
+  "metadata": {
+    "creator": "browser-agent@1.0",
+    "createdAt": "2024-01-15T11:00:00Z",
+    "tags": ["excel", "upload", "popup-handling"]
+  },
+  
+  "params": [
+    {
+      "name": "excelFile",
+      "type": "file",
+      "required": true,
+      "description": "Excel file to upload",
+      "fileType": "xlsx"
+    }
+  ],
+  
+  "globalSettings": {
+    "autoDismissPopup": {
+      "enabled": true,
+      "mode": "smart",
+      "selectors": [
+        "button.cookie-accept",
+        "button.close",
+        ".modal-close",
+        "[aria-label='Close']",
+        ".notification .dismiss"
+      ],
+      "timeout": 2000,
+      "retryCount": 2
+    },
+    "handleBrowserAlerts": {
+      "alert": "accept",
+      "confirm": "accept"
+    },
+    "defaultTimeout": 10000
+  },
+  
+  "actions": [
+    {
+      "id": "step-1-navigate",
+      "type": "navigate",
+      "url": "https://example.com/upload"
+    },
+    {
+      "id": "step-2-dismiss-popup-explicit",
+      "type": "dismissPopup",
+      "selectors": [
+        "button.cookie-accept",
+        "button.accept-all"
+      ],
+      "timeout": 3000
+    },
+    {
+      "id": "step-3-upload-file",
+      "type": "uploadFile",
+      "selector": "input#excel-file",
+      "value": "${excelFile}",
+      "waitAfter": 1000
+    },
+    {
+      "id": "step-4-click-process",
+      "type": "click",
+      "selector": "button#process-button",
+      "waitAfter": 500
+    },
+    {
+      "id": "step-5-wait-completion",
+      "type": "waitForSelector",
+      "selector": "div.success-message, table.results",
+      "timeout": 15000
+    },
+    {
+      "id": "step-6-extract-table",
+      "type": "extractTable",
+      "selector": "table.results",
+      "headers": ["Status", "Count", "Message"],
+      "output": "results"
+    }
+  ],
+  
+  "exportFormats": [
+    {
+      "type": "excel",
+      "output": "results.xlsx",
+      "dataKey": "results"
+    }
+  ]
+}
