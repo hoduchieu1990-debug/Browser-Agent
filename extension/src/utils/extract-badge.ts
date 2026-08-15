@@ -3,8 +3,12 @@ import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 
 const BADGE_ID = '__browser_agent_add_badge__';
 const MAX_TEXT_LENGTH = 300;
-const HIDE_DELAY_MS = 1400;
-const IDLE_ON_BADGE_MS = 2500;
+const HIDE_DELAY_MS = 4000;
+const CURSOR_OFFSET_PX = 18;
+// The badge only needs to hold still over the short hop from the element to
+// itself; freezing over a wider radius would also swallow moves to a
+// neighbouring element, silently capturing the wrong thing.
+const APPROACH_MARGIN_PX = 34;
 
 export interface BadgeCallbacks {
   onAddTable: (table: HTMLTableElement) => void;
@@ -17,7 +21,7 @@ export interface BadgeCallbacks {
 function findTextTarget(el: Element | null): HTMLElement | null {
   if (!(el instanceof HTMLElement)) return null;
   if (el === document.body || el === document.documentElement) return null;
-  if (isExtensionUi(el)) return null; // never offer to capture our own panel
+  if (isExtensionUi(el)) return null; // never offer to capture our own overlays
 
   const text = el.textContent?.trim() ?? '';
   if (!text || text.length > MAX_TEXT_LENGTH) return null;
@@ -32,16 +36,16 @@ function styleMenuItem(btn: HTMLButtonElement): void {
   btn.style.alignItems = 'center';
   btn.style.gap = '8px';
   btn.style.width = '100%';
-  btn.style.padding = '7px 12px';
+  btn.style.padding = '8px 12px';
   btn.style.border = 'none';
   btn.style.background = 'transparent';
-  btn.style.color = '#09090b';
-  btn.style.font = '500 12px "Segoe UI", Tahoma, sans-serif';
+  btn.style.color = '#1e293b';
+  btn.style.font = '500 12px system-ui, "Segoe UI", sans-serif';
   btn.style.textAlign = 'left';
   btn.style.cursor = 'pointer';
   btn.style.whiteSpace = 'nowrap';
 
-  btn.addEventListener('mouseenter', () => (btn.style.background = '#f4f4f5'));
+  btn.addEventListener('mouseenter', () => (btn.style.background = '#eef1f7'));
   btn.addEventListener('mouseleave', () => (btn.style.background = 'transparent'));
 }
 
@@ -70,25 +74,27 @@ function createBadge(): BadgeElements {
 
   const trigger = document.createElement('button');
   trigger.type = 'button';
+  trigger.dataset.baRole = 'add';
   trigger.textContent = '＋ Add';
   trigger.style.border = 'none';
   trigger.style.borderRadius = '999px';
-  trigger.style.padding = '5px 14px';
-  trigger.style.background = '#18181b';
+  trigger.style.padding = '6px 14px';
+  trigger.style.background = '#4f46e5';
   trigger.style.color = '#fff';
-  trigger.style.font = '600 11px "Segoe UI", Tahoma, sans-serif';
+  trigger.style.font = '600 11px system-ui, "Segoe UI", sans-serif';
   trigger.style.cursor = 'pointer';
-  trigger.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.25)';
+  trigger.style.boxShadow = '0 2px 10px rgba(79, 70, 229, 0.45)';
 
   const menu = document.createElement('div');
+  menu.dataset.baRole = 'menu';
   menu.style.display = 'none';
   menu.style.flexDirection = 'column';
-  menu.style.minWidth = '168px';
+  menu.style.minWidth = '178px';
   menu.style.padding = '4px 0';
-  menu.style.borderRadius = '8px';
-  menu.style.background = '#ffffff';
-  menu.style.border = '1px solid #e4e4e7';
-  menu.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)';
+  menu.style.borderRadius = '10px';
+  menu.style.background = '#fbfcfe';
+  menu.style.border = '1px solid #d5dde8';
+  menu.style.boxShadow = '0 8px 28px rgba(15, 23, 42, 0.18)';
 
   const tableItem = document.createElement('button');
   tableItem.textContent = '📊  Table data';
@@ -105,8 +111,8 @@ function createBadge(): BadgeElements {
   return { root, trigger, menu, tableItem, textItem, imageItem };
 }
 
-// Follows the pointer during recording and offers to capture whatever is under
-// it, so extracting data never requires leaving the page for the popup.
+// Rides along with the pointer during recording and offers to capture whatever
+// is under it, so extracting data never requires leaving the page.
 export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeCallbacks): () => void {
   const { root, trigger, menu, tableItem, textItem, imageItem } = createBadge();
 
@@ -114,30 +120,24 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeC
   let currentText: HTMLElement | null = null;
   let hideTimer: number | null = null;
   let menuOpen = false;
+  let anchorX = 0;
+  let anchorY = 0;
 
-  const position = (anchor: HTMLElement) => {
-    const rect = anchor.getBoundingClientRect();
-    root.style.display = 'flex';
+  const moveTo = (x: number, y: number) => {
+    const width = trigger.offsetWidth || 74;
+    const height = trigger.offsetHeight || 26;
+    anchorX = Math.max(4, Math.min(x, window.innerWidth - width - 4));
+    anchorY = Math.max(4, Math.min(y, window.innerHeight - height - 4));
+    root.style.left = `${anchorX}px`;
+    root.style.top = `${anchorY}px`;
+  };
 
-    // measure the pill only: when the menu is open the root is much taller/wider
-    const width = trigger.offsetWidth || 70;
-    const height = trigger.offsetHeight || 24;
-    const GAP = 6;
-
-    // Prefer the empty space to the right of the target. Sitting above it looks
-    // tidy but covers the line above, and the badge captures pointer events —
-    // whatever it covers becomes unhoverable and unclickable.
-    let left = rect.right + GAP;
-    let top = rect.top;
-
-    if (left + width > window.innerWidth - GAP) {
-      left = Math.max(GAP, Math.min(rect.left, window.innerWidth - width - GAP));
-      const above = rect.top - height - GAP;
-      top = above >= GAP ? above : rect.bottom + GAP;
-    }
-
-    root.style.left = `${left}px`;
-    root.style.top = `${Math.max(GAP, Math.min(top, window.innerHeight - height - GAP))}px`;
+  // distance to the badge's box, zero when the pointer is inside it
+  const distanceToBadge = (x: number, y: number) => {
+    const rect = trigger.getBoundingClientRect();
+    const dx = Math.max(rect.left - x, 0, x - rect.right);
+    const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+    return Math.hypot(dx, dy);
   };
 
   const closeMenu = () => {
@@ -159,24 +159,19 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeC
     }
   };
 
-  // Leaving the target must not yank the badge away instantly, or the pointer
-  // can never travel the gap to reach it.
-  const scheduleHide = (delayMs = HIDE_DELAY_MS) => {
+  const scheduleHide = () => {
     if (menuOpen) return; // an open menu waits for a choice, however long that takes
-    if (hideTimer === null) hideTimer = window.setTimeout(hide, delayMs);
+    if (hideTimer === null) hideTimer = window.setTimeout(hide, HIDE_DELAY_MS);
   };
 
-  const handleOver = (event: MouseEvent) => {
+  const handleMove = (event: MouseEvent) => {
     const target = event.target as Element | null;
+
     if (target && root.contains(target)) {
-      // The badge sits over page content, so it cannot linger forever just
-      // because the pointer is resting on it — that would permanently block
-      // whatever is underneath. Long enough to click, short enough to move on.
-      cancelHide();
-      scheduleHide(IDLE_ON_BADGE_MS);
+      cancelHide(); // the pointer is on the badge: it stays until used
       return;
     }
-    if (menuOpen) return; // don't re-target while the user is choosing
+    if (menuOpen) return; // don't re-aim while the user is choosing
 
     const table = findTableAncestor(target);
     const text = findTextTarget(target);
@@ -186,24 +181,28 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeC
       return;
     }
 
-    // An ancestor of the current target is usually just the container the
-    // pointer crosses on its way to the badge — re-anchoring there would make
-    // the badge jump out from under the pointer.
-    const anchored = currentTable ?? currentText;
-    if (anchored && (text?.contains(anchored) || table?.contains(anchored)) && (text ?? table) !== anchored) {
-      cancelHide();
-      return;
-    }
-
     cancelHide();
+
+    const visible = root.style.display !== 'none';
+    const sameTarget = visible && table === currentTable && text === currentText;
+
+    // Moving around inside the element you are already aiming at must not drag
+    // the badge along, or it would flee from every attempt to click it.
+    if (sameTarget) return;
+
+    // The badge is offset from the cursor and may sit over a different element;
+    // reaching for it crosses that element, which must not re-aim the capture.
+    if (visible && distanceToBadge(event.clientX, event.clientY) < APPROACH_MARGIN_PX) return;
+
     currentTable = table;
     currentText = text;
-    position(table ?? text!);
+    root.style.display = 'flex';
+    moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
   };
 
   const handleScroll = () => {
-    const anchor = currentTable ?? currentText;
-    if (anchor) position(anchor);
+    // the page moved under a badge pinned to viewport coordinates
+    if (root.style.display !== 'none') hide();
   };
 
   const stop = (event: Event) => {
@@ -217,6 +216,7 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeC
     cancelHide();
     menuOpen = !menuOpen;
     tableItem.style.display = currentTable ? 'flex' : 'none';
+    textItem.style.display = currentText ? 'flex' : 'none';
     menu.style.display = menuOpen ? 'flex' : 'none';
   };
 
@@ -253,14 +253,14 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage }: BadgeC
   tableItem.addEventListener('click', handleTable, true);
   textItem.addEventListener('click', handleText, true);
   imageItem.addEventListener('click', handleImage, true);
-  document.addEventListener('mouseover', handleOver, true);
+  document.addEventListener('mousemove', handleMove, true);
   document.addEventListener('keydown', handleKeydown, true);
   document.addEventListener('click', handleOutsideClick, true);
   window.addEventListener('scroll', handleScroll, true);
 
   return () => {
     cancelHide();
-    document.removeEventListener('mouseover', handleOver, true);
+    document.removeEventListener('mousemove', handleMove, true);
     document.removeEventListener('keydown', handleKeydown, true);
     document.removeEventListener('click', handleOutsideClick, true);
     window.removeEventListener('scroll', handleScroll, true);

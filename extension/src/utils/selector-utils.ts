@@ -13,6 +13,12 @@ function isStableToken(token: string): boolean {
   return token.length >= 2 && token.length <= 40 && !GENERATED_TOKEN.test(token) && !/^\d+$/.test(token);
 }
 
+// The two-character floor above is aimed at minified class noise; an id may
+// legitimately be a single letter and is still far better than a position.
+function isStableId(id: string): boolean {
+  return id.length >= 1 && id.length <= 40 && !GENERATED_TOKEN.test(id) && !/^\d+$/.test(id);
+}
+
 function matchesOnly(selector: string, el: Element): boolean {
   try {
     const found = el.ownerDocument.querySelectorAll(selector);
@@ -71,7 +77,7 @@ function anchoredPath(el: Element): string | null {
 
 // A selector for an ancestor worth anchoring to: something named, not positional.
 function anchorSelector(el: Element): string | null {
-  if (el.id && isStableToken(el.id) && matchesOnly(`#${CSS.escape(el.id)}`, el)) return `#${CSS.escape(el.id)}`;
+  if (el.id && isStableId(el.id) && matchesOnly(`#${CSS.escape(el.id)}`, el)) return `#${CSS.escape(el.id)}`;
 
   for (const attribute of TEST_ATTRIBUTES) {
     const candidate = attributeSelector(el, attribute);
@@ -91,7 +97,7 @@ export function generateSelectorCandidates(el: Element): string[] {
     if (selector && !candidates.includes(selector) && matchesOnly(selector, el)) candidates.push(selector);
   };
 
-  if (el.id && isStableToken(el.id)) add(`#${CSS.escape(el.id)}`);
+  if (el.id && isStableId(el.id)) add(`#${CSS.escape(el.id)}`);
   for (const attribute of TEST_ATTRIBUTES) add(attributeSelector(el, attribute));
 
   add(attributeSelector(el, 'name'));
