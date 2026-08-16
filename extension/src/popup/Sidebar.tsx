@@ -1,4 +1,4 @@
-export type TabKey = 'recording' | 'preview' | 'saved' | 'export' | 'batch' | 'settings';
+export type TabKey = 'recording' | 'preview' | 'saved' | 'export' | 'batch' | 'settings' | 'about';
 
 interface Item {
   key: TabKey;
@@ -66,6 +66,17 @@ const ITEMS: Item[] = [
         <line x1="8" y1="4" x2="8" y2="8" />
         <line x1="12" y1="10" x2="12" y2="14" />
         <line x1="14" y1="16" x2="14" y2="20" />
+      </>
+    ),
+  },
+  {
+    key: 'about',
+    label: 'About',
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <line x1="12" y1="11" x2="12" y2="16" />
+        <line x1="12" y1="7.5" x2="12" y2="7.5" />
       </>
     ),
   },

@@ -8,6 +8,7 @@ const CHECKS = [
   'bubble-check.js',
   'badge-follow-check.js',
   'target-frame-check.js',
+  'lock-target-check.js',
   'tailwind-selector-check.js',
   'code-block-check.js',
   'variant-class-check.js',

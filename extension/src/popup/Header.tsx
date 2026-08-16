@@ -7,6 +7,7 @@ const TITLES: Record<TabKey, string> = {
   export: 'Export',
   batch: 'Batch',
   settings: 'Settings',
+  about: 'About',
 };
 
 interface Props {

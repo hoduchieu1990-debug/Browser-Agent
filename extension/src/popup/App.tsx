@@ -18,6 +18,7 @@ import { SavedTab } from './SavedTab';
 import { ExportTab } from './ExportTab';
 import { BatchTab } from './BatchTab';
 import { SettingsTab } from './SettingsTab';
+import { AboutTab } from './AboutTab';
 
 export function App() {
   const [recording, setRecording] = useState(false);
@@ -203,6 +204,7 @@ export function App() {
             />
           )}
           {activeTab === 'settings' && <SettingsTab settings={settings} onChange={updateSetting} />}
+          {activeTab === 'about' && <AboutTab />}
         </div>
       </div>
     </div>

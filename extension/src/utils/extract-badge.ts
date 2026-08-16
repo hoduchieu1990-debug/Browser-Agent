@@ -5,6 +5,10 @@ import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 const BADGE_ID = '__browser_agent_add_badge__';
 const MAX_TEXT_LENGTH = 300;
 const HIDE_DELAY_MS = 4000;
+// A locked-in target only gives way to a new one after this long — enough to
+// tell "I paused here on purpose" from "I'm just passing through on my way
+// to the Add button".
+const RETARGET_DEBOUNCE_MS = 150;
 const CURSOR_OFFSET_PX = 18;
 // The badge only needs to hold still over the short hop from the element to
 // itself; freezing over a wider radius would also swallow moves to a
@@ -285,6 +289,7 @@ export function attachExtractBadge({
   let currentText: HTMLElement | null = null;
   let currentBatch: HTMLElement | null = null;
   let hideTimer: number | null = null;
+  let retargetTimer: number | null = null;
   let menuOpen = false;
   let anchorX = 0;
   let anchorY = 0;
@@ -319,7 +324,15 @@ export function attachExtractBadge({
     frameDefault();
   };
 
+  const cancelRetarget = () => {
+    if (retargetTimer !== null) {
+      clearTimeout(retargetTimer);
+      retargetTimer = null;
+    }
+  };
+
   const hide = () => {
+    cancelRetarget();
     closeMenu();
     root.style.display = 'none';
     frame.hide();
@@ -346,6 +359,7 @@ export function attachExtractBadge({
 
     if (target && root.contains(target)) {
       cancelHide(); // the pointer is on the badge: it stays until used
+      cancelRetarget(); // reaching it commits to the current target, not a pending one
       return;
     }
     if (menuOpen) return; // don't re-aim while the user is choosing
@@ -355,6 +369,7 @@ export function attachExtractBadge({
     const batch = findBatchTarget(target);
 
     if (!table && !text && !batch) {
+      cancelRetarget(); // whatever was about to be picked up next no longer applies
       scheduleHide();
       return;
     }
@@ -366,19 +381,38 @@ export function attachExtractBadge({
 
     // Moving around inside the element you are already aiming at must not drag
     // the badge along, or it would flee from every attempt to click it.
-    if (sameTarget) return;
+    if (sameTarget) {
+      cancelRetarget(); // back on the locked target — whatever was pending is stale
+      return;
+    }
 
     // The badge is offset from the cursor and may sit over a different element;
     // reaching for it crosses that element, which must not re-aim the capture.
     if (visible && distanceToBadge(event.clientX, event.clientY) < APPROACH_MARGIN_PX) return;
 
-    currentTable = table;
-    currentText = text;
-    currentBatch = batch;
-    root.style.display = 'flex';
-    moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
-    frameDefault();
-    onTargetChange?.(true);
+    const commit = () => {
+      retargetTimer = null;
+      if (menuOpen) return; // the menu opened while this was pending — too late to swap targets
+      currentTable = table;
+      currentText = text;
+      currentBatch = batch;
+      root.style.display = 'flex';
+      moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
+      frameDefault();
+      onTargetChange?.(true);
+    };
+
+    if (!visible) {
+      commit(); // first appearance — show it immediately, nothing to steal focus from yet
+      return;
+    }
+
+    // A target is already locked in and shown; only swap it for a new one once
+    // the cursor has actually settled on that new element for a beat, so
+    // passing over a neighbour on the way to the Add button doesn't silently
+    // steal the target out from under you.
+    cancelRetarget();
+    retargetTimer = window.setTimeout(commit, RETARGET_DEBOUNCE_MS);
   };
 
   const handleScroll = () => {
@@ -468,6 +502,7 @@ export function attachExtractBadge({
 
   return () => {
     cancelHide();
+    cancelRetarget();
     frame.remove();
     document.removeEventListener('mousemove', handleMove, true);
     document.removeEventListener('keydown', handleKeydown, true);
