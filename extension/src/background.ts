@@ -142,6 +142,31 @@ async function detachFromActiveTab(): Promise<void> {
     .catch(() => {}); // page may already be gone — nothing to turn off
 }
 
+// Every capture names the variable it fills, and those names have to stay
+// distinct across the whole recording: replay collects them into one object,
+// so a repeat silently overwrites the earlier value. The page-side counters
+// cannot manage that alone — a navigation reloads the content script and
+// restarts them at 1 — so the last word on naming belongs here, where the
+// session actually lives.
+function withUniqueOutput(action: WorkflowAction): WorkflowAction {
+  const desired = 'output' in action ? action.output : undefined;
+  if (!desired) return action;
+
+  const taken = new Set(actions.map((a) => ('output' in a ? a.output : undefined)).filter(Boolean));
+  if (!taken.has(desired)) return action;
+
+  const base = desired.replace(/\d+$/, '') || 'value';
+  let n = 2;
+  while (taken.has(`${base}${n}`)) n++;
+  const output = `${base}${n}`;
+
+  // a screenshot's file is named after its variable; renaming one renames both
+  const renamed = { ...action, output } as WorkflowAction;
+  return action.type === 'screenshot' && action.filename
+    ? ({ ...renamed, filename: `${output}.png` } as WorkflowAction)
+    : renamed;
+}
+
 function notifyActionsUpdated(): void {
   chrome.runtime.sendMessage({ type: 'ACTIONS_UPDATED', actions } satisfies RuntimeMessage).catch(() => {});
 }
@@ -642,7 +667,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       const tabId = sender.tab?.id;
       recordingHost ??= hostnameOf(sender.url); // sender.url needs no "tabs" permission
 
-      const action = { ...message.action, id: `step-${++stepCounter}` } as WorkflowAction;
+      const action = withUniqueOutput({ ...message.action, id: `step-${++stepCounter}` } as WorkflowAction);
 
       // Recording usually starts on a page that is already open, so nothing
       // captured the starting URL. Without it the workflow cannot run anywhere
