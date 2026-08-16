@@ -28,7 +28,7 @@ function locate(el: Element): { selector: string; selectorFallbacks?: string[] }
   return rest.length ? { selector, selectorFallbacks: rest } : { selector };
 }
 
-function recordTable(table: HTMLTableElement): void {
+function recordTable(table: HTMLElement): void {
   chrome.runtime.sendMessage({
     type: 'RECORDED_ACTION',
     action: {

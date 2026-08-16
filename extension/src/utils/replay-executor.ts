@@ -1,5 +1,5 @@
 import type { WorkflowAction } from '../types';
-import { extractTableHeaders } from './table-utils';
+import { readTableRecords } from '@browser-agent/shared/dist/table-reader';
 import { resolveOne } from './selector-utils';
 
 // Client-rendered pages finish well after load, and a background window is
@@ -89,24 +89,6 @@ function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectE
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function readTable(table: HTMLTableElement, headers?: string[]): Record<string, string>[] {
-  const columns = headers?.length ? headers : extractTableHeaders(table);
-  const rows: Record<string, string>[] = [];
-
-  for (const row of Array.from(table.querySelectorAll('tr'))) {
-    const cells = Array.from(row.querySelectorAll('td'));
-    if (cells.length === 0) continue;
-
-    const record: Record<string, string> = {};
-    cells.forEach((cell, i) => {
-      record[columns[i] ?? `column${i + 1}`] = cell.textContent?.trim() ?? '';
-    });
-    rows.push(record);
-  }
-
-  return rows;
-}
-
 export async function executeStep(action: WorkflowAction): Promise<StepResult> {
   switch (action.type) {
     case 'click': {
@@ -141,8 +123,8 @@ export async function executeStep(action: WorkflowAction): Promise<StepResult> {
     }
 
     case 'extractTable': {
-      const el = (await locateFor(action)) as HTMLTableElement;
-      return { output: { key: action.output, value: readTable(el, action.headers) } };
+      const el = await locateFor(action);
+      return { output: { key: action.output, value: readTableRecords(el, action.headers) } };
     }
 
     case 'extractJson': {

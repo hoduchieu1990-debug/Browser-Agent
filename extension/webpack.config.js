@@ -15,6 +15,13 @@ module.exports = {
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js'],
+    alias: {
+      // Compile the shared table reader from source. Pulling in its CommonJS
+      // build instead makes webpack emit a CJS interop helper without the
+      // runtime that backs it, and the content script dies on
+      // "__webpack_require__ is not defined".
+      '@browser-agent/shared/dist/table-reader': path.resolve(__dirname, '..', 'shared', 'table-reader.ts'),
+    },
   },
   module: {
     rules: [

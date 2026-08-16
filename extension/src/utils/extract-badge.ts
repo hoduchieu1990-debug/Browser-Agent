@@ -12,7 +12,7 @@ const CURSOR_OFFSET_PX = 18;
 const APPROACH_MARGIN_PX = 34;
 
 export interface BadgeCallbacks {
-  onAddTable: (table: HTMLTableElement) => void;
+  onAddTable: (table: HTMLElement) => void;
   onAddText: (el: HTMLElement) => void;
   onAddImage: (el: HTMLElement) => void;
   /** Fires when the badge takes over (or releases) showing the outline. */
@@ -209,7 +209,7 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTarget
   const { root, trigger, menu, tableItem, textItem, imageItem } = createBadge();
   const frame = createTargetFrame();
 
-  let currentTable: HTMLTableElement | null = null;
+  let currentTable: HTMLElement | null = null;
   let currentText: HTMLElement | null = null;
   let hideTimer: number | null = null;
   let menuOpen = false;

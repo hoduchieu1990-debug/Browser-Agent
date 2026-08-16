@@ -1,6 +1,7 @@
 import schemaJson from './schema.json';
 
 export * from './types';
+export * from './table-reader';
 export * from './constants';
 export * from './utils';
 

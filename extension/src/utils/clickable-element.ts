@@ -1,3 +1,5 @@
+import { isTableLike } from '@browser-agent/shared/dist/table-reader';
+
 const CLICKABLE_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL', 'SUMMARY']);
 const CLICKABLE_ROLES = new Set(['button', 'link', 'checkbox', 'radio', 'menuitem', 'tab', 'switch']);
 const MAX_DEPTH = 8;
@@ -25,12 +27,13 @@ export function findClickableAncestor(el: Element | null): HTMLElement | null {
   return el instanceof HTMLElement ? el : null;
 }
 
-// For "pick a table" mode: walk up to the nearest <table>, regardless of
-// which cell/row the user actually clicked.
-export function findTableAncestor(el: Element | null): HTMLTableElement | null {
+// Walk up to the nearest thing that presents itself as a table, regardless of
+// which cell the pointer is actually over. Plenty of apps never use <table> —
+// ARIA roles and div grids are just as common — so isTableLike decides.
+export function findTableAncestor(el: Element | null): HTMLElement | null {
   let current = el;
   for (let depth = 0; current && depth < MAX_DEPTH; depth++) {
-    if (current instanceof HTMLTableElement) return current;
+    if (current instanceof HTMLElement && isTableLike(current)) return current;
     current = current.parentElement;
   }
   return null;
