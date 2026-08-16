@@ -471,24 +471,15 @@ export function attachExtractBadge({
     if (menuOpen && !root.contains(event.target as Node)) hide();
   };
 
-  const previewOnHover = (item: HTMLButtonElement, pick: () => Element | null, label: string) => {
-    item.addEventListener('mouseenter', () => {
-      const el = pick();
-      if (el) frame.show(el, label);
-    });
-    item.addEventListener('mouseleave', frameDefault);
-  };
-
-  previewOnHover(tableItem, () => currentTable, 'table');
-  previewOnHover(textItem, () => currentText ?? currentTable, 'text');
-  previewOnHover(imageItem, () => currentTable ?? currentText, 'image');
-
+  // The frame no longer changes per menu item on hover — it used to preview
+  // each option's own target (the whole table for "Table data" vs. just a
+  // cell for "Text value"), but with several options meaning several
+  // possibly-different elements, that made the outline flip around while you
+  // were still choosing. One fixed frame for the whole time the menu is open
+  // is what "locked" actually means here.
   const batchKinds: BatchKind[] = ['input', 'click', 'search', 'extract'];
-  const batchTarget = () => currentBatch ?? currentText ?? currentTable;
   batchKinds.forEach((kind) => {
-    const item = batchItems[kind];
-    previewOnHover(item, batchTarget, kind);
-    item.addEventListener('click', (event) => handleBatch(event, kind), true);
+    batchItems[kind].addEventListener('click', (event) => handleBatch(event, kind), true);
   });
 
   trigger.addEventListener('click', handleTriggerClick, true);

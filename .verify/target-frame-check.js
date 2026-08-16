@@ -73,26 +73,29 @@ const sameBox = (a, b, tol = 3) =>
 
     await page.screenshot({ path: path.join(__dirname, 'frame-text.png') });
 
-    // ---------- menu entries preview their own target ----------
+    // ---------- the frame stays locked while the menu is open, regardless
+    // of which option is hovered ----------
     const cellBox = await page.locator('#cell').boundingBox();
-    const tableBox = await page.locator('#results').boundingBox();
     await page.mouse.move(cellBox.x + cellBox.width / 2, cellBox.y + cellBox.height / 2);
     await page.waitForTimeout(350);
     await trigger.click();
     await page.waitForTimeout(300);
 
+    const boxAtOpen = await frame.boundingBox();
+
     await badge.locator('button', { hasText: 'Table data' }).hover();
     await page.waitForTimeout(300);
-    check('"Table data" frames the whole table', sameBox(await frame.boundingBox(), tableBox),
-      `${(await frame.locator('span').textContent()).trim()}`);
+    check('hovering "Table data" does not move the frame', sameBox(await frame.boundingBox(), boxAtOpen),
+      JSON.stringify(await frame.boundingBox()));
     await page.screenshot({ path: path.join(__dirname, 'frame-table.png') });
 
     await badge.locator('button', { hasText: 'Text value' }).hover();
     await page.waitForTimeout(300);
-    check('"Text value" frames just the cell', sameBox(await frame.boundingBox(), cellBox),
-      `${(await frame.locator('span').textContent()).trim()}`);
+    check('hovering "Text value" does not move the frame either', sameBox(await frame.boundingBox(), boxAtOpen),
+      JSON.stringify(await frame.boundingBox()));
 
-    // ---------- capturing uses the framed element ----------
+    // ---------- each option still captures its own correct target, even
+    // though the frame preview no longer follows it ----------
     await badge.locator('button', { hasText: 'Table data' }).click();
     await page.waitForTimeout(400);
     check('frame clears after capturing', !(await frame.isVisible()));
@@ -100,7 +103,7 @@ const sameBox = (a, b, tol = 3) =>
     await popup.bringToFront();
     await popup.waitForTimeout(300);
     const selectors = await popup.locator('.action-selector').allTextContents();
-    check('captured what the frame showed', selectors.some((s) => s.includes('#results')), selectors.join(' | '));
+    check('"Table data" still captured the whole table', selectors.some((s) => s.includes('#results')), selectors.join(' | '));
   } finally {
     await context.close();
     server.close();
