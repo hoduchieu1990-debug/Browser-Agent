@@ -61,15 +61,42 @@ function log(...args: unknown[]): void {
   if (settings.verboseLogging) console.log('[browser-agent]', ...args);
 }
 
-// The popup window Stop reopens takes over "last focused", and its own tab is
-// this extension's page — recording that instead of the site is never what was
-// meant. Filtering by window type keeps this working without the "tabs"
-// permission, which reading tab.url would require.
+// Which browsing window the user was last actually looking at. The popup
+// window Stop reopens takes over "last focused" while offering no site to
+// record, and with several windows open there is otherwise no way to tell
+// which one they came from — chrome.windows.getAll() is not focus-ordered.
+let lastBrowsingWindowId: number | null = null;
+
+chrome.storage.session.get('lastBrowsingWindowId').then((stored) => {
+  lastBrowsingWindowId ??= (stored.lastBrowsingWindowId as number | undefined) ?? null;
+});
+
+function rememberBrowsingWindow(windowId: number): void {
+  lastBrowsingWindowId = windowId;
+  // MV3 stops the worker whenever it feels like it; without this the memory
+  // of which window to record dies with it.
+  chrome.storage.session.set({ lastBrowsingWindowId: windowId }).catch(() => {});
+}
+
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  const win = await chrome.windows.get(windowId).catch(() => null);
+  if (win?.type === 'normal') rememberBrowsingWindow(windowId);
+});
+
 async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
   const focused = await chrome.windows.getLastFocused().catch(() => null);
   if (focused?.type === 'normal' && focused.id !== undefined) {
     const [tab] = await chrome.tabs.query({ active: true, windowId: focused.id });
-    if (tab) return tab;
+    if (tab) {
+      rememberBrowsingWindow(focused.id);
+      return tab;
+    }
+  }
+
+  if (lastBrowsingWindowId !== null) {
+    const [remembered] = await chrome.tabs.query({ active: true, windowId: lastBrowsingWindowId });
+    if (remembered) return remembered;
   }
 
   const [fallback] = await chrome.tabs.query({ active: true, windowType: 'normal' });
@@ -509,7 +536,12 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       // (chrome.action.openPopup() looks like the fit, but it only honours a
       // gesture made directly on the action button; a click relayed from a
       // content script doesn't qualify and it fails silently.)
-      if (sender.tab) openPopupWindow();
+      if (sender.tab) {
+        // The badge that sent this is proof of which window holds the site,
+        // so the popup we are about to focus cannot muddle it.
+        if (sender.tab.windowId !== undefined) rememberBrowsingWindow(sender.tab.windowId);
+        openPopupWindow();
+      }
       return;
 
     case 'GET_RECORDINGS':
