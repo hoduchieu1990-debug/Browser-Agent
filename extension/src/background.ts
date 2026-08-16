@@ -195,22 +195,35 @@ async function archiveCurrentRecording(): Promise<void> {
 
 function navigateAndWait(tabId: number, url: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      chrome.webNavigation.onCompleted.removeListener(onCompleted);
-      reject(new Error(`Navigation to ${url} timed out`));
-    }, NAVIGATION_TIMEOUT_MS);
+    // Going somewhere that differs only by #fragment never reloads the page,
+    // so onCompleted alone would sit there until it timed out. The same goes
+    // for a site that answers the change with history.pushState.
+    const events = [
+      chrome.webNavigation.onCompleted,
+      chrome.webNavigation.onReferenceFragmentUpdated,
+      chrome.webNavigation.onHistoryStateUpdated,
+    ];
 
-    function onCompleted(details: chrome.webNavigation.WebNavigationFramedCallbackDetails) {
-      if (details.tabId !== tabId || details.frameId !== 0) return;
+    const stopListening = () => {
       clearTimeout(timer);
-      chrome.webNavigation.onCompleted.removeListener(onCompleted);
+      for (const event of events) event.removeListener(onNavigated);
+    };
+
+    function onNavigated(details: chrome.webNavigation.WebNavigationFramedCallbackDetails) {
+      if (details.tabId !== tabId || details.frameId !== 0) return;
+      stopListening();
       resolve();
     }
 
-    chrome.webNavigation.onCompleted.addListener(onCompleted);
+    const timer = setTimeout(() => {
+      stopListening();
+      reject(new Error(`Navigation to ${url} timed out`));
+    }, NAVIGATION_TIMEOUT_MS);
+
+    for (const event of events) event.addListener(onNavigated);
+
     chrome.tabs.update(tabId, { url }).catch((error) => {
-      clearTimeout(timer);
-      chrome.webNavigation.onCompleted.removeListener(onCompleted);
+      stopListening();
       reject(error);
     });
   });
