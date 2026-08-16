@@ -21,6 +21,7 @@ export interface BadgeCallbacks {
   onAddText: (el: HTMLElement) => void;
   onAddImage: (el: HTMLElement) => void;
   onAddBatch: (el: HTMLElement, kind: BatchKind) => void;
+  onStop: () => void;
   /** Fires when the badge takes over (or releases) showing the outline. */
   onTargetChange?: (hasTarget: boolean) => void;
 }
@@ -194,7 +195,9 @@ function createTargetFrame(): TargetFrame {
 
 interface BadgeElements {
   root: HTMLDivElement;
+  row: HTMLDivElement;
   trigger: HTMLButtonElement;
+  stopBtn: HTMLButtonElement;
   menu: HTMLDivElement;
   tableItem: HTMLButtonElement;
   textItem: HTMLButtonElement;
@@ -228,6 +231,33 @@ function createBadge(): BadgeElements {
   trigger.style.font = '600 11px system-ui, "Segoe UI", sans-serif';
   trigger.style.cursor = 'pointer';
   trigger.style.boxShadow = '0 2px 10px rgba(79, 70, 229, 0.45)';
+
+  // Sits right beside Add — the counting bubble that used to float in the
+  // corner is gone, so this is the only on-page way to stop a recording now.
+  const stopBtn = document.createElement('button');
+  stopBtn.type = 'button';
+  stopBtn.dataset.baRole = 'stop';
+  stopBtn.title = 'Stop recording';
+  stopBtn.textContent = '⏹';
+  stopBtn.style.border = 'none';
+  stopBtn.style.borderRadius = '999px';
+  stopBtn.style.width = '28px';
+  stopBtn.style.height = '28px';
+  stopBtn.style.flexShrink = '0';
+  stopBtn.style.display = 'flex';
+  stopBtn.style.alignItems = 'center';
+  stopBtn.style.justifyContent = 'center';
+  stopBtn.style.background = '#dc2626';
+  stopBtn.style.color = '#fff';
+  stopBtn.style.fontSize = '11px';
+  stopBtn.style.cursor = 'pointer';
+  stopBtn.style.boxShadow = '0 2px 10px rgba(220, 38, 38, 0.45)';
+
+  const row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.alignItems = 'center';
+  row.style.gap = '6px';
+  row.append(trigger, stopBtn);
 
   const menu = document.createElement('div');
   menu.dataset.baRole = 'menu';
@@ -266,10 +296,10 @@ function createBadge(): BadgeElements {
     styleMenuLabel('Batch'),
     ...batchKinds.map((kind) => batchItems[kind]),
   );
-  root.append(trigger, menu);
+  root.append(row, menu);
   document.documentElement.appendChild(root);
 
-  return { root, trigger, menu, tableItem, textItem, imageItem, batchItems };
+  return { root, row, trigger, stopBtn, menu, tableItem, textItem, imageItem, batchItems };
 }
 
 // Rides along with the pointer during recording and offers to capture whatever
@@ -279,9 +309,10 @@ export function attachExtractBadge({
   onAddText,
   onAddImage,
   onAddBatch,
+  onStop,
   onTargetChange,
 }: BadgeCallbacks): () => void {
-  const { root, trigger, menu, tableItem, textItem, imageItem, batchItems } = createBadge();
+  const { root, row, trigger, stopBtn, menu, tableItem, textItem, imageItem, batchItems } = createBadge();
   const frame = createTargetFrame();
 
   let currentTable: HTMLElement | null = null;
@@ -293,17 +324,17 @@ export function attachExtractBadge({
   let anchorY = 0;
 
   const moveTo = (x: number, y: number) => {
-    const width = trigger.offsetWidth || 74;
-    const height = trigger.offsetHeight || 26;
+    const width = row.offsetWidth || 110;
+    const height = row.offsetHeight || 28;
     anchorX = Math.max(4, Math.min(x, window.innerWidth - width - 4));
     anchorY = Math.max(4, Math.min(y, window.innerHeight - height - 4));
     root.style.left = `${anchorX}px`;
     root.style.top = `${anchorY}px`;
   };
 
-  // distance to the trigger button, zero when the pointer is inside it
+  // distance to the Add+Stop row, zero when the pointer is inside it
   const distanceToBadge = (x: number, y: number) => {
-    const rect = trigger.getBoundingClientRect();
+    const rect = row.getBoundingClientRect();
     const dx = Math.max(rect.left - x, 0, x - rect.right);
     const dy = Math.max(rect.top - y, 0, y - rect.bottom);
     return Math.hypot(dx, dy);
@@ -450,6 +481,12 @@ export function attachExtractBadge({
     choose(event, () => el && onAddBatch(el, kind));
   };
 
+  const handleStop = (event: MouseEvent) => {
+    stop(event);
+    onStop();
+    hide(); // instant feedback — the real teardown lands shortly after via SET_RECORDING
+  };
+
   const handleKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') hide();
   };
@@ -470,6 +507,7 @@ export function attachExtractBadge({
   });
 
   trigger.addEventListener('click', handleTriggerClick, true);
+  stopBtn.addEventListener('click', handleStop, true);
   tableItem.addEventListener('click', handleTable, true);
   textItem.addEventListener('click', handleText, true);
   imageItem.addEventListener('click', handleImage, true);

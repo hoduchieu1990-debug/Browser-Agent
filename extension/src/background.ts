@@ -29,7 +29,6 @@ import {
 } from './utils/storage-manager';
 import { captureElement, captureElementViaDebugger, type CaptureRect } from './utils/capture';
 import { setFileInputFilesViaDebugger } from './utils/file-input';
-import { describeAction } from './utils/action-display';
 
 const STEP_SETTLE_MS = 300;
 const NAVIGATION_TIMEOUT_MS = 30000;
@@ -62,9 +61,19 @@ function log(...args: unknown[]): void {
   if (settings.verboseLogging) console.log('[browser-agent]', ...args);
 }
 
+// The popup window Stop reopens takes over "last focused", and its own tab is
+// this extension's page — recording that instead of the site is never what was
+// meant. Filtering by window type keeps this working without the "tabs"
+// permission, which reading tab.url would require.
 async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
-  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  return tab;
+  const focused = await chrome.windows.getLastFocused().catch(() => null);
+  if (focused?.type === 'normal' && focused.id !== undefined) {
+    const [tab] = await chrome.tabs.query({ active: true, windowId: focused.id });
+    if (tab) return tab;
+  }
+
+  const [fallback] = await chrome.tabs.query({ active: true, windowType: 'normal' });
+  return fallback;
 }
 
 // A page loaded before this extension was installed/reloaded has no content
@@ -114,18 +123,6 @@ function pushAction(action: WorkflowAction, tabId?: number): void {
   actions.push(action);
   saveSession(actions);
   notifyActionsUpdated();
-
-  if (tabId) {
-    // the bubble is the only recorder UI left on screen mid-session, so it is
-    // told about every step regardless of the toast setting
-    chrome.tabs
-      .sendMessage(tabId, {
-        type: 'RECORDING_PROGRESS',
-        count: actions.length,
-        label: describeAction(action),
-      } satisfies RuntimeMessage)
-      .catch(() => {});
-  }
 
   if (settings.onPageConfirmation && tabId) {
     chrome.tabs
@@ -233,6 +230,34 @@ async function publishReplayState(state: ReplayState): Promise<void> {
 // minimized window still renders and returns a real frame.
 async function openHiddenWindow(): Promise<chrome.windows.Window> {
   return chrome.windows.create({ url: 'about:blank', focused: false, state: 'minimized' });
+}
+
+let popupWindowId: number | null = null;
+
+chrome.windows.onRemoved.addListener((id) => {
+  if (id === popupWindowId) popupWindowId = null;
+});
+
+// Reopens the popup as its own small window so Stop (clicked from the
+// on-page badge, with the toolbar popup closed) has somewhere to land. A
+// popup-type window, not a tab, so it looks and behaves like the real thing.
+async function openPopupWindow(): Promise<void> {
+  if (popupWindowId !== null) {
+    try {
+      await chrome.windows.update(popupWindowId, { focused: true });
+      return;
+    } catch {
+      popupWindowId = null; // the window was already closed
+    }
+  }
+
+  const win = await chrome.windows.create({
+    url: chrome.runtime.getURL('popup.html'),
+    type: 'popup',
+    width: 480,
+    height: 640,
+  });
+  popupWindowId = win.id ?? null;
 }
 
 // Two ways to photograph an element, each with a blind spot: captureVisibleTab
@@ -476,6 +501,15 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       detachFromActiveTab();
       archiveCurrentRecording();
       sendResponse({ recording, actions });
+      // Only when Stop came from the on-page badge (sender.tab is set) is
+      // there no popup on screen to show the result in. Reopening one
+      // regardless would also steal lastFocusedWindow, which is what
+      // attachToActiveTab reads — the next Start would then try to record
+      // the popup itself.
+      // (chrome.action.openPopup() looks like the fit, but it only honours a
+      // gesture made directly on the action button; a click relayed from a
+      // content script doesn't qualify and it fails silently.)
+      if (sender.tab) openPopupWindow();
       return;
 
     case 'GET_RECORDINGS':
@@ -522,6 +556,14 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       actions[message.index] = { ...actions[message.index], ...message.patch } as WorkflowAction;
       saveSession(actions);
       notifyActionsUpdated();
+      return;
+
+    case 'CLOSE_POPUP':
+      // window.close() only works for the one true action popup, not a
+      // window opened via chrome.windows.create (like the one Stop reopens)
+      // — chrome.windows.remove closes either kind, called from here where
+      // it's actually allowed.
+      chrome.windows.remove(message.windowId).catch(() => {});
       return;
 
     case 'GET_SETTINGS':

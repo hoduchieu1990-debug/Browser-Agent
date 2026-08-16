@@ -5,7 +5,7 @@ const path = require('path');
 const execFileAsync = promisify(execFile);
 
 const CHECKS = [
-  'bubble-check.js',
+  'add-stop-pair-check.js',
   'badge-follow-check.js',
   'target-frame-check.js',
   'lock-target-check.js',

@@ -31,13 +31,13 @@ export type RuntimeMessage =
   | { type: 'GET_STATE' }
   | { type: 'REMOVE_ACTION'; index: number }
   | { type: 'UPDATE_ACTION'; index: number; patch: Record<string, unknown> }
+  | { type: 'CLOSE_POPUP'; windowId: number }
   | { type: 'GET_SETTINGS' }
   | { type: 'SET_SETTINGS'; settings: RecorderSettings }
   | { type: 'SET_RECORDING'; value: boolean; highlightElements: boolean }
   | { type: 'RECORDED_ACTION'; action: RecordedActionPayload }
   | { type: 'ACTIONS_UPDATED'; actions: WorkflowAction[] }
   | { type: 'SHOW_TOAST'; step: number; action: WorkflowAction }
-  | { type: 'RECORDING_PROGRESS'; count: number; label: string }
   | { type: 'REPLAY_START'; background: boolean }
   | { type: 'REPLAY_STEP'; action: WorkflowAction & { resolvedValue?: string } }
   | { type: 'REPLAY_UPDATED'; state: ReplayState }

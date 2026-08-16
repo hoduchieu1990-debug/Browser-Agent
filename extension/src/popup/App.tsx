@@ -20,6 +20,26 @@ import { BatchTab } from './BatchTab';
 import { SettingsTab } from './SettingsTab';
 import { AboutTab } from './AboutTab';
 
+// This same page runs in three places, and only two of them should vanish
+// when recording starts:
+//   - the real toolbar popup: no tab of its own, window.close() works
+//   - the window Stop reopens: a 'popup'-type window, needs windows.remove
+//     (window.close() is refused for windows the page didn't itself open)
+//   - a plain tab someone navigated to popup.html: closing the whole window
+//     would take their other tabs with it, so leave it alone
+async function dismissSelf(): Promise<void> {
+  const tab = await chrome.tabs.getCurrent();
+  if (!tab) {
+    window.close();
+    return;
+  }
+
+  const win = await chrome.windows.getCurrent();
+  if (win.type === 'popup' && win.id !== undefined) {
+    chrome.runtime.sendMessage({ type: 'CLOSE_POPUP', windowId: win.id } satisfies RuntimeMessage);
+  }
+}
+
 export function App() {
   const [recording, setRecording] = useState(false);
   const [actions, setActions] = useState<WorkflowAction[]>([]);
@@ -90,11 +110,16 @@ export function App() {
   }, []);
 
   const toggleRecording = () => {
-    const type = recording ? 'STOP_RECORDING' : 'START_RECORDING';
-    chrome.runtime.sendMessage({ type } satisfies RuntimeMessage, (state: RecorderState) => {
+    const starting = !recording;
+    const type = starting ? 'START_RECORDING' : 'STOP_RECORDING';
+    chrome.runtime.sendMessage({ type } satisfies RuntimeMessage, async (state: RecorderState) => {
       setRecording(state.recording);
       setActions(state.actions);
       setError(state.error ?? null);
+      // Get out of the way once recording actually starts, so the page is
+      // clear to interact with — stopping (from the on-page badge) reopens
+      // this same popup to review the result.
+      if (starting && state.recording && !state.error) await dismissSelf();
     });
   };
 
