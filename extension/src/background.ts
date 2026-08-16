@@ -5,6 +5,10 @@ import type {
   ReplayState,
   ReplayStepLog,
   SavedRecording,
+  BatchDataset,
+  BatchReplayState,
+  BatchRunRow,
+  DataRow,
 } from './types';
 import { DEFAULT_SETTINGS } from './types';
 import {
@@ -18,8 +22,13 @@ import {
   deleteRecording,
   saveReplayState,
   loadReplayState,
+  saveBatchDataset,
+  loadBatchDataset,
+  saveBatchState,
+  loadBatchState,
 } from './utils/storage-manager';
 import { captureElement, captureElementViaDebugger, type CaptureRect } from './utils/capture';
+import { setFileInputFilesViaDebugger } from './utils/file-input';
 import { describeAction } from './utils/action-display';
 
 const STEP_SETTLE_MS = 300;
@@ -33,6 +42,10 @@ let settings: RecorderSettings = DEFAULT_SETTINGS;
 let replayState: ReplayState | null = null;
 let replaying = false;
 let recordingHost: string | null = null;
+let batchDataset: BatchDataset | null = null;
+let batchState: BatchReplayState | null = null;
+let batchRunning = false;
+let batchCancelled = false;
 
 loadSession().then((saved) => {
   actions = saved;
@@ -40,6 +53,9 @@ loadSession().then((saved) => {
 });
 loadSettings().then((saved) => {
   settings = saved;
+});
+loadBatchDataset().then((saved) => {
+  batchDataset = saved;
 });
 
 function log(...args: unknown[]): void {
@@ -340,6 +356,102 @@ async function runReplay(inBackground: boolean): Promise<void> {
   await finish();
 }
 
+// A Search node's own selector is already on the page the instant it's
+// clicked — waiting on it would be a no-op. Absent an explicit wait target,
+// the thing actually worth waiting for is whatever the workflow extracts next.
+function defaultSearchWaitSelector(fromIndex: number): string | undefined {
+  for (let i = fromIndex + 1; i < actions.length; i++) {
+    const next = actions[i];
+    if (next.type === 'batchExtract') return next.selector;
+  }
+  return undefined;
+}
+
+async function publishBatchState(state: BatchReplayState): Promise<void> {
+  batchState = state;
+  await saveBatchState(state);
+  chrome.runtime.sendMessage({ type: 'BATCH_UPDATED', state } satisfies RuntimeMessage).catch(() => {});
+}
+
+// One action, one dataset row. Handles the one input type a content script
+// cannot perform itself (fileUpload needs the debugger session); everything
+// else goes through the normal REPLAY_STEP round trip.
+async function runBatchStep(
+  tabId: number,
+  action: WorkflowAction,
+  index: number,
+  row: DataRow,
+): Promise<{ output?: { key: string; value: unknown }; error?: string }> {
+  if (action.type === 'navigate') {
+    await navigateAndWait(tabId, action.url);
+    return {};
+  }
+
+  if (action.type === 'batchInput' && action.inputType === 'fileUpload') {
+    const filePath = row[action.column] ?? '';
+    await setFileInputFilesViaDebugger(tabId, action.selector, action.selectorFallbacks, filePath);
+    return {};
+  }
+
+  let toSend: WorkflowAction & { resolvedValue?: string } = action;
+  if (action.type === 'batchInput') {
+    toSend = { ...action, resolvedValue: row[action.column] ?? '' };
+  } else if (action.type === 'batchSearch' && !action.waitCondition.selector) {
+    const fallback = defaultSearchWaitSelector(index);
+    if (fallback) toSend = { ...action, waitCondition: { ...action.waitCondition, selector: fallback } };
+  }
+
+  const result = await sendStep(tabId, toSend);
+  if (result?.error) return { error: result.error };
+  return { output: result?.output };
+}
+
+// Runs the recorded batch nodes once per dataset row, on the active tab —
+// unlike runReplay this is meant to be watched, so there is no hidden window.
+async function runBatchReplay(rows: DataRow[], stopOnError: boolean): Promise<void> {
+  batchCancelled = false;
+  const startedAt = Date.now();
+  const state: BatchReplayState = { running: true, total: rows.length, rows: [], startedAt, updatedAt: startedAt };
+  await publishBatchState(state);
+
+  const tab = await getActiveTab();
+  if (!tab?.id) {
+    await publishBatchState({ ...state, running: false, error: 'No active tab found.', updatedAt: Date.now() });
+    return;
+  }
+  const tabId = tab.id;
+
+  for (const [i, row] of rows.entries()) {
+    if (batchCancelled) break;
+
+    let rowResult: BatchRunRow = { index: i + 1, input: row, output: {}, status: 'running' };
+    state.rows = [...state.rows, rowResult];
+    state.updatedAt = Date.now();
+    await publishBatchState(state);
+
+    try {
+      const outputs: Record<string, string> = {};
+      for (let a = 0; a < actions.length; a++) {
+        if (batchCancelled) break;
+        const stepResult = await runBatchStep(tabId, actions[a], a, row);
+        if (stepResult.error) throw new Error(`${actions[a].type}: ${stepResult.error}`);
+        if (stepResult.output) outputs[stepResult.output.key] = String(stepResult.output.value);
+      }
+      rowResult = { ...rowResult, output: outputs, status: 'success' };
+    } catch (error) {
+      rowResult = { ...rowResult, status: 'failed', error: (error as Error).message };
+    }
+
+    state.rows = state.rows.map((r) => (r.index === rowResult.index ? rowResult : r));
+    state.updatedAt = Date.now();
+    await publishBatchState(state);
+
+    if (rowResult.status === 'failed' && stopOnError) break;
+  }
+
+  await publishBatchState({ ...state, running: false, updatedAt: Date.now() });
+}
+
 chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendResponse) => {
   log('message', message.type);
 
@@ -406,6 +518,12 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       notifyActionsUpdated();
       return;
 
+    case 'UPDATE_ACTION':
+      actions[message.index] = { ...actions[message.index], ...message.patch } as WorkflowAction;
+      saveSession(actions);
+      notifyActionsUpdated();
+      return;
+
     case 'GET_SETTINGS':
       sendResponse(settings);
       return;
@@ -456,6 +574,40 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       }
       return;
     }
+
+    case 'BATCH_SET_DATASET':
+      batchDataset = { fileName: message.fileName, headers: message.headers, rows: message.rows };
+      saveBatchDataset(batchDataset);
+      sendResponse(batchDataset);
+      return;
+
+    case 'BATCH_GET_DATASET':
+      sendResponse(batchDataset);
+      return;
+
+    case 'BATCH_TEST_ROW':
+      if (batchRunning || !batchDataset?.rows.length) return;
+      batchRunning = true;
+      runBatchReplay([batchDataset.rows[0]], false).finally(() => {
+        batchRunning = false;
+      });
+      return;
+
+    case 'BATCH_RUN_ALL':
+      if (batchRunning || !batchDataset?.rows.length) return;
+      batchRunning = true;
+      runBatchReplay(batchDataset.rows, message.stopOnError).finally(() => {
+        batchRunning = false;
+      });
+      return;
+
+    case 'BATCH_STOP':
+      batchCancelled = true;
+      return;
+
+    case 'BATCH_GET_STATE':
+      loadBatchState().then((stored) => sendResponse(stored ?? batchState));
+      return true; // async sendResponse
   }
 });
 

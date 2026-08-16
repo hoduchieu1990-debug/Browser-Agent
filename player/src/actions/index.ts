@@ -11,6 +11,10 @@ import { extractText } from './extract-text';
 import { dismissPopup } from './dismiss-popup';
 import { screenshot } from './screenshot';
 import { scroll } from './scroll';
+import { batchInput } from './batch-input';
+import { batchClick } from './batch-click';
+import { batchSearch } from './batch-search';
+import { batchExtract } from './batch-extract';
 
 const registry = new Map<string, ActionHandler>([
   ['navigate', navigate],
@@ -26,6 +30,10 @@ const registry = new Map<string, ActionHandler>([
   ['dismissPopup', dismissPopup],
   ['screenshot', (page, action, ctx: RunContext) => screenshot(page, action, ctx.outputDir)],
   ['scroll', scroll],
+  ['batchInput', batchInput],
+  ['batchClick', batchClick],
+  ['batchSearch', batchSearch],
+  ['batchExtract', batchExtract],
 ]);
 
 export function registerActionHandler(type: string, handler: ActionHandler): void {

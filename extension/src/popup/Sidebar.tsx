@@ -1,4 +1,4 @@
-export type TabKey = 'recording' | 'preview' | 'saved' | 'export' | 'settings';
+export type TabKey = 'recording' | 'preview' | 'saved' | 'export' | 'batch' | 'settings';
 
 interface Item {
   key: TabKey;
@@ -41,6 +41,18 @@ const ITEMS: Item[] = [
     ),
   },
   {
+    key: 'batch',
+    label: 'Batch',
+    icon: (
+      <>
+        <rect x="3" y="4" width="7" height="7" rx="1" />
+        <rect x="14" y="4" width="7" height="7" rx="1" />
+        <rect x="3" y="15" width="7" height="5" rx="1" />
+        <rect x="14" y="15" width="7" height="5" rx="1" />
+      </>
+    ),
+  },
+  {
     key: 'settings',
     label: 'Settings',
     icon: (
@@ -62,16 +74,20 @@ const ITEMS: Item[] = [
 interface Props {
   active: TabKey;
   onChange: (tab: TabKey) => void;
+  /** The Batch tab only makes sense once the recording has a batch node. */
+  showBatch: boolean;
 }
 
-export function Sidebar({ active, onChange }: Props) {
+export function Sidebar({ active, onChange, showBatch }: Props) {
+  const items = ITEMS.filter((item) => item.key !== 'batch' || showBatch);
+
   return (
     <nav className="sidebar">
       <div className="sidebar-brand" title="Browser Agent">
         BA
       </div>
 
-      {ITEMS.map((item) => (
+      {items.map((item) => (
         <button
           key={item.key}
           className={item.key === active ? 'sidebar-item active' : 'sidebar-item'}

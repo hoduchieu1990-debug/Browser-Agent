@@ -13,6 +13,8 @@ export interface Workflow {
   globalSettings?: GlobalSettings;
   actions: WorkflowAction[];
   exportFormats?: ExportFormat[];
+  /** Label only — the real rows are attached at run time (extension file picker, CLI --data). */
+  dataSource?: { type: 'excel'; fileName: string };
 }
 
 export interface WorkflowMetadata {
@@ -70,7 +72,11 @@ export type WorkflowAction =
   | ExtractTextAction
   | DismissPopupAction
   | ScreenshotAction
-  | ScrollAction;
+  | ScrollAction
+  | BatchInputAction
+  | BatchClickAction
+  | BatchSearchAction
+  | BatchExtractAction;
 
 export type ActionType =
   | 'navigate'
@@ -85,7 +91,11 @@ export type ActionType =
   | 'extractText'
   | 'dismissPopup'
   | 'screenshot'
-  | 'scroll';
+  | 'scroll'
+  | 'batchInput'
+  | 'batchClick'
+  | 'batchSearch'
+  | 'batchExtract';
 
 export interface BaseAction {
   id: string;
@@ -192,6 +202,54 @@ export interface ScrollAction extends BaseAction {
   type: 'scroll';
   position?: 'top' | 'bottom' | 'center';
   pixels?: number;
+}
+
+// --- Batch: Input (one recorded field, replayed once per dataset row) ---
+export type BatchInputType = 'text' | 'fileUpload' | 'select'; // Phase 2: checkbox, radio, date
+export type BatchReplaceMode = 'replace' | 'append' | 'keepExisting';
+
+export interface BatchInputAction extends BaseAction {
+  type: 'batchInput';
+  selector: string;
+  inputType: BatchInputType;
+  /** Dataset column header this node reads its value from. */
+  column: string;
+  /** Default 'replace'. */
+  replaceMode?: BatchReplaceMode;
+}
+
+// --- Batch: Click ---
+export interface BatchClickAction extends BaseAction {
+  type: 'batchClick';
+  selector: string;
+}
+
+// --- Batch: Search (trigger + wait for the result to be ready) ---
+export type BatchWaitConditionType = 'elementAppears'; // Phase 2/3: disappears, text*, networkIdle, custom
+
+export interface BatchWaitCondition {
+  type: BatchWaitConditionType;
+  /** Element to watch; defaults to the Search node's own selector. */
+  selector?: string;
+  timeout: number;
+}
+
+export interface BatchSearchAction extends BaseAction {
+  type: 'batchSearch';
+  selector: string;
+  waitCondition: BatchWaitCondition;
+}
+
+// --- Batch: Extract ---
+export type BatchExtractType = 'text' | 'attribute' | 'value';
+
+export interface BatchExtractAction extends BaseAction {
+  type: 'batchExtract';
+  selector: string;
+  extractType: BatchExtractType;
+  /** Required when extractType === 'attribute'. */
+  attribute?: string;
+  output: string;
 }
 
 // ============= EXPORT =============

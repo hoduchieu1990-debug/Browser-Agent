@@ -96,7 +96,11 @@
               "extractText",
               "dismissPopup",
               "screenshot",
-              "scroll"
+              "scroll",
+              "batchInput",
+              "batchClick",
+              "batchSearch",
+              "batchExtract"
             ]
           },
           "url": { "type": "string", "description": "For navigate action" },
@@ -136,7 +140,29 @@
               "delayMs": { "type": "number" }
             }
           },
-          "onError": { "enum": ["fail", "skip", "ignore"], "default": "fail" }
+          "onError": { "enum": ["fail", "skip", "ignore"], "default": "fail" },
+          "inputType": { "enum": ["text", "fileUpload", "select"], "description": "Batch Input element kind" },
+          "column": { "type": "string", "description": "Dataset column a Batch Input reads its value from" },
+          "replaceMode": {
+            "enum": ["replace", "append", "keepExisting"],
+            "default": "replace",
+            "description": "How a Batch Input treats the field's existing value"
+          },
+          "waitCondition": {
+            "type": "object",
+            "required": ["type", "timeout"],
+            "properties": {
+              "type": { "enum": ["elementAppears"] },
+              "selector": { "type": "string" },
+              "timeout": { "type": "number" }
+            },
+            "description": "Batch Search: how to detect the result is ready"
+          },
+          "extractType": {
+            "enum": ["text", "attribute", "value"],
+            "description": "Batch Extract: what to read off the element"
+          },
+          "attribute": { "type": "string", "description": "Attribute name, required when extractType is 'attribute'" }
         },
         "additionalProperties": false
       }
@@ -152,6 +178,15 @@
           "dataKey": { "type": "string" }
         }
       }
+    },
+    "dataSource": {
+      "type": "object",
+      "required": ["type", "fileName"],
+      "properties": {
+        "type": { "enum": ["excel"] },
+        "fileName": { "type": "string" }
+      },
+      "description": "Label only — the actual dataset is attached at run time"
     }
   },
   "additionalProperties": false

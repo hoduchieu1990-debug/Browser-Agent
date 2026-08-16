@@ -5,6 +5,7 @@ const TITLES: Record<TabKey, string> = {
   preview: 'Preview',
   saved: 'Saved',
   export: 'Export',
+  batch: 'Batch',
   settings: 'Settings',
 };
 

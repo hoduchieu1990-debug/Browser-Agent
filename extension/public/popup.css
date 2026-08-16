@@ -356,7 +356,7 @@ body {
 
 .action-item {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -366,6 +366,11 @@ body {
 .action-item:hover {
   border-color: #c7d2fe;
   background: #f7f8ff;
+}
+
+.action-row {
+  display: flex;
+  align-items: flex-start;
 }
 
 .action-step {
@@ -422,6 +427,47 @@ body {
 
 .action-type[data-type="screenshot"] {
   color: #a21caf;
+}
+
+.action-type[data-type^="batch"] {
+  color: #be185d;
+}
+
+/* the row containing the type/selector opens the config panel when it's a
+   batch node — a real cursor keeps that discoverable */
+.action-item:has(.action-batch-config) .action-info {
+  cursor: pointer;
+}
+
+.action-batch-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 2px 28px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.action-batch-config label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.action-batch-config select,
+.action-batch-config input {
+  font: 500 12px var(--font-sans, inherit);
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--foreground);
+  min-width: 100px;
 }
 
 .action-selector {
@@ -784,6 +830,20 @@ body {
 
 .result-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.progress-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+  margin: 4px 0 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.2s ease;
 }
 
 .result-meta {

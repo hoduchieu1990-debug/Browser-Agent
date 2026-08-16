@@ -30,6 +30,7 @@ export type RuntimeMessage =
   | { type: 'RESET' }
   | { type: 'GET_STATE' }
   | { type: 'REMOVE_ACTION'; index: number }
+  | { type: 'UPDATE_ACTION'; index: number; patch: Record<string, unknown> }
   | { type: 'GET_SETTINGS' }
   | { type: 'SET_SETTINGS'; settings: RecorderSettings }
   | { type: 'SET_RECORDING'; value: boolean; highlightElements: boolean }
@@ -38,13 +39,20 @@ export type RuntimeMessage =
   | { type: 'SHOW_TOAST'; step: number; action: WorkflowAction }
   | { type: 'RECORDING_PROGRESS'; count: number; label: string }
   | { type: 'REPLAY_START'; background: boolean }
-  | { type: 'REPLAY_STEP'; action: WorkflowAction }
+  | { type: 'REPLAY_STEP'; action: WorkflowAction & { resolvedValue?: string } }
   | { type: 'REPLAY_UPDATED'; state: ReplayState }
   | { type: 'GET_REPLAY_STATE' }
   | { type: 'GET_RECORDINGS' }
   | { type: 'LOAD_RECORDING'; id: string }
   | { type: 'DELETE_RECORDING'; id: string }
-  | { type: 'RECORDINGS_UPDATED'; recordings: SavedRecording[] };
+  | { type: 'RECORDINGS_UPDATED'; recordings: SavedRecording[] }
+  | { type: 'BATCH_SET_DATASET'; fileName: string; headers: string[]; rows: DataRow[] }
+  | { type: 'BATCH_GET_DATASET' }
+  | { type: 'BATCH_TEST_ROW' }
+  | { type: 'BATCH_RUN_ALL'; stopOnError: boolean }
+  | { type: 'BATCH_STOP' }
+  | { type: 'BATCH_GET_STATE' }
+  | { type: 'BATCH_UPDATED'; state: BatchReplayState };
 
 export interface SavedRecording {
   id: string;
@@ -79,4 +87,31 @@ export interface RecorderState {
   actions: WorkflowAction[];
   highlightElements: boolean;
   error?: string | null;
+}
+
+// ============= BATCH =============
+
+export type DataRow = Record<string, string>;
+
+export interface BatchDataset {
+  fileName: string;
+  headers: string[];
+  rows: DataRow[];
+}
+
+export interface BatchRunRow {
+  index: number; // 1-based
+  input: DataRow;
+  output: Record<string, string>;
+  status: 'running' | 'success' | 'failed';
+  error?: string;
+}
+
+export interface BatchReplayState {
+  running: boolean;
+  total: number;
+  rows: BatchRunRow[];
+  startedAt: number;
+  updatedAt: number;
+  error?: string;
 }

@@ -6,6 +6,8 @@ import type {
   RecorderSettings,
   ReplayState,
   SavedRecording,
+  BatchDataset,
+  BatchReplayState,
 } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import { Header } from './Header';
@@ -14,6 +16,7 @@ import { RecordTab } from './RecordTab';
 import { PreviewTab } from './PreviewTab';
 import { SavedTab } from './SavedTab';
 import { ExportTab } from './ExportTab';
+import { BatchTab } from './BatchTab';
 import { SettingsTab } from './SettingsTab';
 
 export function App() {
@@ -25,6 +28,10 @@ export function App() {
   const [replayState, setReplayState] = useState<ReplayState | null>(null);
   const [recordings, setRecordings] = useState<SavedRecording[]>([]);
   const [replayInBackground, setReplayInBackground] = useState(false);
+  const [batchDataset, setBatchDataset] = useState<BatchDataset | null>(null);
+  const [batchState, setBatchState] = useState<BatchReplayState | null>(null);
+
+  const hasBatchNodes = actions.some((a) => a.type.startsWith('batch'));
 
   useEffect(() => {
     chrome.runtime.sendMessage({ type: 'GET_STATE' } satisfies RuntimeMessage, (state: RecorderState) => {
@@ -37,6 +44,9 @@ export function App() {
     chrome.runtime.sendMessage({ type: 'GET_RECORDINGS' } satisfies RuntimeMessage, (list: SavedRecording[]) => {
       setRecordings(list);
     });
+    chrome.runtime.sendMessage({ type: 'BATCH_GET_DATASET' } satisfies RuntimeMessage, (dataset: BatchDataset | null) => {
+      setBatchDataset(dataset);
+    });
 
     const pullReplayState = () => {
       chrome.runtime.sendMessage({ type: 'GET_REPLAY_STATE' } satisfies RuntimeMessage, (state: ReplayState | null) => {
@@ -45,15 +55,30 @@ export function App() {
       });
     };
 
+    const pullBatchState = () => {
+      chrome.runtime.sendMessage(
+        { type: 'BATCH_GET_STATE' } satisfies RuntimeMessage,
+        (state: BatchReplayState | null) => {
+          setBatchState(state);
+          if (state?.running) setActiveTab('batch');
+        },
+      );
+    };
+
     pullReplayState();
+    pullBatchState();
     // Broadcasts sent while the popup was closed are lost, so poll as well —
     // this is what keeps progress moving after the page steals focus.
-    const poll = window.setInterval(pullReplayState, 1000);
+    const poll = window.setInterval(() => {
+      pullReplayState();
+      pullBatchState();
+    }, 1000);
 
     const listener = (message: RuntimeMessage) => {
       if (message.type === 'ACTIONS_UPDATED') setActions(message.actions);
       if (message.type === 'RECORDINGS_UPDATED') setRecordings(message.recordings);
       if (message.type === 'REPLAY_UPDATED') setReplayState(message.state);
+      if (message.type === 'BATCH_UPDATED') setBatchState(message.state);
     };
     chrome.runtime.onMessage.addListener(listener);
 
@@ -74,6 +99,31 @@ export function App() {
 
   const removeAction = (index: number) => {
     chrome.runtime.sendMessage({ type: 'REMOVE_ACTION', index } satisfies RuntimeMessage);
+  };
+
+  const updateAction = (index: number, patch: Record<string, unknown>) => {
+    chrome.runtime.sendMessage({ type: 'UPDATE_ACTION', index, patch } satisfies RuntimeMessage);
+  };
+
+  const setDataset = (dataset: BatchDataset) => {
+    chrome.runtime.sendMessage(
+      { type: 'BATCH_SET_DATASET', ...dataset } satisfies RuntimeMessage,
+      (saved: BatchDataset) => setBatchDataset(saved),
+    );
+  };
+
+  const testRow = () => {
+    setActiveTab('batch');
+    chrome.runtime.sendMessage({ type: 'BATCH_TEST_ROW' } satisfies RuntimeMessage);
+  };
+
+  const runAll = (stopOnError: boolean) => {
+    setActiveTab('batch');
+    chrome.runtime.sendMessage({ type: 'BATCH_RUN_ALL', stopOnError } satisfies RuntimeMessage);
+  };
+
+  const stopBatch = () => {
+    chrome.runtime.sendMessage({ type: 'BATCH_STOP' } satisfies RuntimeMessage);
   };
 
   // confirmation lives in RecordTab: a native confirm() dialog is a full browser
@@ -112,7 +162,7 @@ export function App() {
 
   return (
     <div className="popup">
-      <Sidebar active={activeTab} onChange={setActiveTab} />
+      <Sidebar active={activeTab} onChange={setActiveTab} showBatch={hasBatchNodes} />
       <div className="popup-main">
         <Header active={activeTab} actionCount={actions.length} />
         <div className="popup-content">
@@ -121,8 +171,10 @@ export function App() {
               recording={recording}
               actions={actions}
               error={error}
+              datasetHeaders={batchDataset?.headers ?? []}
               onToggleRecording={toggleRecording}
               onRemoveAction={removeAction}
+              onUpdateAction={updateAction}
               onReset={resetActions}
             />
           )}
@@ -139,6 +191,17 @@ export function App() {
             <SavedTab recordings={recordings} onLoad={loadRecording} onDelete={removeRecording} />
           )}
           {activeTab === 'export' && <ExportTab actions={actions} recordings={recordings} settings={settings} />}
+          {activeTab === 'batch' && (
+            <BatchTab
+              actions={actions}
+              dataset={batchDataset}
+              state={batchState}
+              onSetDataset={setDataset}
+              onTestRow={testRow}
+              onRunAll={runAll}
+              onStop={stopBatch}
+            />
+          )}
           {activeTab === 'settings' && <SettingsTab settings={settings} onChange={updateSetting} />}
         </div>
       </div>

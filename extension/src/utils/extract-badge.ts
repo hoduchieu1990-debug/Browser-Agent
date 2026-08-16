@@ -1,4 +1,4 @@
-import { findTableAncestor } from './clickable-element';
+import { findTableAncestor, findClickableAncestor } from './clickable-element';
 import { generateSelectorCandidates } from './selector-utils';
 import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 
@@ -11,10 +11,13 @@ const CURSOR_OFFSET_PX = 18;
 // neighbouring element, silently capturing the wrong thing.
 const APPROACH_MARGIN_PX = 34;
 
+export type BatchKind = 'input' | 'click' | 'search' | 'extract';
+
 export interface BadgeCallbacks {
   onAddTable: (table: HTMLElement) => void;
   onAddText: (el: HTMLElement) => void;
   onAddImage: (el: HTMLElement) => void;
+  onAddBatch: (el: HTMLElement, kind: BatchKind) => void;
   /** Fires when the badge takes over (or releases) showing the outline. */
   onTargetChange?: (hasTarget: boolean) => void;
 }
@@ -62,6 +65,51 @@ function findTextTarget(el: Element | null): HTMLElement | null {
   if (el.querySelector('table')) return null;
 
   return preferLocatable(el);
+}
+
+// Batch Input/Click/Search target form controls and buttons, most of which
+// have no text of their own and so never match findTextTarget above.
+const BATCH_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA']);
+const BATCH_ROLES = new Set(['button', 'link', 'checkbox', 'radio']);
+
+function findBatchTarget(el: Element | null): HTMLElement | null {
+  let current = el;
+
+  for (let depth = 0; current && depth < 6; depth++) {
+    if (current instanceof HTMLElement && !isExtensionUi(current)) {
+      if (BATCH_TAGS.has(current.tagName)) return current;
+      const role = current.getAttribute('role');
+      if (role && BATCH_ROLES.has(role)) return current;
+    }
+    current = current.parentElement;
+  }
+
+  return null;
+}
+
+const BATCH_LABELS: Record<BatchKind, string> = {
+  input: '⌨️  Input',
+  click: '🖱️  Click',
+  search: '🔎  Search',
+  extract: '📤  Extract',
+};
+
+function styleMenuDivider(): HTMLDivElement {
+  const divider = document.createElement('div');
+  divider.style.margin = '4px 0';
+  divider.style.borderTop = '1px solid #e5e9f0';
+  return divider;
+}
+
+function styleMenuLabel(text: string): HTMLDivElement {
+  const label = document.createElement('div');
+  label.textContent = text;
+  label.style.padding = '4px 12px 2px';
+  label.style.font = '600 10px system-ui, "Segoe UI", sans-serif';
+  label.style.textTransform = 'uppercase';
+  label.style.letterSpacing = '0.04em';
+  label.style.color = '#94a3b8';
+  return label;
 }
 
 function styleMenuItem(btn: HTMLButtonElement): void {
@@ -148,6 +196,7 @@ interface BadgeElements {
   tableItem: HTMLButtonElement;
   textItem: HTMLButtonElement;
   imageItem: HTMLButtonElement;
+  batchItems: Record<BatchKind, HTMLButtonElement>;
 }
 
 function createBadge(): BadgeElements {
@@ -196,21 +245,45 @@ function createBadge(): BadgeElements {
   imageItem.textContent = '🖼️  Image of this area';
   [tableItem, textItem, imageItem].forEach(styleMenuItem);
 
-  menu.append(tableItem, textItem, imageItem);
+  const batchKinds: BatchKind[] = ['input', 'click', 'search', 'extract'];
+  const batchItems = Object.fromEntries(
+    batchKinds.map((kind) => {
+      const btn = document.createElement('button');
+      btn.textContent = BATCH_LABELS[kind];
+      styleMenuItem(btn);
+      return [kind, btn];
+    }),
+  ) as Record<BatchKind, HTMLButtonElement>;
+
+  menu.append(
+    tableItem,
+    textItem,
+    imageItem,
+    styleMenuDivider(),
+    styleMenuLabel('Batch'),
+    ...batchKinds.map((kind) => batchItems[kind]),
+  );
   root.append(trigger, menu);
   document.documentElement.appendChild(root);
 
-  return { root, trigger, menu, tableItem, textItem, imageItem };
+  return { root, trigger, menu, tableItem, textItem, imageItem, batchItems };
 }
 
 // Rides along with the pointer during recording and offers to capture whatever
 // is under it, so extracting data never requires leaving the page.
-export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTargetChange }: BadgeCallbacks): () => void {
-  const { root, trigger, menu, tableItem, textItem, imageItem } = createBadge();
+export function attachExtractBadge({
+  onAddTable,
+  onAddText,
+  onAddImage,
+  onAddBatch,
+  onTargetChange,
+}: BadgeCallbacks): () => void {
+  const { root, trigger, menu, tableItem, textItem, imageItem, batchItems } = createBadge();
   const frame = createTargetFrame();
 
   let currentTable: HTMLElement | null = null;
   let currentText: HTMLElement | null = null;
+  let currentBatch: HTMLElement | null = null;
   let hideTimer: number | null = null;
   let menuOpen = false;
   let anchorX = 0;
@@ -233,7 +306,7 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTarget
     return Math.hypot(dx, dy);
   };
 
-  const defaultTarget = () => currentText ?? currentTable;
+  const defaultTarget = () => currentText ?? currentTable ?? currentBatch;
 
   const frameDefault = () => {
     const el = defaultTarget();
@@ -252,6 +325,7 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTarget
     frame.hide();
     currentTable = null;
     currentText = null;
+    currentBatch = null;
     onTargetChange?.(false);
   };
 
@@ -278,8 +352,9 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTarget
 
     const table = findTableAncestor(target);
     const text = findTextTarget(target);
+    const batch = findBatchTarget(target);
 
-    if (!table && !text) {
+    if (!table && !text && !batch) {
       scheduleHide();
       return;
     }
@@ -287,7 +362,7 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTarget
     cancelHide();
 
     const visible = root.style.display !== 'none';
-    const sameTarget = visible && table === currentTable && text === currentText;
+    const sameTarget = visible && table === currentTable && text === currentText && batch === currentBatch;
 
     // Moving around inside the element you are already aiming at must not drag
     // the badge along, or it would flee from every attempt to click it.
@@ -299,6 +374,7 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTarget
 
     currentTable = table;
     currentText = text;
+    currentBatch = batch;
     root.style.display = 'flex';
     moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
     frameDefault();
@@ -322,6 +398,8 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTarget
     menuOpen = !menuOpen;
     tableItem.style.display = currentTable ? 'flex' : 'none';
     textItem.style.display = currentText ? 'flex' : 'none';
+    // Batch nodes can be recorded on anything the badge is currently aimed
+    // at — table, text, or a plain control — so they're never hidden.
     menu.style.display = menuOpen ? 'flex' : 'none';
   };
 
@@ -346,6 +424,11 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTarget
     choose(event, () => el && onAddImage(el));
   };
 
+  const handleBatch = (event: MouseEvent, kind: BatchKind) => {
+    const el = currentBatch ?? currentText ?? currentTable;
+    choose(event, () => el && onAddBatch(el, kind));
+  };
+
   const handleKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') hide();
   };
@@ -365,6 +448,14 @@ export function attachExtractBadge({ onAddTable, onAddText, onAddImage, onTarget
   previewOnHover(tableItem, () => currentTable, 'table');
   previewOnHover(textItem, () => currentText ?? currentTable, 'text');
   previewOnHover(imageItem, () => currentTable ?? currentText, 'image');
+
+  const batchKinds: BatchKind[] = ['input', 'click', 'search', 'extract'];
+  const batchTarget = () => currentBatch ?? currentText ?? currentTable;
+  batchKinds.forEach((kind) => {
+    const item = batchItems[kind];
+    previewOnHover(item, batchTarget, kind);
+    item.addEventListener('click', (event) => handleBatch(event, kind), true);
+  });
 
   trigger.addEventListener('click', handleTriggerClick, true);
   tableItem.addEventListener('click', handleTable, true);

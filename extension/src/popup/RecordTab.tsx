@@ -1,20 +1,44 @@
 import { useEffect, useState } from 'react';
 import type { WorkflowAction } from '../types';
-import { actionSelectorText, actionValueText } from '../utils/action-display';
+import { actionSelectorText, actionValueText, batchNodeLabel } from '../utils/action-display';
+import { BatchNodeConfig } from './BatchNodeConfig';
 
 const CONFIRM_TIMEOUT_MS = 4000;
+
+function isBatchAction(action: WorkflowAction): boolean {
+  return action.type.startsWith('batch');
+}
 
 interface Props {
   recording: boolean;
   actions: WorkflowAction[];
   error: string | null;
+  datasetHeaders: string[];
   onToggleRecording: () => void;
   onRemoveAction: (index: number) => void;
+  onUpdateAction: (index: number, patch: Record<string, unknown>) => void;
   onReset: () => void;
 }
 
-export function RecordTab({ recording, actions, error, onToggleRecording, onRemoveAction, onReset }: Props) {
+export function RecordTab({
+  recording,
+  actions,
+  error,
+  datasetHeaders,
+  onToggleRecording,
+  onRemoveAction,
+  onUpdateAction,
+  onReset,
+}: Props) {
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // The freshest batch node is the one the user just recorded and has yet to
+  // configure (pick a column, name the output, ...) — open it automatically.
+  useEffect(() => {
+    const last = actions[actions.length - 1];
+    if (last && isBatchAction(last)) setExpandedId(last.id);
+  }, [actions.length]);
 
   // an armed Reset should not stay armed forever waiting for a stray click
   useEffect(() => {
@@ -83,21 +107,38 @@ export function RecordTab({ recording, actions, error, onToggleRecording, onRemo
         </div>
       ) : (
         <div className="actions-list">
-          {actions.map((action, index) => (
-            <div className="action-item" key={action.id}>
-              <div className="action-step">{index + 1}</div>
-              <div className="action-info">
-                <div className="action-type" data-type={action.type}>
-                  {action.type}
+          {actions.map((action, index) => {
+            const batch = isBatchAction(action);
+            const expanded = batch && expandedId === action.id;
+
+            return (
+              <div className="action-item" key={action.id}>
+                <div className="action-row">
+                  <div className="action-step">{index + 1}</div>
+                  <div
+                    className="action-info"
+                    onClick={batch ? () => setExpandedId(expanded ? null : action.id) : undefined}
+                  >
+                    <div className="action-type" data-type={action.type}>
+                      {batch ? batchNodeLabel(actions, index) : action.type}
+                    </div>
+                    <div className="action-selector">{actionSelectorText(action)}</div>
+                    {actionValueText(action) && <div className="action-value">{actionValueText(action)}</div>}
+                  </div>
+                  <button className="action-delete" onClick={() => onRemoveAction(index)}>
+                    ✕
+                  </button>
                 </div>
-                <div className="action-selector">{actionSelectorText(action)}</div>
-                {actionValueText(action) && <div className="action-value">{actionValueText(action)}</div>}
+                {expanded && (
+                  <BatchNodeConfig
+                    action={action}
+                    datasetHeaders={datasetHeaders}
+                    onUpdate={(patch) => onUpdateAction(index, patch)}
+                  />
+                )}
               </div>
-              <button className="action-delete" onClick={() => onRemoveAction(index)}>
-                ✕
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

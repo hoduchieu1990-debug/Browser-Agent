@@ -17,6 +17,8 @@ const CHECKS = [
   'reset-confirm-check.js',
   'player-reuse-check.js',
   'batch-check.js',
+  'batch-nodes-check.js',
+  'batch-nodes-cli-check.js',
   'export-picker-check.js',
   'menu-check.js',
   'badge-reach-check.js',

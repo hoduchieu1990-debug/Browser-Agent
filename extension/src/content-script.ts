@@ -1,7 +1,7 @@
-import type { RuntimeMessage, RecorderState } from './types';
+import type { RuntimeMessage, RecorderState, BatchInputType } from './types';
 import { attachListeners, type RecorderHandle } from './utils/action-recorder';
 import { attachHighlighter, type HighlighterHandle } from './utils/highlighter';
-import { attachExtractBadge } from './utils/extract-badge';
+import { attachExtractBadge, type BatchKind } from './utils/extract-badge';
 import { extractTableHeaders } from './utils/table-utils';
 import { generateSelectorCandidates } from './utils/selector-utils';
 import { showToast, clearToasts } from './utils/toast';
@@ -22,6 +22,7 @@ let bubble: BubbleHandle | null = null;
 let tableCount = 0;
 let textCount = 0;
 let imageCount = 0;
+let batchExtractCount = 0;
 
 function locate(el: Element): { selector: string; selectorFallbacks?: string[] } {
   const [selector, ...rest] = generateSelectorCandidates(el);
@@ -55,11 +56,35 @@ function recordImage(el: HTMLElement): void {
   } satisfies RuntimeMessage);
 }
 
+function inferBatchInputType(el: HTMLElement): BatchInputType {
+  if (el instanceof HTMLSelectElement) return 'select';
+  if (el instanceof HTMLInputElement && el.type === 'file') return 'fileUpload';
+  return 'text';
+}
+
+// The Column/Extract Type/etc. fields that make a batch node runnable aren't
+// picked here — there's no page-level config dialog — the user fills them in
+// afterward in the popup's Record tab, which auto-expands the newest node.
+function recordBatch(el: HTMLElement, kind: BatchKind): void {
+  const located = locate(el);
+  const action =
+    kind === 'input'
+      ? { type: 'batchInput' as const, ...located, inputType: inferBatchInputType(el), column: '', replaceMode: 'replace' as const }
+      : kind === 'click'
+        ? { type: 'batchClick' as const, ...located }
+        : kind === 'search'
+          ? { type: 'batchSearch' as const, ...located, waitCondition: { type: 'elementAppears' as const, timeout: 30000 } }
+          : { type: 'batchExtract' as const, ...located, extractType: 'text' as const, output: `result${++batchExtractCount}` };
+
+  chrome.runtime.sendMessage({ type: 'RECORDED_ACTION', action } satisfies RuntimeMessage);
+}
+
 function setRecording(value: boolean, highlightElements: boolean): void {
   if (value && !recorder) {
     tableCount = 0;
     textCount = 0;
     imageCount = 0;
+    batchExtractCount = 0;
     recorder = attachListeners((action) => {
       chrome.runtime.sendMessage({ type: 'RECORDED_ACTION', action } satisfies RuntimeMessage);
     });
@@ -67,6 +92,7 @@ function setRecording(value: boolean, highlightElements: boolean): void {
       onAddTable: recordTable,
       onAddText: recordText,
       onAddImage: recordImage,
+      onAddBatch: recordBatch,
       // two outlines on screen at once is noise; the badge's is the precise one
       onTargetChange: (hasTarget) => highlighter?.setPaused(hasTarget),
     });

@@ -89,7 +89,7 @@ function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectE
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-export async function executeStep(action: WorkflowAction): Promise<StepResult> {
+export async function executeStep(action: WorkflowAction & { resolvedValue?: string }): Promise<StepResult> {
   switch (action.type) {
     case 'click': {
       const el = await locateFor(action);
@@ -150,6 +150,49 @@ export async function executeStep(action: WorkflowAction): Promise<StepResult> {
     case 'uploadFile':
       // browsers forbid scripts from putting a real file into a file input
       return { skipped: `uploadFile (${action.selector}) needs a real file — run it through the CLI` };
+
+    case 'batchInput': {
+      // fileUpload goes through the background's debugger session instead —
+      // the same platform restriction as plain `uploadFile` above applies here.
+      if (action.inputType === 'fileUpload') return { skipped: 'fileUpload is applied via the debugger, not in-page' };
+
+      const el = await locateFor(action);
+      const incoming = action.resolvedValue ?? '';
+      const value =
+        action.replaceMode === 'keepExisting'
+          ? null
+          : action.replaceMode === 'append'
+            ? (el as HTMLInputElement).value + incoming
+            : incoming; // 'replace' (default)
+
+      if (value !== null) setNativeValue(el as HTMLInputElement, value);
+      return {};
+    }
+
+    case 'batchClick': {
+      const el = await locateFor(action);
+      el.click();
+      return {};
+    }
+
+    case 'batchSearch': {
+      const el = await locateFor(action);
+      el.click();
+      const { selector, timeout } = action.waitCondition;
+      await waitForElement(selector ?? action.selector, [], timeout);
+      return {};
+    }
+
+    case 'batchExtract': {
+      const el = await locateFor(action);
+      const value =
+        action.extractType === 'attribute'
+          ? (el.getAttribute(action.attribute ?? '') ?? '')
+          : action.extractType === 'value'
+            ? (el as HTMLInputElement).value
+            : (el.textContent?.trim() ?? '');
+      return { output: { key: action.output, value } };
+    }
 
     case 'screenshot': {
       if (!action.selector || !action.output) {

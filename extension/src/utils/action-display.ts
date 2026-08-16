@@ -20,3 +20,21 @@ export function describeAction(action: WorkflowAction): string {
   const summary = parts.join(' → ');
   return value ? `${summary} = "${value}"` : summary;
 }
+
+const BATCH_NODE_LABELS: Record<string, string> = {
+  batchInput: 'Input',
+  batchClick: 'Click',
+  batchSearch: 'Search',
+  batchExtract: 'Extract',
+};
+
+// "Input 1" / "Click 2" are purely a display convention — nothing stores this
+// number, it's just how many nodes of the same batch kind came before it.
+export function batchNodeLabel(actions: WorkflowAction[], index: number): string {
+  const action = actions[index];
+  const name = BATCH_NODE_LABELS[action.type];
+  if (!name) return action.type;
+
+  const ordinal = actions.slice(0, index + 1).filter((a) => a.type === action.type).length;
+  return `${name} ${ordinal}`;
+}

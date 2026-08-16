@@ -1,4 +1,4 @@
-import type { WorkflowAction, RecorderSettings, SavedRecording, ReplayState } from '../types';
+import type { WorkflowAction, RecorderSettings, SavedRecording, ReplayState, BatchDataset, BatchReplayState } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 
 const DB_NAME = 'browser-agent';
@@ -6,6 +6,8 @@ const STORE_NAME = 'session';
 const SETTINGS_KEY = 'browser-agent-settings';
 const RECORDINGS_KEY = 'browser-agent-recordings';
 const REPLAY_STATE_KEY = 'browser-agent-replay-state';
+const BATCH_DATASET_KEY = 'browser-agent-batch-dataset';
+const BATCH_STATE_KEY = 'browser-agent-batch-state';
 const MAX_RECORDINGS = 50;
 
 function openDb(): Promise<IDBDatabase> {
@@ -85,4 +87,22 @@ export async function saveReplayState(state: ReplayState): Promise<void> {
 export async function loadReplayState(): Promise<ReplayState | null> {
   const result = await chrome.storage.local.get(REPLAY_STATE_KEY);
   return (result[REPLAY_STATE_KEY] as ReplayState | undefined) ?? null;
+}
+
+export async function saveBatchDataset(dataset: BatchDataset | null): Promise<void> {
+  await chrome.storage.local.set({ [BATCH_DATASET_KEY]: dataset });
+}
+
+export async function loadBatchDataset(): Promise<BatchDataset | null> {
+  const result = await chrome.storage.local.get(BATCH_DATASET_KEY);
+  return (result[BATCH_DATASET_KEY] as BatchDataset | undefined) ?? null;
+}
+
+export async function saveBatchState(state: BatchReplayState): Promise<void> {
+  await chrome.storage.local.set({ [BATCH_STATE_KEY]: state });
+}
+
+export async function loadBatchState(): Promise<BatchReplayState | null> {
+  const result = await chrome.storage.local.get(BATCH_STATE_KEY);
+  return (result[BATCH_STATE_KEY] as BatchReplayState | undefined) ?? null;
 }
