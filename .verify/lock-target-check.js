@@ -10,7 +10,9 @@ const check = (name, passed, detail = '') => {
 
 const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-serif">
   <div id="cellA" style="width:70px;height:32px;background:#eef">Alice</div>
-  <div id="cellB" style="width:70px;height:32px;background:#efe;margin-top:200px">Bob</div>
+  <div id="cellB" style="width:70px;height:32px;background:#efe;margin-top:120px">Bob</div>
+  <div id="cellC" style="width:70px;height:32px;background:#fee;margin-top:120px">Carol</div>
+  <div id="cellD" style="position:absolute;top:24px;right:24px;width:70px;height:32px;background:#ffe">Dan</div>
 </body></html>`;
 
 async function run() {
@@ -41,61 +43,97 @@ async function run() {
     const popup = await context.newPage();
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
 
-    // Bypasses real cursor hit-testing (the badge itself can sit on top of
-    // nearby elements) by firing the mousemove with its target set directly —
-    // the same event shape handleMove reacts to either way.
-    const dispatchMoveOn = (selector) =>
-      tab.evaluate((sel) => {
-        const el = document.querySelector(sel);
-        const rect = el.getBoundingClientRect();
-        el.dispatchEvent(
-          new MouseEvent('mousemove', { bubbles: true, clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 }),
-        );
-      }, selector);
+    const badge = tab.locator('#__browser_agent_add_badge__');
 
-    const captureViaAdd = async (label) => {
-      const badge = tab.locator('#__browser_agent_add_badge__');
-      const box = await badge.locator('[data-ba-role="add"]').boundingBox();
-      await tab.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-      await tab.waitForTimeout(150);
-      await badge.locator('button', { hasText: 'Text value' }).click();
-      await tab.waitForTimeout(300);
+    // Fires the mousemove *from* a given element (so detection resolves it
+    // as the target) but with explicit coordinates, decoupling "which
+    // element" from "how close to the badge" — real cursor movement can't
+    // hit-test through the badge's own overlay reliably enough for that.
+    const dispatchMoveFrom = (selector, clientX, clientY) =>
+      tab.evaluate(
+        ({ sel, x, y }) => {
+          const el = document.querySelector(sel);
+          el.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y }));
+        },
+        { sel: selector, x: clientX, y: clientY },
+      );
+
+    const dispatchMoveOn = async (selector) => {
+      const box = await tab.locator(selector).boundingBox();
+      await dispatchMoveFrom(selector, box.x + box.width / 2, box.y + box.height / 2);
+      return box;
+    };
+
+    const startRecording = async () => {
+      await tab.bringToFront();
+      await popup.click('.record-btn.start');
+      await tab.waitForTimeout(400);
+    };
+
+    const stopAndReadLastSelector = async () => {
       await tab.bringToFront();
       await popup.click('.record-btn.stop');
       await popup.waitForTimeout(400);
-      const selector = await popup.locator('.action-selector').last().textContent();
-      check(label, selector != null, selector ?? '(none)');
-      return selector;
+      return popup.locator('.action-selector').last().textContent();
     };
 
-    // ---- scenario 1: a quick pass over B, immediately followed by moving
-    // back off it, must not leave B as the locked target ----
-    await tab.bringToFront();
-    await popup.click('.record-btn.start');
-    await tab.waitForTimeout(400);
-
+    // ---- fast recognition: hovering a fresh element must not wait out any
+    // artificial debounce, unlike the earlier fix that slowed this down ----
+    await startRecording();
     await dispatchMoveOn('#cellA');
-    await tab.waitForTimeout(250); // let the badge lock onto A (first appearance is instant)
-    await dispatchMoveOn('#cellB'); // schedules a retarget to B after RETARGET_DEBOUNCE_MS
-    await dispatchMoveOn('#cellA'); // back on A well within the debounce window — cancels it
-    await tab.waitForTimeout(300); // long enough that a non-cancelled timer would have fired
+    await tab.waitForTimeout(60);
+    check('badge appears promptly on first hover', await badge.isVisible());
 
-    const selector1 = await captureViaAdd('scenario 1 capture recorded');
-    check('pass-through over B did not steal the target', selector1?.includes('cellA') ?? false, selector1 ?? '');
-
-    // ---- scenario 2: genuinely settling on B (past the debounce, no move
-    // back to A) must retarget to it ----
-    await tab.bringToFront();
-    await popup.click('.record-btn.start');
-    await tab.waitForTimeout(400);
-
-    await dispatchMoveOn('#cellA');
-    await tab.waitForTimeout(250);
     await dispatchMoveOn('#cellB');
-    await tab.waitForTimeout(300); // past the debounce, nothing cancels it this time
+    await tab.waitForTimeout(60); // well under the old 150ms debounce
+    const framedAfterFast = await tab.locator('#__browser_agent_target_frame__').boundingBox();
+    const cellBBox = await tab.locator('#cellB').boundingBox();
+    const sameBox = (a, b, tol = 3) =>
+      a && b && Math.abs(a.x - b.x) < tol && Math.abs(a.y - b.y) < tol && Math.abs(a.width - b.width) < tol;
+    check('retargeting to a new element is just as fast, no debounce lag', sameBox(framedAfterFast, cellBBox));
 
-    const selector2 = await captureViaAdd('scenario 2 capture recorded');
-    check('settling on B genuinely retargets it', selector2?.includes('cellB') ?? false, selector2 ?? '');
+    // ---- locked while the menu is open: a different element nearby must
+    // not steal the target ----
+    await dispatchMoveOn('#cellA');
+    await tab.waitForTimeout(200);
+    const triggerBox = await badge.locator('[data-ba-role="add"]').boundingBox();
+    await tab.mouse.click(triggerBox.x + triggerBox.width / 2, triggerBox.y + triggerBox.height / 2);
+    await tab.waitForTimeout(150);
+
+    const rootBox = await badge.boundingBox();
+    const nearX = rootBox.x + rootBox.width / 2;
+    const nearY = rootBox.y + rootBox.height + 20; // well inside the dismiss distance
+    await dispatchMoveFrom('#cellB', nearX, nearY);
+    await tab.waitForTimeout(150);
+    check('menu stays open when the cursor stays close', await badge.locator('[data-ba-role="menu"]').isVisible());
+
+    await badge.locator('button', { hasText: 'Text value' }).click();
+    await tab.waitForTimeout(300);
+    const selectorNear = await stopAndReadLastSelector();
+    check('a nearby element did not steal the locked target', selectorNear?.includes('cellA') ?? false, selectorNear ?? '');
+
+    // ---- moving well clear of the menu (no click needed) closes it and
+    // immediately resumes fast, live targeting ----
+    await startRecording();
+    await dispatchMoveOn('#cellC');
+    await tab.waitForTimeout(200);
+    const triggerBox2 = await badge.locator('[data-ba-role="add"]').boundingBox();
+    await tab.mouse.click(triggerBox2.x + triggerBox2.width / 2, triggerBox2.y + triggerBox2.height / 2);
+    await tab.waitForTimeout(150);
+
+    // cellD's own natural position is comfortably >120px from cellC's badge
+    // and stays within the viewport, unlike an arbitrary large offset would.
+    await dispatchMoveOn('#cellD');
+    await tab.waitForTimeout(150);
+    check('menu closes once the cursor clears out', !(await badge.locator('[data-ba-role="menu"]').isVisible()));
+
+    const triggerBox3 = await badge.locator('[data-ba-role="add"]').boundingBox();
+    await tab.mouse.click(triggerBox3.x + triggerBox3.width / 2, triggerBox3.y + triggerBox3.height / 2);
+    await tab.waitForTimeout(150);
+    await badge.locator('button', { hasText: 'Text value' }).click();
+    await tab.waitForTimeout(300);
+    const selectorFar = await stopAndReadLastSelector();
+    check('moving away re-locked onto the new element', selectorFar?.includes('cellD') ?? false, selectorFar ?? '');
   } finally {
     await context.close();
     server.close();
