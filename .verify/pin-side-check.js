@@ -84,6 +84,38 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     check('and did not spawn a separate popup window', windowsAfter === windowsBefore, `${windowsBefore} → ${windowsAfter}`);
     check('the page is still there beside it', !tab.isClosed());
 
+    // ---- Start must not dismiss a pinned panel. Playwright cannot click
+    // inside the panel's own page, so send the exact message Start sends. ----
+    const winId = await worker.evaluate(async () => {
+      const [t] = await chrome.tabs.query({ active: true, windowType: 'normal' });
+      return t.windowId;
+    });
+    await worker.evaluate(
+      (wid) => new Promise((r) => chrome.runtime.sendMessage({ type: 'CLOSE_POPUP', windowId: wid }, () => r(null))),
+      winId,
+    );
+    await tab.waitForTimeout(1000);
+
+    const afterStart = await contextTypes();
+    check('Start leaves the pinned panel in place', afterStart.includes('SIDE_PANEL'), afterStart.join(', '));
+    check('and leaves the browser window alone', !tab.isClosed());
+
+    // ---- nothing spills past the right edge of a narrow panel ----
+    const probe = await context.newPage();
+    await probe.setViewportSize({ width: 320, height: 640 });
+    await probe.goto(`chrome-extension://${extensionId}/popup.html?side=1`);
+    await probe.waitForTimeout(400);
+    const geometry = await probe.evaluate(() => ({
+      clientW: document.documentElement.clientWidth,
+      innerW: window.innerWidth,
+      scrollsDown: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+    }));
+    check(
+      'no page scrollbar stealing the right edge',
+      geometry.clientW === geometry.innerW && !geometry.scrollsDown,
+      JSON.stringify(geometry),
+    );
+
     // ---- turning it back off restores the popup-window behaviour ----
     await popup.click('text=Settings');
     await popup.waitForTimeout(200);

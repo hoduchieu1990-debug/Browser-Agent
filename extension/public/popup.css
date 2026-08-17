@@ -134,7 +134,12 @@ html.in-side-panel .popup {
 /* ---------- Main column ---------- */
 .popup-main {
   flex: 1;
+  /* Both explicit: a flex item defaults to min-*: auto, which refuses to
+     shrink below its content. Without these the tab's own scroller never
+     takes effect — the whole page grows instead and its scrollbar eats a
+     strip of the panel's right edge. */
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
