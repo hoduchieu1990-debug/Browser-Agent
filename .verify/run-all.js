@@ -31,6 +31,7 @@ const CHECKS = [
   'batch-nodes-check.js',
   'batch-nodes-cli-check.js',
   'export-picker-check.js',
+  'export-completeness-check.js',
   'menu-check.js',
   'badge-reach-check.js',
   'stop-cleanup-check.js',
