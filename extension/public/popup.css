@@ -68,6 +68,7 @@ html.in-side-panel .popup {
   height: 100vh;
 }
 
+
 /* ---------- Sidebar ---------- */
 .sidebar {
   width: 68px;
@@ -1081,4 +1082,54 @@ html.in-side-panel .popup {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ring);
+}
+
+/* ---------- Narrow (docked to the side) ----------
+   Must stay last in the file: a media query carries no extra specificity, so
+   these only win by coming after the rules they adjust.
+
+   A 68px rail down the side is a fifth of a narrow panel, taken from the very
+   content it exists to show. Lay the nav across the top instead, where a
+   full-height panel has room to spare, and give the steps, tables and
+   screenshots the whole width back. */
+@media (max-width: 400px) {
+  .popup {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 2px;
+    padding: 5px 4px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-brand {
+    display: none; /* the header underneath already names the panel */
+  }
+
+  .sidebar-item {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 2px;
+    gap: 2px;
+    font-size: 9px;
+  }
+
+  .sidebar-item svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .popup-header {
+    height: 40px;
+    padding: 0 12px;
+  }
+
+  .popup-content {
+    padding: 12px;
+  }
 }
