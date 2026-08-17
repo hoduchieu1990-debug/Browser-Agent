@@ -11,6 +11,7 @@ const CHECKS = [
   'cross-page-capture-check.js',
   'pin-side-check.js',
   'popup-width-check.js',
+  'aim-click-check.js',
   'badge-follow-check.js',
   'target-frame-check.js',
   'lock-target-check.js',

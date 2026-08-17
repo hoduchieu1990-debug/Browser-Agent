@@ -315,6 +315,10 @@ async function applyPinSide(enabled: boolean): Promise<void> {
   await chrome.sidePanel.setOptions({ path: 'popup.html?side=1', enabled }).catch(() => {});
   // With the panel enabled the toolbar button should open it, not the popup.
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: enabled }).catch(() => {});
+  // …but a declared popup wins over that behaviour, so the button would keep
+  // opening the popup — which dismisses itself the moment the page is clicked,
+  // exactly what pinning is meant to avoid. Clear it while pinned.
+  await chrome.action.setPopup({ popup: enabled ? '' : 'popup.html' }).catch(() => {});
 }
 
 // Reopens the popup so Stop (clicked from the on-page badge, with nothing of
@@ -699,6 +703,12 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       if (!recording) return;
       const tabId = sender.tab?.id;
       recordingHost ??= hostnameOf(sender.url); // sender.url needs no "tabs" permission
+
+      // The click that aimed at this element was the same intention as the
+      // Add that followed it, so it is not a step of its own.
+      if (message.replacesLastClick && actions[actions.length - 1]?.type === 'click') {
+        actions.pop();
+      }
 
       const action = withUniqueOutput({ ...message.action, id: `step-${++stepCounter}` } as WorkflowAction);
 

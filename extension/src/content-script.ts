@@ -1,4 +1,5 @@
-import type { RuntimeMessage, RecorderState, BatchInputType } from './types';
+import type { RuntimeMessage, RecorderState, BatchInputType, RecordedActionPayload } from './types';
+import { isExtensionUi } from './utils/ui-marker';
 import { attachListeners, type RecorderHandle } from './utils/action-recorder';
 import { attachHighlighter, type HighlighterHandle } from './utils/highlighter';
 import { attachExtractBadge, type BatchKind } from './utils/extract-badge';
@@ -27,31 +28,52 @@ function locate(el: Element): { selector: string; selectorFallbacks?: string[] }
   return rest.length ? { selector, selectorFallbacks: rest } : { selector };
 }
 
-function recordTable(table: HTMLElement): void {
+// Clicking something to aim at it and then pressing Add is one intention, not
+// two: the click was how the user pointed, and Add is what they meant. Left
+// alone it lands in the recording as its own step, so Add reports whether it
+// supersedes one and the background drops it.
+const AIM_CLICK_WINDOW_MS = 10000;
+let lastPageClick: { el: Element; at: number } | null = null;
+
+function takeSupersededClick(captured: Element): boolean {
+  const aim = lastPageClick;
+  lastPageClick = null;
+  if (!aim || Date.now() - aim.at > AIM_CLICK_WINDOW_MS) return false;
+  return captured === aim.el || captured.contains(aim.el);
+}
+
+function notePageClick(event: MouseEvent): void {
+  const target = event.target as Element | null;
+  if (target && !isExtensionUi(target)) lastPageClick = { el: target, at: Date.now() };
+}
+
+function capture(action: RecordedActionPayload, el: Element): void {
   chrome.runtime.sendMessage({
     type: 'RECORDED_ACTION',
-    action: {
+    action,
+    replacesLastClick: takeSupersededClick(el),
+  } satisfies RuntimeMessage);
+}
+
+function recordTable(table: HTMLElement): void {
+  capture(
+    {
       type: 'extractTable',
       ...locate(table),
       headers: extractTableHeaders(table),
       output: `table${++tableCount}`,
     },
-  } satisfies RuntimeMessage);
+    table,
+  );
 }
 
 function recordText(el: HTMLElement): void {
-  chrome.runtime.sendMessage({
-    type: 'RECORDED_ACTION',
-    action: { type: 'extractText', ...locate(el), output: `text${++textCount}` },
-  } satisfies RuntimeMessage);
+  capture({ type: 'extractText', ...locate(el), output: `text${++textCount}` }, el);
 }
 
 function recordImage(el: HTMLElement): void {
   const name = `image${++imageCount}`;
-  chrome.runtime.sendMessage({
-    type: 'RECORDED_ACTION',
-    action: { type: 'screenshot', ...locate(el), filename: `${name}.png`, output: name },
-  } satisfies RuntimeMessage);
+  capture({ type: 'screenshot', ...locate(el), filename: `${name}.png`, output: name }, el);
 }
 
 function inferBatchInputType(el: HTMLElement): BatchInputType {
@@ -74,7 +96,7 @@ function recordBatch(el: HTMLElement, kind: BatchKind): void {
           ? { type: 'batchSearch' as const, ...located, waitCondition: { type: 'elementAppears' as const, timeout: 30000 } }
           : { type: 'batchExtract' as const, ...located, extractType: 'text' as const, output: `result${++batchExtractCount}` };
 
-  chrome.runtime.sendMessage({ type: 'RECORDED_ACTION', action } satisfies RuntimeMessage);
+  capture(action, el);
 }
 
 function setRecording(value: boolean, highlightElements: boolean): void {
@@ -83,6 +105,8 @@ function setRecording(value: boolean, highlightElements: boolean): void {
     textCount = 0;
     imageCount = 0;
     batchExtractCount = 0;
+    lastPageClick = null;
+    document.addEventListener('click', notePageClick, true);
     recorder = attachListeners((action) => {
       chrome.runtime.sendMessage({ type: 'RECORDED_ACTION', action } satisfies RuntimeMessage);
     });
@@ -96,6 +120,8 @@ function setRecording(value: boolean, highlightElements: boolean): void {
       onTargetChange: (hasTarget) => highlighter?.setPaused(hasTarget),
     });
   } else if (!value && recorder) {
+    document.removeEventListener('click', notePageClick, true);
+    lastPageClick = null;
     recorder.detach();
     recorder = null;
     detachBadge?.();

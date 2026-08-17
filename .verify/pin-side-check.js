@@ -58,6 +58,12 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     check('turning it on enables the panel', options.enabled === true, JSON.stringify(options));
     check('and points the toolbar button at it', behavior.openPanelOnActionClick === true, JSON.stringify(behavior));
 
+    // A declared popup overrides openPanelOnActionClick, so the button would
+    // keep opening the popup — which dismisses itself as soon as the page is
+    // clicked, defeating the whole point of pinning.
+    const pinnedPopup = await worker.evaluate(() => chrome.action.getPopup({}));
+    check('and stops the button opening a dismissable popup', pinnedPopup === '', JSON.stringify(pinnedPopup));
+
     // ---- Stop from the page opens the panel rather than a popup window ----
     await popup.click('text=Record');
     await popup.waitForTimeout(200);
@@ -124,6 +130,9 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
 
     const offAgain = await worker.evaluate(() => chrome.sidePanel.getOptions({}));
     check('turning it off disables the panel again', offAgain.enabled === false, JSON.stringify(offAgain));
+
+    const restoredPopup = await worker.evaluate(() => chrome.action.getPopup({}));
+    check('and gives the button its popup back', restoredPopup.endsWith('popup.html'), restoredPopup);
   } finally {
     await context.close();
     server.close();

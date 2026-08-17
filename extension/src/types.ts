@@ -37,7 +37,7 @@ export type RuntimeMessage =
   | { type: 'GET_SETTINGS' }
   | { type: 'SET_SETTINGS'; settings: RecorderSettings }
   | { type: 'SET_RECORDING'; value: boolean; highlightElements: boolean }
-  | { type: 'RECORDED_ACTION'; action: RecordedActionPayload }
+  | { type: 'RECORDED_ACTION'; action: RecordedActionPayload; replacesLastClick?: boolean }
   | { type: 'ACTIONS_UPDATED'; actions: WorkflowAction[] }
   | { type: 'SHOW_TOAST'; step: number; action: WorkflowAction }
   | { type: 'REPLAY_START'; background: boolean }
