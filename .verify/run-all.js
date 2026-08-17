@@ -10,6 +10,7 @@ const CHECKS = [
   'navigate-fragment-check.js',
   'cross-page-capture-check.js',
   'pin-side-check.js',
+  'popup-width-check.js',
   'badge-follow-check.js',
   'target-frame-check.js',
   'lock-target-check.js',

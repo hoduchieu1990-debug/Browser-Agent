@@ -38,11 +38,10 @@
 }
 
 body {
+  /* Deliberately not capped to the viewport: Chrome opens a popup in a small
+     frame and grows it to fit, so anything sized off vw here would lock it to
+     that first, tiny frame. Panel widths are handled under .in-side-panel. */
   width: 460px;
-  /* Never wider than the frame it was given — a popup gets exactly the 460
-     it asked for, while a narrower side panel clips this back instead of
-     pushing the controls out of reach behind a scrollbar. */
-  max-width: 100vw;
   margin: 0;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 13px;
@@ -1093,11 +1092,11 @@ html.in-side-panel .popup {
    full-height panel has room to spare, and give the steps, tables and
    screenshots the whole width back. */
 @media (max-width: 400px) {
-  .popup {
+  html.in-side-panel .popup {
     flex-direction: column;
   }
 
-  .sidebar {
+  html.in-side-panel .sidebar {
     width: 100%;
     flex-direction: row;
     align-items: stretch;
@@ -1107,11 +1106,11 @@ html.in-side-panel .popup {
     border-bottom: 1px solid var(--border);
   }
 
-  .sidebar-brand {
+  html.in-side-panel .sidebar-brand {
     display: none; /* the header underneath already names the panel */
   }
 
-  .sidebar-item {
+  html.in-side-panel .sidebar-item {
     flex: 1;
     min-width: 0;
     padding: 5px 2px;
@@ -1119,17 +1118,17 @@ html.in-side-panel .popup {
     font-size: 9px;
   }
 
-  .sidebar-item svg {
+  html.in-side-panel .sidebar-item svg {
     width: 15px;
     height: 15px;
   }
 
-  .popup-header {
+  html.in-side-panel .popup-header {
     height: 40px;
     padding: 0 12px;
   }
 
-  .popup-content {
+  html.in-side-panel .popup-content {
     padding: 12px;
   }
 }
