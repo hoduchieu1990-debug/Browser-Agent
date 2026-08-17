@@ -10,6 +10,7 @@ const ITEMS: { key: keyof RecorderSettings; name: string; desc: string }[] = [
   { key: 'captureScreenshots', name: 'Capture Screenshots', desc: 'Add a screenshot step after each action' },
   { key: 'highlightElements', name: 'Highlight Elements', desc: 'Outline element under cursor while recording' },
   { key: 'onPageConfirmation', name: 'On-page Confirmation', desc: 'Toast on the page after each recorded step' },
+  { key: 'pinSide', name: 'Pin to Side', desc: 'Dock to the right edge; the page shrinks beside it' },
   { key: 'verboseLogging', name: 'Verbose Logging', desc: 'Log extension activity to the console' },
 ];
 

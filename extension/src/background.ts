@@ -52,6 +52,9 @@ loadSession().then((saved) => {
 });
 loadSettings().then((saved) => {
   settings = saved;
+  // The panel's enabled/behaviour flags live in the browser, not our storage,
+  // and reset when the extension reloads — restate them from the saved choice.
+  applyPinSide(settings.pinSide);
 });
 loadBatchDataset().then((saved) => {
   batchDataset = saved;
@@ -303,10 +306,35 @@ chrome.windows.onRemoved.addListener((id) => {
   if (id === popupWindowId) popupWindowId = null;
 });
 
-// Reopens the popup as its own small window so Stop (clicked from the
-// on-page badge, with the toolbar popup closed) has somewhere to land. A
-// popup-type window, not a tab, so it looks and behaves like the real thing.
-async function openPopupWindow(): Promise<void> {
+// Pin to Side hands the whole job to Chrome's side panel: it lives at the
+// right edge and the page reflows beside it rather than being covered, which
+// a popup window can never do.
+async function applyPinSide(enabled: boolean): Promise<void> {
+  // ?side is how the page knows to lay itself out for a resizable panel
+  // instead of a fixed-width popup — nothing else can tell the two apart.
+  await chrome.sidePanel.setOptions({ path: 'popup.html?side=1', enabled }).catch(() => {});
+  // With the panel enabled the toolbar button should open it, not the popup.
+  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: enabled }).catch(() => {});
+}
+
+// Reopens the popup so Stop (clicked from the on-page badge, with nothing of
+// ours on screen) has somewhere to land — the side panel when pinned, else a
+// popup-type window so it still looks and behaves like the real thing.
+async function openPopupWindow(windowId?: number): Promise<void> {
+  if (settings.pinSide) {
+    // open() demands a window or tab to attach to, and only accepts one from
+    // a user gesture — the badge click that got us here counts.
+    const target = windowId ?? (await getActiveTab())?.windowId;
+    if (target !== undefined) {
+      try {
+        await chrome.sidePanel.open({ windowId: target });
+        return;
+      } catch (error) {
+        log('side panel open failed', (error as Error).message);
+      }
+    }
+  }
+
   if (popupWindowId !== null) {
     try {
       await chrome.windows.update(popupWindowId, { focused: true });
@@ -578,7 +606,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
         // The badge that sent this is proof of which window holds the site,
         // so the popup we are about to focus cannot muddle it.
         if (sender.tab.windowId !== undefined) rememberBrowsingWindow(sender.tab.windowId);
-        openPopupWindow();
+        openPopupWindow(sender.tab.windowId);
       }
       return;
 
@@ -629,6 +657,10 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       return;
 
     case 'CLOSE_POPUP':
+      // Pinned to the side, staying put is the whole point — and the id here
+      // would be the browser window itself, so closing it would take the
+      // page down with it.
+      if (settings.pinSide) return;
       // window.close() only works for the one true action popup, not a
       // window opened via chrome.windows.create (like the one Stop reopens)
       // — chrome.windows.remove closes either kind, called from here where
@@ -658,6 +690,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
     case 'SET_SETTINGS':
       settings = message.settings;
       saveSettings(settings);
+      applyPinSide(settings.pinSide);
       if (recording) attachToActiveTab(settings.highlightElements);
       sendResponse(settings);
       return;

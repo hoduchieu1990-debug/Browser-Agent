@@ -13,6 +13,7 @@ export interface RecorderSettings {
   captureScreenshots: boolean;
   highlightElements: boolean;
   onPageConfirmation: boolean;
+  pinSide: boolean;
   verboseLogging: boolean;
 }
 
@@ -21,6 +22,7 @@ export const DEFAULT_SETTINGS: RecorderSettings = {
   captureScreenshots: false,
   highlightElements: true,
   onPageConfirmation: true,
+  pinSide: false,
   verboseLogging: false,
 };
 

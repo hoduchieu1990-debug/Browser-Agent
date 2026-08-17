@@ -27,6 +27,9 @@
       "all_frames": true
     }
   ],
-  "permissions": ["storage", "activeTab", "scripting", "webNavigation", "downloads", "debugger"],
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "permissions": ["storage", "activeTab", "scripting", "webNavigation", "downloads", "debugger", "sidePanel"],
   "host_permissions": ["<all_urls>"]
 }

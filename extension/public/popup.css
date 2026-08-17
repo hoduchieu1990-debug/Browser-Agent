@@ -53,6 +53,17 @@ body {
   height: 600px;
 }
 
+/* Docked to the side, width and height are the user's to set — stretch to
+   whatever they drag it to instead of holding the popup's fixed box. */
+html.in-side-panel body {
+  width: 100%;
+  min-width: 0;
+}
+
+html.in-side-panel .popup {
+  height: 100vh;
+}
+
 /* ---------- Sidebar ---------- */
 .sidebar {
   width: 68px;
