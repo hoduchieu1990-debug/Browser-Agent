@@ -366,14 +366,18 @@ async function openPopupWindow(windowId?: number): Promise<void> {
 // Prefer whichever suits the mode and fall back to the other rather than
 // losing the screenshot.
 async function captureForStep(
-  request: { rect: CaptureRect; pageRect: CaptureRect; dpr: number },
+  request: { rect: CaptureRect; pageRect: CaptureRect; dpr: number; exceedsViewport?: boolean },
   tabId: number,
   windowId: number,
   inBackground: boolean,
 ): Promise<string> {
   const viaTab = () => captureElement(windowId, request.rect, request.dpr);
   const viaDebugger = () => captureElementViaDebugger(tabId, request.pageRect);
-  const attempts = inBackground ? [viaDebugger, viaTab] : [viaTab, viaDebugger];
+  // An element taller or wider than the screen cannot be cropped out of a
+  // photo of the screen — whatever lies beyond the edge was never in it. The
+  // devtools route renders past the viewport, so it is the only one that can.
+  const preferDebugger = inBackground || request.exceedsViewport === true;
+  const attempts = preferDebugger ? [viaDebugger, viaTab] : [viaTab, viaDebugger];
 
   let lastError: unknown;
   for (const attempt of attempts) {

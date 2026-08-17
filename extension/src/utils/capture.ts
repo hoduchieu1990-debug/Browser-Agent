@@ -22,12 +22,27 @@ function toBase64(buffer: ArrayBuffer): string {
 // on a minimized window; this is what makes background runs able to capture.
 // The clip is in document coordinates and CDP does the cropping for us.
 export async function captureElementViaDebugger(tabId: number, pageRect: CaptureRect): Promise<string> {
+  // The clip is read in the page's own unzoomed coordinates, while the rect
+  // came from a zoomed page — at anything but 100% the two disagree and the
+  // capture lands somewhere else entirely.
+  const zoom = await chrome.tabs.getZoom(tabId).catch(() => 1);
+  const clip =
+    zoom === 1
+      ? { ...pageRect, scale: 1 }
+      : {
+          x: pageRect.x * zoom,
+          y: pageRect.y * zoom,
+          width: pageRect.width * zoom,
+          height: pageRect.height * zoom,
+          scale: 1,
+        };
+
   await chrome.debugger.attach({ tabId }, '1.3');
   try {
     const result = (await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', {
       format: 'png',
       captureBeyondViewport: true,
-      clip: { ...pageRect, scale: 1 },
+      clip,
     })) as { data: string } | undefined;
 
     if (!result?.data) throw new Error('Page.captureScreenshot returned no image');

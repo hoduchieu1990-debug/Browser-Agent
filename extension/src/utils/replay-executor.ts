@@ -24,6 +24,8 @@ export interface CaptureRequest {
   rect: CaptureRect; // viewport-relative, for cropping a captureVisibleTab frame
   pageRect: CaptureRect; // document-relative, for the devtools clip
   dpr: number;
+  /** Larger than the screen, so cropping a photo of the screen cannot contain it. */
+  exceedsViewport: boolean;
 }
 
 export interface StepResult {
@@ -215,6 +217,10 @@ export async function executeStep(action: WorkflowAction & { resolvedValue?: str
             height: rect.height,
           },
           dpr: window.devicePixelRatio || 1,
+          // Scrolling it into view cannot help when it is simply bigger than
+          // the view; only a capture that renders past the viewport can hold
+          // all of it.
+          exceedsViewport: rect.height > window.innerHeight || rect.width > window.innerWidth,
         },
       };
     }
