@@ -51,6 +51,9 @@ export function App() {
   const [replayInBackground, setReplayInBackground] = useState(false);
   const [batchDataset, setBatchDataset] = useState<BatchDataset | null>(null);
   const [batchState, setBatchState] = useState<BatchReplayState | null>(null);
+  // Looked up ahead of time: sidePanel.open() must be called straight out of
+  // the click, and awaiting the window there would spend the gesture.
+  const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
 
   const hasBatchNodes = actions.some((a) => a.type.startsWith('batch'));
 
@@ -68,6 +71,7 @@ export function App() {
     chrome.runtime.sendMessage({ type: 'BATCH_GET_DATASET' } satisfies RuntimeMessage, (dataset: BatchDataset | null) => {
       setBatchDataset(dataset);
     });
+    chrome.windows.getCurrent().then((win) => setCurrentWindowId(win.id ?? null));
 
     const pullReplayState = () => {
       chrome.runtime.sendMessage({ type: 'GET_REPLAY_STATE' } satisfies RuntimeMessage, (state: ReplayState | null) => {
@@ -118,8 +122,9 @@ export function App() {
       setError(state.error ?? null);
       // Get out of the way once recording actually starts, so the page is
       // clear to interact with — stopping (from the on-page badge) reopens
-      // this same popup to review the result.
-      if (starting && state.recording && !state.error) await dismissSelf();
+      // this same popup to review the result. Pinned is the exception: there
+      // the whole point is that it stays put and the page reflows beside it.
+      if (starting && state.recording && !state.error && !settings.pinSide) await dismissSelf();
     });
   };
 
@@ -181,6 +186,18 @@ export function App() {
   };
 
   const updateSetting = (key: keyof RecorderSettings, value: boolean) => {
+    // Turning Pin on takes effect at once, so the user is not left in an
+    // ordinary popup that still vanishes at the first click on the page.
+    // This runs before anything else because sidePanel.open() insists on the
+    // gesture that triggered it, and only a direct call from the click keeps
+    // it — relaying the request through the background loses it.
+    if (key === 'pinSide' && value && currentWindowId !== null) {
+      chrome.sidePanel
+        .open({ windowId: currentWindowId })
+        .then(() => dismissSelf())
+        .catch(() => {}); // the toolbar button opens it either way
+    }
+
     const next = { ...settings, [key]: value };
     setSettings(next);
     chrome.runtime.sendMessage({ type: 'SET_SETTINGS', settings: next } satisfies RuntimeMessage);

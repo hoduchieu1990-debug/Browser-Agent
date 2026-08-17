@@ -41,9 +41,14 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     const contextTypes = () =>
       worker.evaluate(() => chrome.runtime.getContexts({}).then((c) => c.map((x) => x.contextType)));
 
-    // ---- off by default ----
-    const initial = await worker.evaluate(() => chrome.sidePanel.getOptions({}));
-    check('side panel is off until asked for', initial.enabled !== true, JSON.stringify(initial));
+    // ---- off by default. The panel is kept *available* at all times (open()
+    // refuses to work on one that is not, and enabling it on demand costs the
+    // user gesture open() also needs), so what says "off" is that nothing
+    // routes to it: the button still opens the ordinary popup. ----
+    const initialBehavior = await worker.evaluate(() => chrome.sidePanel.getPanelBehavior());
+    const initialPopup = await worker.evaluate(() => chrome.action.getPopup({}));
+    check('nothing opens the panel until asked', initialBehavior.openPanelOnActionClick !== true, JSON.stringify(initialBehavior));
+    check('and the button still opens the popup', initialPopup.endsWith('popup.html'), initialPopup);
 
     // ---- the Settings toggle turns it on ----
     await popup.click('text=Settings');
@@ -55,7 +60,7 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
 
     const options = await worker.evaluate(() => chrome.sidePanel.getOptions({}));
     const behavior = await worker.evaluate(() => chrome.sidePanel.getPanelBehavior());
-    check('turning it on enables the panel', options.enabled === true, JSON.stringify(options));
+    check('the panel is available to open', options.enabled === true, JSON.stringify(options));
     check('and points the toolbar button at it', behavior.openPanelOnActionClick === true, JSON.stringify(behavior));
 
     // A declared popup overrides openPanelOnActionClick, so the button would
@@ -63,6 +68,11 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     // clicked, defeating the whole point of pinning.
     const pinnedPopup = await worker.evaluate(() => chrome.action.getPopup({}));
     check('and stops the button opening a dismissable popup', pinnedPopup === '', JSON.stringify(pinnedPopup));
+
+    // Turning it on has to take hold there and then — otherwise the user is
+    // left in an ordinary popup that still disappears when they click the page.
+    const afterToggle = await contextTypes();
+    check('turning it on docks the panel immediately', afterToggle.includes('SIDE_PANEL'), afterToggle.join(', '));
 
     // ---- Stop from the page opens the panel rather than a popup window ----
     await popup.click('text=Record');
@@ -75,9 +85,6 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     const box = await tab.locator('#cellA').boundingBox();
     await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await tab.waitForTimeout(400);
-
-    const before = await contextTypes();
-    check('no side panel open yet', !before.includes('SIDE_PANEL'), before.join(', '));
 
     const windowsBefore = await worker.evaluate(() => chrome.windows.getAll().then((w) => w.length));
     await badge.locator('[data-ba-role="stop"]').click();
@@ -128,8 +135,8 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     await popup.locator('.setting-item').filter({ hasText: 'Pin to Side' }).locator('.toggle').click();
     await popup.waitForTimeout(500);
 
-    const offAgain = await worker.evaluate(() => chrome.sidePanel.getOptions({}));
-    check('turning it off disables the panel again', offAgain.enabled === false, JSON.stringify(offAgain));
+    const offBehavior = await worker.evaluate(() => chrome.sidePanel.getPanelBehavior());
+    check('turning it off stops routing to the panel', offBehavior.openPanelOnActionClick === false, JSON.stringify(offBehavior));
 
     const restoredPopup = await worker.evaluate(() => chrome.action.getPopup({}));
     check('and gives the button its popup back', restoredPopup.endsWith('popup.html'), restoredPopup);

@@ -310,12 +310,15 @@ chrome.windows.onRemoved.addListener((id) => {
 // right edge and the page reflows beside it rather than being covered, which
 // a popup window can never do.
 async function applyPinSide(enabled: boolean): Promise<void> {
-  // ?side is how the page knows to lay itself out for a resizable panel
+  // Kept available at all times, not switched with the setting: open() fails
+  // outright on a panel that is not already enabled, and enabling it first
+  // costs an await — which spends the user gesture open() also demands.
+  // Availability alone shows nothing; what follows decides when it appears.
+  await chrome.sidePanel.setOptions({ path: 'popup.html?side=1', enabled: true }).catch(() => {});
+  // ?side above is how the page knows to lay itself out for a resizable panel
   // instead of a fixed-width popup — nothing else can tell the two apart.
-  await chrome.sidePanel.setOptions({ path: 'popup.html?side=1', enabled }).catch(() => {});
-  // With the panel enabled the toolbar button should open it, not the popup.
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: enabled }).catch(() => {});
-  // …but a declared popup wins over that behaviour, so the button would keep
+  // A declared popup wins over that behaviour, so the button would keep
   // opening the popup — which dismisses itself the moment the page is clicked,
   // exactly what pinning is meant to avoid. Clear it while pinned.
   await chrome.action.setPopup({ popup: enabled ? '' : 'popup.html' }).catch(() => {});
@@ -691,13 +694,16 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       loadReplayState().then((stored) => sendResponse(markStalled(stored ?? replayState)));
       return true; // async sendResponse
 
-    case 'SET_SETTINGS':
+    case 'SET_SETTINGS': {
       settings = message.settings;
       saveSettings(settings);
+      // Straight away, before any await: opening the panel needs the gesture
+      // that produced this message, and awaiting first would spend it.
       applyPinSide(settings.pinSide);
       if (recording) attachToActiveTab(settings.highlightElements);
       sendResponse(settings);
       return;
+    }
 
     case 'RECORDED_ACTION': {
       if (!recording) return;
