@@ -19,6 +19,7 @@ const CHECKS = [
   'code-block-check.js',
   'variant-class-check.js',
   'table-kinds-check.js',
+  'layout-table-check.js',
   'nth-match-cli-check.js',
   'selector-resilience-check.js',
   'reset-confirm-check.js',

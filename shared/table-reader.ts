@@ -14,9 +14,25 @@ export interface TableShape {
   rows: string[][];
 }
 
+// Plenty of pages still nest their whole layout in a <table>. Structurally
+// that is a table, but capturing it hands back the entire page — stylesheets
+// and all — rather than data, so it must not be offered as one.
+const LAYOUT_CELL_TEXT_LIMIT = 300;
+
+function isLayoutScaffolding(el: Element): boolean {
+  const role = el.getAttribute('role');
+  if (role === 'presentation' || role === 'none') return true;
+
+  // Column headings are the clearest sign the author meant it as data.
+  if (el.querySelector('th, [role="columnheader"]')) return false;
+
+  const cells = Array.from(el.querySelectorAll('td, [role="cell"], [role="gridcell"]'));
+  return cells.some((cell) => (cell.textContent ?? '').trim().length > LAYOUT_CELL_TEXT_LIMIT);
+}
+
 /** Detection only: does this element present itself as tabular data? */
 export function isTableLike(el: Element): boolean {
-  if (el.tagName === 'TABLE') return true;
+  if (el.tagName === 'TABLE') return !isLayoutScaffolding(el);
 
   // A <tbody> also looks like "repeated rows of equal shape", but stopping
   // there would leave the <thead> — and therefore the column names — outside
@@ -24,7 +40,7 @@ export function isTableLike(el: Element): boolean {
   if (['TBODY', 'THEAD', 'TFOOT', 'TR', 'TD', 'TH', 'COLGROUP'].includes(el.tagName)) return false;
 
   const role = el.getAttribute('role');
-  if (role === 'table' || role === 'grid' || role === 'treegrid') return true;
+  if (role === 'table' || role === 'grid' || role === 'treegrid') return !isLayoutScaffolding(el);
 
   // A div grid gives itself away by repetition: several sibling "rows" of the
   // same shape, each holding the same number of children.
@@ -50,7 +66,24 @@ export function readTable(el: Element): TableShape {
   const CELL_SELECTOR = 'td, th, [role="cell"], [role="gridcell"], [role="columnheader"], [role="rowheader"]';
   const HEADER_SELECTOR = 'th, [role="columnheader"]';
 
-  const text = (node: Element) => (node.textContent ?? '').replace(/\s+/g, ' ').trim();
+  // textContent would include anything a <style> or <script> inside the cell
+  // happens to hold, and pages do put those mid-content — the stylesheet then
+  // shows up as the cell's "value". Walk the text nodes and skip those.
+  const text = (node: Element) => {
+    const parts: string[] = [];
+    const collect = (n: Node) => {
+      if (n.nodeType === 3) {
+        parts.push(n.nodeValue ?? '');
+        return;
+      }
+      if (n.nodeType !== 1) return;
+      const tag = (n as Element).tagName;
+      if (tag === 'STYLE' || tag === 'SCRIPT' || tag === 'NOSCRIPT' || tag === 'TEMPLATE') return;
+      n.childNodes.forEach(collect);
+    };
+    collect(node);
+    return parts.join(' ').replace(/\s+/g, ' ').trim();
+  };
 
   const isHeaderCell = (cell: Element) => cell.tagName === 'TH' || cell.getAttribute('role') === 'columnheader';
 
