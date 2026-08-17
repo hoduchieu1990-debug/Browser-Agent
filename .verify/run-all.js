@@ -13,6 +13,7 @@ const CHECKS = [
   'popup-width-check.js',
   'aim-click-check.js',
   'capture-crop-check.js',
+  'image-matches-frame-check.js',
   'badge-follow-check.js',
   'target-frame-check.js',
   'lock-target-check.js',

@@ -471,8 +471,11 @@ export function attachExtractBadge({
     choose(event, () => el && onAddText(el));
   };
 
+  // "Image of this area" means the area drawn on screen — so it takes exactly
+  // what the outline is around. Preferring the table here instead used to
+  // photograph a whole table when the outline was on one of its cells.
   const handleImage = (event: MouseEvent) => {
-    const el = currentTable ?? currentText;
+    const el = defaultTarget();
     choose(event, () => el && onAddImage(el));
   };
 
