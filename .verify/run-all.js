@@ -14,6 +14,7 @@ const CHECKS = [
   'aim-click-check.js',
   'capture-crop-check.js',
   'image-matches-frame-check.js',
+  'single-toast-check.js',
   'badge-follow-check.js',
   'target-frame-check.js',
   'lock-target-check.js',

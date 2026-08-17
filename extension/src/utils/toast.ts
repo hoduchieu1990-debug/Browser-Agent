@@ -25,6 +25,11 @@ function getContainer(): HTMLDivElement {
 
 export function showToast(step: number, label: string): void {
   const container = getContainer();
+  // One notice at a time. They used to stack, so a single Add could leave two
+  // on screen at once — its own, plus the starting-url step recorded with it,
+  // or simply the previous one that had not faded yet.
+  container.replaceChildren();
+
   const toast = document.createElement('div');
   toast.textContent = `✓ Step ${step}: ${label}`;
   toast.style.background = '#ffffff';
