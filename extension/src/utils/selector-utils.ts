@@ -208,6 +208,31 @@ function nthMatchSelector(el: Element): string | null {
   return index === -1 ? null : `:nth-match(${base}, ${index + 1})`;
 }
 
+// Same order as generateSelectorCandidates up through looseDescendantPath/bare
+// tag, but stops at the first match instead of computing every remaining
+// strategy — callers that only need a yes/no (is this element identifiable by
+// something other than its position) don't need the nth-match/anchored/
+// absolute tail, which is the expensive part on pages with many elements.
+export function hasNonPositionalSelector(el: Element): boolean {
+  if (el.id && isStableId(el.id) && matchesOnly(`#${CSS.escape(el.id)}`, el)) return true;
+  for (const attribute of TEST_ATTRIBUTES) {
+    const candidate = attributeSelector(el, attribute);
+    if (candidate && matchesOnly(candidate, el)) return true;
+  }
+  for (const attribute of ['name', 'aria-label', 'placeholder', 'title', 'alt']) {
+    const candidate = attributeSelector(el, attribute);
+    if (candidate && matchesOnly(candidate, el)) return true;
+  }
+  if (el.tagName === 'A') {
+    const href = attributeSelector(el, 'href');
+    if (href && matchesOnly(href, el)) return true;
+  }
+  const byClass = stableClassSelector(el);
+  if (byClass && matchesOnly(byClass, el)) return true;
+  if (looseDescendantPath(el) !== null) return true;
+  return matchesOnly(el.tagName.toLowerCase(), el);
+}
+
 // Ordered best-first, every one verified to match this element and nothing else.
 export function generateSelectorCandidates(el: Element): string[] {
   const candidates: string[] = [];

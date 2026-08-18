@@ -1,5 +1,5 @@
 import { findTableAncestor, findClickableAncestor } from './clickable-element';
-import { generateSelectorCandidates } from './selector-utils';
+import { hasNonPositionalSelector } from './selector-utils';
 import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 
 const BADGE_ID = '__browser_agent_add_badge__';
@@ -39,8 +39,7 @@ const INLINE_TAGS = new Set([
 // by what it is — good enough to replay, but a sign the element itself is
 // anonymous and its container is the better thing to capture.
 function isPositionOnly(el: Element): boolean {
-  const best = generateSelectorCandidates(el)[0];
-  return best.startsWith('body >') || best.startsWith(':nth-match(') || best.includes(':nth-of-type(');
+  return !hasNonPositionalSelector(el);
 }
 
 function preferLocatable(el: HTMLElement): HTMLElement {

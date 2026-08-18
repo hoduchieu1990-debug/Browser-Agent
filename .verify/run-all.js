@@ -46,6 +46,7 @@ const CHECKS = [
   'upload-check.js',
   'spa-highlight-check.js',
   'stale-page-check.js',
+  'hover-perf-check.js',
 ];
 
 (async () => {
