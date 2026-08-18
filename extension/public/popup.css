@@ -697,13 +697,52 @@ html.in-side-panel .popup {
   text-align: center;
 }
 
-/* ---------- Step log ---------- */
-.step-log {
+/* ---------- Panels ----------
+   A replay shows two different things — what it did, and what it came back
+   with. Run together they read as one long list, so each gets its own titled
+   region. */
+.panel {
+  margin-bottom: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.panel-body {
+  padding: 11px;
+}
+
+.panel-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Step log ---------- */
+.step-log {
   background: var(--surface-raised);
-  margin-bottom: 12px;
-  max-height: 190px;
+  max-height: 210px;
   overflow-y: auto;
 }
 
@@ -786,6 +825,10 @@ html.in-side-panel .popup {
 /* ---------- Results ---------- */
 .result-block {
   margin-bottom: 14px;
+}
+
+.panel-body > .result-block:last-child {
+  margin-bottom: 0;
 }
 
 .result-name {

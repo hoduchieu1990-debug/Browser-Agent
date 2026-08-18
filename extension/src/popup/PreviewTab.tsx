@@ -87,6 +87,7 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
   const variables = state?.variables ?? {};
   const extractCount = actions.filter((a) => a.type.startsWith('extract')).length;
   const currentStep = state?.steps.find((s) => s.status === 'running');
+  const capturedNames = Object.keys(variables);
 
   return (
     <div>
@@ -115,11 +116,31 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
 
       {state?.error && <div className="error-banner">⚠️ {state.error}</div>}
 
-      {state && state.steps.length > 0 && <StepLog steps={state.steps} total={state.total} />}
+      {state && state.steps.length > 0 && (
+        <section className="panel">
+          <h3 className="panel-title">
+            Steps
+            <span className="panel-count">
+              {state.steps.filter((s) => s.status !== 'running').length}/{state.total}
+            </span>
+          </h3>
+          <StepLog steps={state.steps} total={state.total} />
+        </section>
+      )}
 
-      {Object.entries(variables).map(([name, value]) => (
-        <DataView key={name} name={name} value={value} />
-      ))}
+      {capturedNames.length > 0 && (
+        <section className="panel">
+          <h3 className="panel-title">
+            Captured data
+            <span className="panel-count">{capturedNames.length}</span>
+          </h3>
+          <div className="panel-body">
+            {capturedNames.map((name) => (
+              <DataView key={name} name={name} value={variables[name]} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {state && !running && !state.error && Object.keys(variables).length === 0 && (
         <div className="empty-state">
