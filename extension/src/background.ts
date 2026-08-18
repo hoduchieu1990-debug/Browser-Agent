@@ -170,6 +170,13 @@ function withUniqueOutput(action: WorkflowAction): WorkflowAction {
     : renamed;
 }
 
+// Recording can be stopped from the page's own badge, with the extension's
+// window sitting open beside it — without this it would go on showing a
+// recording that has already finished.
+function notifyRecordingState(): void {
+  chrome.runtime.sendMessage({ type: 'RECORDING_UPDATED', recording } satisfies RuntimeMessage).catch(() => {});
+}
+
 function notifyActionsUpdated(): void {
   chrome.runtime.sendMessage({ type: 'ACTIONS_UPDATED', actions } satisfies RuntimeMessage).catch(() => {});
 }
@@ -596,12 +603,14 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
           recording = false;
           log('attach failed', error);
         }
+        notifyRecordingState();
         sendResponse({ recording, actions, error });
       });
       return true; // async sendResponse
 
     case 'STOP_RECORDING':
       recording = false;
+      notifyRecordingState();
       detachFromActiveTab();
       archiveCurrentRecording();
       sendResponse({ recording, actions });
@@ -686,6 +695,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
     case 'REPLAY_START':
       if (replaying) return;
       recording = false; // otherwise the recorder would capture the replay's own clicks
+      notifyRecordingState();
       detachFromActiveTab();
       replaying = true;
       runReplay(message.background).finally(() => {

@@ -39,6 +39,7 @@ export type RuntimeMessage =
   | { type: 'SET_RECORDING'; value: boolean; highlightElements: boolean }
   | { type: 'RECORDED_ACTION'; action: RecordedActionPayload; replacesLastClick?: boolean }
   | { type: 'ACTIONS_UPDATED'; actions: WorkflowAction[] }
+  | { type: 'RECORDING_UPDATED'; recording: boolean }
   | { type: 'SHOW_TOAST'; step: number; action: WorkflowAction }
   | { type: 'REPLAY_START'; background: boolean }
   | { type: 'REPLAY_STEP'; action: WorkflowAction & { resolvedValue?: string } }

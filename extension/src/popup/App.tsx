@@ -101,6 +101,7 @@ export function App() {
 
     const listener = (message: RuntimeMessage) => {
       if (message.type === 'ACTIONS_UPDATED') setActions(message.actions);
+      if (message.type === 'RECORDING_UPDATED') setRecording(message.recording);
       if (message.type === 'RECORDINGS_UPDATED') setRecordings(message.recordings);
       if (message.type === 'REPLAY_UPDATED') setReplayState(message.state);
       if (message.type === 'BATCH_UPDATED') setBatchState(message.state);

@@ -16,6 +16,7 @@ const CHECKS = [
   'image-matches-frame-check.js',
   'single-toast-check.js',
   'result-order-check.js',
+  'stop-sync-check.js',
   'badge-follow-check.js',
   'target-frame-check.js',
   'lock-target-check.js',
