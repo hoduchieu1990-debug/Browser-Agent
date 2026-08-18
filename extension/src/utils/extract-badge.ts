@@ -20,6 +20,7 @@ export interface BadgeCallbacks {
   onAddTable: (table: HTMLElement) => void;
   onAddText: (el: HTMLElement) => void;
   onAddImage: (el: HTMLElement) => void;
+  onAddInput: (el: HTMLElement) => void;
   onAddBatch: (el: HTMLElement, kind: BatchKind) => void;
   onStop: () => void;
   /** Fires when the badge takes over (or releases) showing the outline. */
@@ -89,6 +90,16 @@ function findBatchTarget(el: Element | null): HTMLElement | null {
   }
 
   return null;
+}
+
+// "Type text" only makes sense for a field the user can actually type into —
+// not every button/link findBatchTarget also matches.
+function isTypeable(el: Element | null): boolean {
+  if (!(el instanceof HTMLTextAreaElement)) {
+    if (!(el instanceof HTMLInputElement)) return false;
+    if (['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'image', 'hidden'].includes(el.type)) return false;
+  }
+  return true;
 }
 
 const BATCH_LABELS: Record<BatchKind, string> = {
@@ -202,6 +213,7 @@ interface BadgeElements {
   tableItem: HTMLButtonElement;
   textItem: HTMLButtonElement;
   imageItem: HTMLButtonElement;
+  inputItem: HTMLButtonElement;
   batchItems: Record<BatchKind, HTMLButtonElement>;
 }
 
@@ -276,7 +288,9 @@ function createBadge(): BadgeElements {
   textItem.textContent = '🎯  Text value';
   const imageItem = document.createElement('button');
   imageItem.textContent = '🖼️  Image of this area';
-  [tableItem, textItem, imageItem].forEach(styleMenuItem);
+  const inputItem = document.createElement('button');
+  inputItem.textContent = '⌨️  Type text';
+  [tableItem, textItem, imageItem, inputItem].forEach(styleMenuItem);
 
   const batchKinds: BatchKind[] = ['input', 'click', 'search', 'extract'];
   const batchItems = Object.fromEntries(
@@ -292,6 +306,7 @@ function createBadge(): BadgeElements {
     tableItem,
     textItem,
     imageItem,
+    inputItem,
     styleMenuDivider(),
     styleMenuLabel('Batch'),
     ...batchKinds.map((kind) => batchItems[kind]),
@@ -299,7 +314,7 @@ function createBadge(): BadgeElements {
   root.append(row, menu);
   document.documentElement.appendChild(root);
 
-  return { root, row, trigger, stopBtn, menu, tableItem, textItem, imageItem, batchItems };
+  return { root, row, trigger, stopBtn, menu, tableItem, textItem, imageItem, inputItem, batchItems };
 }
 
 // Rides along with the pointer during recording and offers to capture whatever
@@ -308,11 +323,12 @@ export function attachExtractBadge({
   onAddTable,
   onAddText,
   onAddImage,
+  onAddInput,
   onAddBatch,
   onStop,
   onTargetChange,
 }: BadgeCallbacks): () => void {
-  const { root, row, trigger, stopBtn, menu, tableItem, textItem, imageItem, batchItems } = createBadge();
+  const { root, row, trigger, stopBtn, menu, tableItem, textItem, imageItem, inputItem, batchItems } = createBadge();
   const frame = createTargetFrame();
 
   let currentTable: HTMLElement | null = null;
@@ -450,6 +466,7 @@ export function attachExtractBadge({
     menuOpen = !menuOpen;
     tableItem.style.display = currentTable ? 'flex' : 'none';
     textItem.style.display = currentText ? 'flex' : 'none';
+    inputItem.style.display = isTypeable(currentBatch) ? 'flex' : 'none';
     // Batch nodes can be recorded on anything the badge is currently aimed
     // at — table, text, or a plain control — so they're never hidden.
     menu.style.display = menuOpen ? 'flex' : 'none';
@@ -477,6 +494,13 @@ export function attachExtractBadge({
   const handleImage = (event: MouseEvent) => {
     const el = defaultTarget();
     choose(event, () => el && onAddImage(el));
+  };
+
+  // A one-shot "fill this field with X" step — distinct from Batch → Input,
+  // which reads a different value per dataset row instead of one fixed value.
+  const handleInput = (event: MouseEvent) => {
+    const el = currentBatch;
+    choose(event, () => el && isTypeable(el) && onAddInput(el));
   };
 
   const handleBatch = (event: MouseEvent, kind: BatchKind) => {
@@ -514,6 +538,7 @@ export function attachExtractBadge({
   tableItem.addEventListener('click', handleTable, true);
   textItem.addEventListener('click', handleText, true);
   imageItem.addEventListener('click', handleImage, true);
+  inputItem.addEventListener('click', handleInput, true);
   document.addEventListener('mousemove', handleMove, true);
   document.addEventListener('keydown', handleKeydown, true);
   document.addEventListener('click', handleOutsideClick, true);

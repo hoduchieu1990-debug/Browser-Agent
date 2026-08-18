@@ -17,6 +17,7 @@ const CHECKS = [
   'single-toast-check.js',
   'result-order-check.js',
   'stop-sync-check.js',
+  'type-text-note-duration-check.js',
   'badge-follow-check.js',
   'target-frame-check.js',
   'lock-target-check.js',

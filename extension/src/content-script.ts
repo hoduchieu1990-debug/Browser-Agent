@@ -76,6 +76,12 @@ function recordImage(el: HTMLElement): void {
   capture({ type: 'screenshot', ...locate(el), filename: `${name}.png`, output: name }, el);
 }
 
+// A one-shot "type this value into this field" step, configured afterward in
+// the popup rather than by actually typing it on the page during recording.
+function recordInput(el: HTMLElement): void {
+  capture({ type: 'input', ...locate(el), value: '' }, el);
+}
+
 function inferBatchInputType(el: HTMLElement): BatchInputType {
   if (el instanceof HTMLSelectElement) return 'select';
   if (el instanceof HTMLInputElement && el.type === 'file') return 'fileUpload';
@@ -114,6 +120,7 @@ function setRecording(value: boolean, highlightElements: boolean): void {
       onAddTable: recordTable,
       onAddText: recordText,
       onAddImage: recordImage,
+      onAddInput: recordInput,
       onAddBatch: recordBatch,
       onStop: () => chrome.runtime.sendMessage({ type: 'STOP_RECORDING' } satisfies RuntimeMessage),
       // two outlines on screen at once is noise; the badge's is the precise one

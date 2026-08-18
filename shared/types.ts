@@ -106,6 +106,8 @@ export interface BaseAction {
   onError?: 'fail' | 'skip' | 'ignore';
   /** Alternative selectors, tried in order when `selector` no longer matches. */
   selectorFallbacks?: string[];
+  /** A label the user gave this step — display only, never read during replay. */
+  note?: string;
 }
 
 export interface RetryConfig {

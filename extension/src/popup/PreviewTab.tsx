@@ -15,6 +15,10 @@ const STATUS_ICON: Record<ReplayStepLog['status'], string> = {
   failed: '✕',
 };
 
+function formatDuration(ms: number): string {
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+}
+
 function isTableData(value: unknown): value is Record<string, string>[] {
   return Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0] !== null;
 }
@@ -97,6 +101,7 @@ function StepLog({ steps, total }: { steps: ReplayStepLog[]; total: number }) {
             {step.target && <span className="step-target">{step.target}</span>}
             {step.message && <span className="step-message">{step.message}</span>}
           </span>
+          {step.durationMs !== undefined && <span className="step-duration">{formatDuration(step.durationMs)}</span>}
         </div>
       ))}
     </div>
@@ -109,6 +114,7 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
   const extractCount = actions.filter((a) => a.type.startsWith('extract')).length;
   const currentStep = state?.steps.find((s) => s.status === 'running');
   const capturedNames = capturedInStepOrder(actions, variables);
+  const totalDurationMs = state && !running ? state.updatedAt - state.startedAt : null;
 
   return (
     <div>
@@ -144,6 +150,9 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
             <span className="panel-count">
               {state.steps.filter((s) => s.status !== 'running').length}/{state.total}
             </span>
+            {totalDurationMs !== null && (
+              <span className="panel-duration">⏱ {formatDuration(totalDurationMs)} total</span>
+            )}
           </h3>
           <StepLog steps={state.steps} total={state.total} />
         </section>

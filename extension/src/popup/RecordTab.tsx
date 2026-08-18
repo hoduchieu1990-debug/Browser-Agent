@@ -9,6 +9,34 @@ function isBatchAction(action: WorkflowAction): boolean {
   return action.type.startsWith('batch');
 }
 
+// Plain `input` steps (via Add → Type text, or typed on the page) get the
+// same expandable panel batch nodes do, just to edit the one field they have.
+function isConfigurable(action: WorkflowAction): boolean {
+  return isBatchAction(action) || action.type === 'input';
+}
+
+// Uncontrolled against the parent's state so a keystroke doesn't wait on the
+// UPDATE_ACTION round trip before it shows up — only the commit does.
+function NoteField({ value, onCommit }: { value: string; onCommit: (next: string) => void }) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => setDraft(value), [value]);
+
+  return (
+    <input
+      className="action-note"
+      type="text"
+      placeholder="Add a note…"
+      value={draft}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== value) onCommit(draft);
+      }}
+    />
+  );
+}
+
 interface Props {
   recording: boolean;
   actions: WorkflowAction[];
@@ -33,11 +61,12 @@ export function RecordTab({
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // The freshest batch node is the one the user just recorded and has yet to
-  // configure (pick a column, name the output, ...) — open it automatically.
+  // The freshest configurable node is the one the user just recorded and has
+  // yet to fill in (a value, a column, an output name, ...) — open it
+  // automatically.
   useEffect(() => {
     const last = actions[actions.length - 1];
-    if (last && isBatchAction(last)) setExpandedId(last.id);
+    if (last && isConfigurable(last)) setExpandedId(last.id);
   }, [actions.length]);
 
   // an armed Reset should not stay armed forever waiting for a stray click
@@ -67,8 +96,8 @@ export function RecordTab({
 
       {recording && (
         <div className="extract-hint">
-          💡 Hover anything on the page, then click <strong>＋ Add</strong> to capture it as table data, a text value,
-          or an image.
+          💡 Hover anything on the page, then click <strong>＋ Add</strong> to capture it as table data, a text
+          value, an image, or text to type in.
         </div>
       )}
 
@@ -109,7 +138,8 @@ export function RecordTab({
         <div className="actions-list">
           {actions.map((action, index) => {
             const batch = isBatchAction(action);
-            const expanded = batch && expandedId === action.id;
+            const configurable = isConfigurable(action);
+            const expanded = configurable && expandedId === action.id;
 
             return (
               <div className="action-item" key={action.id}>
@@ -117,7 +147,7 @@ export function RecordTab({
                   <div className="action-step">{index + 1}</div>
                   <div
                     className="action-info"
-                    onClick={batch ? () => setExpandedId(expanded ? null : action.id) : undefined}
+                    onClick={configurable ? () => setExpandedId(expanded ? null : action.id) : undefined}
                   >
                     <div className="action-type" data-type={action.type}>
                       {batch ? batchNodeLabel(actions, index) : action.type}
@@ -129,12 +159,30 @@ export function RecordTab({
                     ✕
                   </button>
                 </div>
-                {expanded && (
+
+                <NoteField
+                  value={action.note ?? ''}
+                  onCommit={(note) => onUpdateAction(index, { note: note || undefined })}
+                />
+
+                {expanded && batch && (
                   <BatchNodeConfig
                     action={action}
                     datasetHeaders={datasetHeaders}
                     onUpdate={(patch) => onUpdateAction(index, patch)}
                   />
+                )}
+                {expanded && action.type === 'input' && (
+                  <div className="action-batch-config">
+                    <label>
+                      Value
+                      <input
+                        type="text"
+                        value={action.value}
+                        onChange={(e) => onUpdateAction(index, { value: e.target.value })}
+                      />
+                    </label>
+                  </div>
                 )}
               </div>
             );

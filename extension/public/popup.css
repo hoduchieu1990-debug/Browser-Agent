@@ -503,6 +503,32 @@ html.in-side-panel .popup {
   min-width: 100px;
 }
 
+/* A quiet, always-present field — most steps never need it, so it should
+   read as blank space until typed into rather than another form control. */
+.action-note {
+  display: block;
+  width: 100%;
+  margin: 6px 0 0 28px;
+  padding: 3px 0;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  background: transparent;
+  font: 400 11px var(--font-sans, inherit);
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+
+.action-note:hover,
+.action-note:focus {
+  border-bottom-color: var(--border);
+  outline: none;
+}
+
+.action-note:not(:placeholder-shown) {
+  font-style: normal;
+  color: var(--foreground);
+}
+
 .action-selector {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -755,6 +781,16 @@ html.in-side-panel .popup {
   font-variant-numeric: tabular-nums;
 }
 
+.panel-duration {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Step log ---------- */
 .step-log {
   background: var(--surface-raised);
@@ -792,9 +828,17 @@ html.in-side-panel .popup {
 
 .step-body {
   min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+.step-duration {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
 }
 
 .step-type {
