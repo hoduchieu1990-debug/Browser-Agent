@@ -702,7 +702,7 @@ html.in-side-panel .popup {
    with. Run together they read as one long list, so each gets its own titled
    region. */
 .panel {
-  margin-bottom: 14px;
+  margin-bottom: 18px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -714,14 +714,30 @@ html.in-side-panel .popup {
   align-items: center;
   gap: 6px;
   margin: 0;
-  padding: 8px 11px;
+  padding: 9px 11px;
   border-bottom: 1px solid var(--border);
   background: var(--muted);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--muted-foreground);
+  color: #475569;
+}
+
+/* The two panels answer different questions — what the run did, and what it
+   brought back — so they are tinted apart rather than left to a shared grey. */
+.panel-results {
+  border-color: #c7d2fe;
+}
+
+.panel-results .panel-title {
+  background: var(--primary-soft);
+  color: #4338ca;
+}
+
+.panel-results .panel-count {
+  background: #c7d2fe;
+  color: #4338ca;
 }
 
 .panel-body {

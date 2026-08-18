@@ -60,6 +60,27 @@ function DataView({ name, value }: { name: string; value: unknown }) {
   );
 }
 
+// The order captures come back in is not the order they were recorded in, so
+// follow the workflow itself and let the results read top-to-bottom the way
+// the steps do.
+function capturedInStepOrder(actions: WorkflowAction[], variables: Record<string, unknown>): string[] {
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+
+  for (const action of actions) {
+    const name = 'output' in action ? action.output : undefined;
+    if (name && name in variables && !seen.has(name)) {
+      ordered.push(name);
+      seen.add(name);
+    }
+  }
+
+  // anything captured that no step claims still deserves to be shown
+  for (const name of Object.keys(variables)) if (!seen.has(name)) ordered.push(name);
+
+  return ordered;
+}
+
 function StepLog({ steps, total }: { steps: ReplayStepLog[]; total: number }) {
   return (
     <div className="step-log">
@@ -87,7 +108,7 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
   const variables = state?.variables ?? {};
   const extractCount = actions.filter((a) => a.type.startsWith('extract')).length;
   const currentStep = state?.steps.find((s) => s.status === 'running');
-  const capturedNames = Object.keys(variables);
+  const capturedNames = capturedInStepOrder(actions, variables);
 
   return (
     <div>
@@ -129,7 +150,7 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
       )}
 
       {capturedNames.length > 0 && (
-        <section className="panel">
+        <section className="panel panel-results">
           <h3 className="panel-title">
             Captured data
             <span className="panel-count">{capturedNames.length}</span>
