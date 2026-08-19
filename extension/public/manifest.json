@@ -30,6 +30,12 @@
   "side_panel": {
     "default_path": "popup.html?side=1"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["nexacro-bridge.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "permissions": ["storage", "activeTab", "scripting", "webNavigation", "downloads", "debugger", "sidePanel"],
   "host_permissions": ["<all_urls>"]
 }

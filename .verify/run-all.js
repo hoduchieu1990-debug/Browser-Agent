@@ -47,6 +47,8 @@ const CHECKS = [
   'spa-highlight-check.js',
   'stale-page-check.js',
   'hover-perf-check.js',
+  'nexacro-check.js',
+  'nexacro-cli-check.js',
 ];
 
 (async () => {

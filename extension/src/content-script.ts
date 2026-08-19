@@ -8,6 +8,7 @@ import { generateSelectorCandidates } from './utils/selector-utils';
 import { showToast, clearToasts } from './utils/toast';
 import { describeAction } from './utils/action-display';
 import { executeStep } from './utils/replay-executor';
+import { findNexacroComponent, nexacroSelector } from './utils/nexacro';
 
 declare global {
   interface Window {
@@ -24,6 +25,9 @@ let imageCount = 0;
 let batchExtractCount = 0;
 
 function locate(el: Element): { selector: string; selectorFallbacks?: string[] } {
+  const nexacro = findNexacroComponent(el);
+  if (nexacro) return { selector: nexacroSelector(nexacro.id) };
+
   const [selector, ...rest] = generateSelectorCandidates(el);
   return rest.length ? { selector, selectorFallbacks: rest } : { selector };
 }

@@ -1,6 +1,7 @@
 import type { WorkflowAction } from '../types';
 import { readTableRecords } from '@browser-agent/shared/dist/table-reader';
 import { resolveOne } from './selector-utils';
+import { isNexacroSelector, nexacroComponentId, runNexacroAction } from './nexacro';
 
 // Client-rendered pages finish well after load, and a background window is
 // timer-throttled on top of that.
@@ -80,6 +81,15 @@ function locateFor(action: { selector: string; selectorFallbacks?: string[] }): 
   return waitForElement(action.selector, action.selectorFallbacks ?? []);
 }
 
+async function runNexacroOrThrow(
+  selector: string,
+  action: 'click' | 'set_value',
+  value?: string,
+): Promise<void> {
+  const result = await runNexacroAction(nexacroComponentId(selector), action, value);
+  if (!result.ok) throw new Error(result.error ?? `Nexacro ${action} failed: ${selector}`);
+}
+
 function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string): void {
   // React and friends track the value on the DOM node's own setter; assigning
   // el.value directly leaves their internal state stale and the change is lost.
@@ -94,18 +104,30 @@ function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectE
 export async function executeStep(action: WorkflowAction & { resolvedValue?: string }): Promise<StepResult> {
   switch (action.type) {
     case 'click': {
+      if (isNexacroSelector(action.selector)) {
+        await runNexacroOrThrow(action.selector, 'click');
+        return {};
+      }
       const el = await locateFor(action);
       el.click();
       return {};
     }
 
     case 'input': {
+      if (isNexacroSelector(action.selector)) {
+        await runNexacroOrThrow(action.selector, 'set_value', action.value);
+        return {};
+      }
       const el = await locateFor(action);
       setNativeValue(el as HTMLInputElement, action.value);
       return {};
     }
 
     case 'select': {
+      if (isNexacroSelector(action.selector)) {
+        await runNexacroOrThrow(action.selector, 'set_value', action.value);
+        return {};
+      }
       const el = (await locateFor(action)) as HTMLSelectElement;
       setNativeValue(el, action.value);
       return {};

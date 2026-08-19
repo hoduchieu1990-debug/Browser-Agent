@@ -2,6 +2,7 @@ import type { RecordedActionPayload } from '../types';
 import { generateSelectorCandidates } from './selector-utils';
 import { findClickableAncestor } from './clickable-element';
 import { isExtensionUi } from './ui-marker';
+import { findNexacroComponent, nexacroSelector, runNexacroAction, setNexacroMarking } from './nexacro';
 
 export interface RecorderHandle {
   detach: () => void;
@@ -27,6 +28,15 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
     // our own overlays (Add badge, toasts) sit in the page but are not part of it
     if (isExtensionUi(event.target as Element | null)) return;
 
+    // Nexacro renders its own object model instead of plain DOM — a component
+    // id (nexacro.getActiveFrame().lookup(id)) is the only thing that reliably
+    // addresses it again, so this bypasses the CSS-selector strategies below.
+    const nexacroTarget = findNexacroComponent(event.target as Element | null);
+    if (nexacroTarget) {
+      onAction({ type: 'click', selector: nexacroSelector(nexacroTarget.id) });
+      return;
+    }
+
     // clicks often land on an icon/span *inside* the real control — resolve to
     // the actual clickable ancestor so the recorded selector is stable.
     const target = findClickableAncestor(event.target as Element | null) ?? (event.target as HTMLElement);
@@ -49,6 +59,16 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
     const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
     if (target instanceof HTMLInputElement && target.type === 'file') return; // handled on click, above
 
+    const nexacroTarget = findNexacroComponent(target);
+    if (nexacroTarget) {
+      // The component's real DOM element is rarely an <input> — reading its
+      // value has to go through the component itself (get_value), not .value.
+      runNexacroAction(nexacroTarget.id, 'get_value').then((result) => {
+        onAction({ type: 'input', selector: nexacroSelector(nexacroTarget.id), value: result.value ?? '' });
+      });
+      return;
+    }
+
     const located = selectorWithFallbacks(target);
 
     if (target instanceof HTMLSelectElement) {
@@ -66,11 +86,13 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
 
   document.addEventListener('click', handleClick, true);
   document.addEventListener('change', handleChange, true);
+  setNexacroMarking(true); // no-op on non-Nexacro pages, cheap either way
 
   return {
     detach: () => {
       document.removeEventListener('click', handleClick, true);
       document.removeEventListener('change', handleChange, true);
+      setNexacroMarking(false);
     },
     setPaused: (value: boolean) => {
       paused = value;

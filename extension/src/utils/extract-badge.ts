@@ -1,6 +1,7 @@
 import { findTableAncestor, findClickableAncestor } from './clickable-element';
 import { hasNonPositionalSelector } from './selector-utils';
 import { markAsExtensionUi, isExtensionUi } from './ui-marker';
+import { findNexacroComponent } from './nexacro';
 
 const BADGE_ID = '__browser_agent_add_badge__';
 const MAX_TEXT_LENGTH = 300;
@@ -77,6 +78,11 @@ const BATCH_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA']);
 const BATCH_ROLES = new Set(['button', 'link', 'checkbox', 'radio']);
 
 function findBatchTarget(el: Element | null): HTMLElement | null {
+  // Nexacro's own DOM element for a component rarely has a matching tag/role
+  // (BATCH_TAGS/BATCH_ROLES below), so it needs its own check up front.
+  const nexacro = findNexacroComponent(el);
+  if (nexacro) return nexacro.element;
+
   let current = el;
 
   for (let depth = 0; current && depth < 6; depth++) {
@@ -94,6 +100,9 @@ function findBatchTarget(el: Element | null): HTMLElement | null {
 // "Type text" only makes sense for a field the user can actually type into —
 // not every button/link findBatchTarget also matches.
 function isTypeable(el: Element | null): boolean {
+  const nexacro = findNexacroComponent(el);
+  if (nexacro) return !/button/i.test(nexacro.type);
+
   if (!(el instanceof HTMLTextAreaElement)) {
     if (!(el instanceof HTMLInputElement)) return false;
     if (['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'image', 'hidden'].includes(el.type)) return false;

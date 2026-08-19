@@ -7,6 +7,7 @@ module.exports = {
   entry: {
     background: './src/background.ts',
     'content-script': './src/content-script.ts',
+    'nexacro-bridge': './src/nexacro-bridge.ts',
     popup: './src/popup/index.tsx',
   },
   output: {
@@ -21,6 +22,12 @@ module.exports = {
       // runtime that backs it, and the content script dies on
       // "__webpack_require__ is not defined".
       '@browser-agent/shared/dist/table-reader': path.resolve(__dirname, '..', 'shared', 'table-reader.ts'),
+      // Same reasoning, plus a second one: the package root (@browser-agent/shared)
+      // barrels in utils.ts, which calls ajv.compile() at module load — Ajv
+      // compiles by generating and new Function()-ing JS, which the content
+      // script's CSP forbids and throws on before any of its own code runs.
+      // Importing the constants module directly skips that barrel entirely.
+      '@browser-agent/shared/dist/constants': path.resolve(__dirname, '..', 'shared', 'constants.ts'),
     },
   },
   module: {
