@@ -51,6 +51,7 @@ const CHECKS = [
   'nexacro-cli-check.js',
   'hover-raf-coalesce-check.js',
   'preview-stale-check.js',
+  'pin-default-icons-check.js',
 ];
 
 (async () => {

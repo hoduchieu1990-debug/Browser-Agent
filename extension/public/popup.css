@@ -427,11 +427,23 @@ html.in-side-panel .popup {
   min-width: 0;
 }
 
+.action-type-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.action-icon {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1;
+}
+
 .action-type {
   font-size: 12px;
   font-weight: 600;
   color: var(--foreground);
-  margin-bottom: 2px;
 }
 
 /* a hue per kind of step, so a long list is scannable without reading it */
@@ -839,6 +851,12 @@ html.in-side-panel .popup {
   font-size: 10px;
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
+}
+
+.step-type-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .step-type {

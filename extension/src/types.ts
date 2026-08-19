@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS: RecorderSettings = {
   captureScreenshots: false,
   highlightElements: true,
   onPageConfirmation: true,
-  pinSide: false,
+  pinSide: true,
   verboseLogging: false,
 };
 

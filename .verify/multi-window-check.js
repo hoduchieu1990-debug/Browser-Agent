@@ -64,6 +64,16 @@ const PAGE = (label) => `<!doctype html><html><body style="padding:24px;font-fam
     await popupWin.waitForLoadState();
     await popupWin.waitForTimeout(300);
 
+    // This test is specifically about the plain (non-pinned) popup's own
+    // behavior — Pin to Side now defaults to on, so turn it off first. Check
+    // rather than assume the starting state: run-all.js reuses one profile
+    // across every check, so whichever ran before this may have left it
+    // either way.
+    await popupWin.click('text=Settings');
+    const pinToggle = popupWin.locator('.setting-item', { hasText: 'Pin to Side' }).locator('.toggle');
+    if ((await pinToggle.getAttribute('class')).includes('on')) await pinToggle.click();
+    await popupWin.click('text=Record');
+
     const closed = popupWin.waitForEvent('close', { timeout: 5000 }).then(() => true, () => false);
     await popupWin.click('.record-btn.start');
     check('popup window closed on Start', await closed);

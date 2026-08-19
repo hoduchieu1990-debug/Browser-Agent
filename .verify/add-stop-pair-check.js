@@ -54,6 +54,17 @@ const check = (name, passed, detail = '') => {
     };
 
     let popup = await openPopupWindow();
+
+    // This test is specifically about the plain (non-pinned) popup's own
+    // behavior — Pin to Side now defaults to on, so turn it off first. Check
+    // rather than assume the starting state: run-all.js reuses one profile
+    // across every check, so whichever ran before this may have left it
+    // either way.
+    await popup.click('text=Settings');
+    const pinToggle = popup.locator('.setting-item', { hasText: 'Pin to Side' }).locator('.toggle');
+    if ((await pinToggle.getAttribute('class')).includes('on')) await pinToggle.click();
+    await popup.click('text=Record');
+
     check('no bubble on the page', (await tab.locator('#__browser_agent_bubble__').count()) === 0);
 
     // ---------- Start closes the popup ----------

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { WorkflowAction } from '../types';
-import { actionSelectorText, actionValueText, batchNodeLabel } from '../utils/action-display';
+import { actionSelectorText, actionValueText, actionTypeIcon, batchNodeLabel } from '../utils/action-display';
 import { BatchNodeConfig } from './BatchNodeConfig';
 
 const CONFIRM_TIMEOUT_MS = 4000;
@@ -149,8 +149,11 @@ export function RecordTab({
                     className="action-info"
                     onClick={configurable ? () => setExpandedId(expanded ? null : action.id) : undefined}
                   >
-                    <div className="action-type" data-type={action.type}>
-                      {batch ? batchNodeLabel(actions, index) : action.type}
+                    <div className="action-type-line">
+                      <span className="action-icon">{actionTypeIcon(action.type)}</span>
+                      <div className="action-type" data-type={action.type}>
+                        {batch ? batchNodeLabel(actions, index) : action.type}
+                      </div>
                     </div>
                     <div className="action-selector">{actionSelectorText(action)}</div>
                     {actionValueText(action) && <div className="action-value">{actionValueText(action)}</div>}

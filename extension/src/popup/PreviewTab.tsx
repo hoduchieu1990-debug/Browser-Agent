@@ -1,5 +1,5 @@
 import type { WorkflowAction, ReplayState, ReplayStepLog } from '../types';
-import { actionSelectorText } from '../utils/action-display';
+import { actionSelectorText, actionTypeIcon } from '../utils/action-display';
 
 interface Props {
   actions: WorkflowAction[];
@@ -100,8 +100,11 @@ function PendingStepLog({ actions }: { actions: WorkflowAction[] }) {
             {i + 1}/{actions.length}
           </span>
           <span className="step-body">
-            <span className="step-type action-type" data-type={action.type}>
-              {action.type}
+            <span className="step-type-line">
+              <span className="action-icon">{actionTypeIcon(action.type)}</span>
+              <span className="step-type action-type" data-type={action.type}>
+                {action.type}
+              </span>
             </span>
             {actionSelectorText(action) && <span className="step-target">{actionSelectorText(action)}</span>}
           </span>
@@ -121,8 +124,11 @@ function StepLog({ steps, total }: { steps: ReplayStepLog[]; total: number }) {
             {step.index}/{total}
           </span>
           <span className="step-body">
-            <span className="step-type action-type" data-type={step.type}>
-              {step.type}
+            <span className="step-type-line">
+              <span className="action-icon">{actionTypeIcon(step.type)}</span>
+              <span className="step-type action-type" data-type={step.type}>
+                {step.type}
+              </span>
             </span>
             {step.target && <span className="step-target">{step.target}</span>}
             {step.message && <span className="step-message">{step.message}</span>}

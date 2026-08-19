@@ -43,6 +43,16 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     const popup = await context.newPage();
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
 
+    // This test is specifically about Stop reopening a plain popup WINDOW —
+    // Pin to Side now defaults to on, under which Stop opens the side panel
+    // instead, so turn it off first. Check rather than assume the starting
+    // state: run-all.js reuses one profile across every check, so whichever
+    // ran before this may have left it either way.
+    await popup.click('text=Settings');
+    const pinToggle = popup.locator('.setting-item', { hasText: 'Pin to Side' }).locator('.toggle');
+    if ((await pinToggle.getAttribute('class')).includes('on')) await pinToggle.click();
+    await popup.click('text=Record');
+
     // ---- record a capture, which also stores the starting url ----
     await tab.bringToFront();
     await popup.click('.record-btn.start');

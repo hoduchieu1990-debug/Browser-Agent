@@ -1,5 +1,32 @@
 import type { WorkflowAction } from '../types';
 
+// Same icon a given kind of step uses everywhere it's offered while
+// recording (the Add badge's menu, Batch's submenu) — reusing those keeps
+// one visual vocabulary instead of a second, unrelated set just for lists.
+const ACTION_TYPE_ICONS: Record<string, string> = {
+  navigate: '🌐',
+  click: '🖱️',
+  input: '⌨️',
+  select: '🔽',
+  uploadFile: '📎',
+  wait: '⏳',
+  waitForSelector: '👁️',
+  extractText: '🎯',
+  extractTable: '📊',
+  extractJson: '🧾',
+  dismissPopup: '✖️',
+  screenshot: '🖼️',
+  scroll: '📜',
+  batchInput: '⌨️',
+  batchClick: '🖱️',
+  batchSearch: '🔎',
+  batchExtract: '📤',
+};
+
+export function actionTypeIcon(type: string): string {
+  return ACTION_TYPE_ICONS[type] ?? '▫️';
+}
+
 export function actionSelectorText(action: WorkflowAction): string | undefined {
   if ('url' in action) return action.url;
   if ('selector' in action) return action.selector;

@@ -10,6 +10,7 @@ extension/public/icons/
 
 # throwaway output from the .verify check scripts (the scripts themselves are tracked)
 .verify/profile/
+.verify/profile-fresh/
 .verify/edge-profile/
 .verify/*.png
 .verify/*.json

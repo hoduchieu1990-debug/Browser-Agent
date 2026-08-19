@@ -41,20 +41,25 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     const contextTypes = () =>
       worker.evaluate(() => chrome.runtime.getContexts({}).then((c) => c.map((x) => x.contextType)));
 
-    // ---- off by default. The panel is kept *available* at all times (open()
-    // refuses to work on one that is not, and enabling it on demand costs the
-    // user gesture open() also needs), so what says "off" is that nothing
-    // routes to it: the button still opens the ordinary popup. ----
+    // This test is about the toggle MECHANISM in both directions, not which
+    // way it defaults (pin-default-icons-check.js owns that) — force a known
+    // "off" starting state regardless of the default, so everything below
+    // (written as off -> on -> off) holds either way.
+    await popup.click('text=Settings');
+    await popup.waitForTimeout(200);
+    const row = popup.locator('.setting-item').filter({ hasText: 'Pin to Side' });
+    check('Pin to Side appears in Settings', (await row.count()) === 1);
+    const startedOn = (await row.locator('.toggle').getAttribute('class')).includes('on');
+    if (startedOn) {
+      await row.locator('.toggle').click();
+      await popup.waitForTimeout(300);
+    }
     const initialBehavior = await worker.evaluate(() => chrome.sidePanel.getPanelBehavior());
     const initialPopup = await worker.evaluate(() => chrome.action.getPopup({}));
     check('nothing opens the panel until asked', initialBehavior.openPanelOnActionClick !== true, JSON.stringify(initialBehavior));
     check('and the button still opens the popup', initialPopup.endsWith('popup.html'), initialPopup);
 
     // ---- the Settings toggle turns it on ----
-    await popup.click('text=Settings');
-    await popup.waitForTimeout(200);
-    const row = popup.locator('.setting-item').filter({ hasText: 'Pin to Side' });
-    check('Pin to Side appears in Settings', (await row.count()) === 1);
     await row.locator('.toggle').click();
     await popup.waitForTimeout(500);
 
