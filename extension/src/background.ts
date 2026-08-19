@@ -22,6 +22,7 @@ import {
   deleteRecording,
   saveReplayState,
   loadReplayState,
+  clearReplayState,
   saveBatchDataset,
   loadBatchDataset,
   saveBatchState,
@@ -181,7 +182,16 @@ function notifyActionsUpdated(): void {
   chrome.runtime.sendMessage({ type: 'ACTIONS_UPDATED', actions } satisfies RuntimeMessage).catch(() => {});
 }
 
+// Preview's Steps/Result Data belong to whichever recording produced them —
+// once the action list changes, that run no longer describes what Replay
+// would do, so it must not keep showing as if it still did.
+function invalidateReplayState(): void {
+  replayState = null;
+  clearReplayState();
+}
+
 function pushAction(action: WorkflowAction, tabId?: number): void {
+  invalidateReplayState();
   actions.push(action);
   saveSession(actions);
   notifyActionsUpdated();
@@ -640,7 +650,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
         if (found) {
           actions = [...found.actions];
           stepCounter = actions.length;
-          replayState = null; // results from the previous recording no longer apply
+          invalidateReplayState();
           saveSession(actions);
           notifyActionsUpdated();
         }
@@ -656,6 +666,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       actions = [];
       stepCounter = 0;
       clearSession();
+      invalidateReplayState();
       notifyActionsUpdated();
       sendResponse({ recording, actions });
       return;
@@ -667,12 +678,14 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
     case 'REMOVE_ACTION':
       actions.splice(message.index, 1);
       saveSession(actions);
+      invalidateReplayState();
       notifyActionsUpdated();
       return;
 
     case 'UPDATE_ACTION':
       actions[message.index] = { ...actions[message.index], ...message.patch } as WorkflowAction;
       saveSession(actions);
+      invalidateReplayState();
       notifyActionsUpdated();
       return;
 

@@ -1,4 +1,5 @@
 import type { WorkflowAction, ReplayState, ReplayStepLog } from '../types';
+import { actionSelectorText } from '../utils/action-display';
 
 interface Props {
   actions: WorkflowAction[];
@@ -85,6 +86,31 @@ function capturedInStepOrder(actions: WorkflowAction[], variables: Record<string
   return ordered;
 }
 
+// Before Replay has ever run (or after the recording changed since it last
+// did), there is no ReplayStepLog yet — this shows what WOULD run, using the
+// current recording directly, so Preview never has to fall back to showing
+// a stale run's steps just because a fresh one hasn't happened yet.
+function PendingStepLog({ actions }: { actions: WorkflowAction[] }) {
+  return (
+    <div className="step-log">
+      {actions.map((action, i) => (
+        <div className="step-row" key={action.id}>
+          <span className="step-icon">•</span>
+          <span className="step-index">
+            {i + 1}/{actions.length}
+          </span>
+          <span className="step-body">
+            <span className="step-type action-type" data-type={action.type}>
+              {action.type}
+            </span>
+            {actionSelectorText(action) && <span className="step-target">{actionSelectorText(action)}</span>}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StepLog({ steps, total }: { steps: ReplayStepLog[]; total: number }) {
   return (
     <div className="step-log">
@@ -143,7 +169,7 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
 
       {state?.error && <div className="error-banner">⚠️ {state.error}</div>}
 
-      {state && state.steps.length > 0 && (
+      {state && state.steps.length > 0 ? (
         <section className="panel">
           <h3 className="panel-title">
             Steps
@@ -156,12 +182,23 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
           </h3>
           <StepLog steps={state.steps} total={state.total} />
         </section>
+      ) : (
+        !state &&
+        actions.length > 0 && (
+          <section className="panel">
+            <h3 className="panel-title">
+              Steps
+              <span className="panel-count">{actions.length}</span>
+            </h3>
+            <PendingStepLog actions={actions} />
+          </section>
+        )
       )}
 
       {capturedNames.length > 0 && (
         <section className="panel panel-results">
           <h3 className="panel-title">
-            Captured data
+            Result Data
             <span className="panel-count">{capturedNames.length}</span>
           </h3>
           <div className="panel-body">
@@ -180,11 +217,11 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
         </div>
       )}
 
-      {!state && (
+      {!state && actions.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">✨</div>
-          <strong>Review your recording</strong>
-          <p>Replay the steps in this tab and see the data they capture.</p>
+          <strong>Nothing recorded yet</strong>
+          <p>Record some steps, then come back here to replay them.</p>
         </div>
       )}
     </div>

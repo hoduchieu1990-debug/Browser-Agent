@@ -89,6 +89,13 @@ export async function loadReplayState(): Promise<ReplayState | null> {
   return (result[REPLAY_STATE_KEY] as ReplayState | undefined) ?? null;
 }
 
+// The steps and captured data shown in Preview belong to whichever run they
+// came from — once the recording changes, they describe a workflow that no
+// longer exists and have to go, not linger until the next replay overwrites them.
+export async function clearReplayState(): Promise<void> {
+  await chrome.storage.local.remove(REPLAY_STATE_KEY);
+}
+
 export async function saveBatchDataset(dataset: BatchDataset | null): Promise<void> {
   await chrome.storage.local.set({ [BATCH_DATASET_KEY]: dataset });
 }
