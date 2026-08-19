@@ -49,6 +49,7 @@ const CHECKS = [
   'hover-perf-check.js',
   'nexacro-check.js',
   'nexacro-cli-check.js',
+  'hover-raf-coalesce-check.js',
 ];
 
 (async () => {

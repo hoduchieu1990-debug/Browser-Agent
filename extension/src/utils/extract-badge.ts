@@ -408,7 +408,7 @@ export function attachExtractBadge({
     if (hideTimer === null) hideTimer = window.setTimeout(hide, HIDE_DELAY_MS);
   };
 
-  const handleMove = (event: MouseEvent) => {
+  const processMove = (event: MouseEvent) => {
     const target = event.target as Element | null;
 
     if (target && root.contains(target)) {
@@ -455,6 +455,25 @@ export function attachExtractBadge({
     moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
     frameDefault();
     onTargetChange?.(true);
+  };
+
+  // A real mouse fires mousemove far more often than the screen repaints —
+  // running the full detection logic (ancestor walks, selector checks) on
+  // every single one makes fast sweeps feel laggy for no visible benefit.
+  // Coalescing to one pass per animation frame keeps the badge exactly as
+  // responsive (still ~60 updates/sec) while cutting the actual work down to
+  // what a human can perceive; Add always reads the latest currentTable/
+  // currentText/currentBatch, so which element it captures is unaffected.
+  let pendingMove: MouseEvent | null = null;
+  let moveRafId: number | null = null;
+
+  const handleMove = (event: MouseEvent) => {
+    pendingMove = event;
+    if (moveRafId !== null) return;
+    moveRafId = requestAnimationFrame(() => {
+      moveRafId = null;
+      if (pendingMove) processMove(pendingMove);
+    });
   };
 
   const handleScroll = () => {
@@ -554,6 +573,7 @@ export function attachExtractBadge({
 
   return () => {
     cancelHide();
+    if (moveRafId !== null) cancelAnimationFrame(moveRafId);
     frame.remove();
     document.removeEventListener('mousemove', handleMove, true);
     document.removeEventListener('keydown', handleKeydown, true);
