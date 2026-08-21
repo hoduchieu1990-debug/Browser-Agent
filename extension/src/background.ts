@@ -9,6 +9,7 @@ import type {
   BatchReplayState,
   BatchRunRow,
   DataRow,
+  ThumbnailRect,
 } from './types';
 import { DEFAULT_SETTINGS } from './types';
 import {
@@ -27,8 +28,10 @@ import {
   loadBatchDataset,
   saveBatchState,
   loadBatchState,
+  saveThumbnails,
+  loadThumbnails,
 } from './utils/storage-manager';
-import { captureElement, captureElementViaDebugger, type CaptureRect } from './utils/capture';
+import { captureElement, captureElementViaDebugger, captureThumbnail, type CaptureRect } from './utils/capture';
 import { setFileInputFilesViaDebugger } from './utils/file-input';
 
 const STEP_SETTLE_MS = 300;
@@ -46,10 +49,14 @@ let batchDataset: BatchDataset | null = null;
 let batchState: BatchReplayState | null = null;
 let batchRunning = false;
 let batchCancelled = false;
+let thumbnails: Record<string, string> = {};
 
 loadSession().then((saved) => {
   actions = saved;
   stepCounter = saved.length;
+});
+loadThumbnails().then((saved) => {
+  thumbnails = saved;
 });
 loadSettings().then((saved) => {
   settings = saved;
@@ -188,6 +195,27 @@ function notifyActionsUpdated(): void {
 function invalidateReplayState(): void {
   replayState = null;
   clearReplayState();
+}
+
+// Fire-and-forget, on purpose: the click that triggered this has already
+// been recorded and the popup already notified by the time this runs, so
+// nothing about it can make recording feel slower. A failed capture (rate
+// limit, tab mid-navigation, ...) just means that one step has no preview —
+// not worth surfacing as an error.
+function captureThumbnailFor(actionId: string, rect: ThumbnailRect, dpr: number, tabId: number): void {
+  chrome.tabs
+    .get(tabId)
+    .then((tab) => {
+      if (tab.windowId === undefined) return null;
+      return captureThumbnail(tab.windowId, rect, dpr);
+    })
+    .then((dataUrl) => {
+      if (!dataUrl) return;
+      thumbnails[actionId] = dataUrl;
+      saveThumbnails(thumbnails);
+      chrome.runtime.sendMessage({ type: 'THUMBNAIL_READY', actionId, dataUrl } satisfies RuntimeMessage).catch(() => {});
+    })
+    .catch(() => {});
 }
 
 function pushAction(action: WorkflowAction, tabId?: number): void {
@@ -650,8 +678,10 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
         if (found) {
           actions = [...found.actions];
           stepCounter = actions.length;
+          thumbnails = {};
           invalidateReplayState();
           saveSession(actions);
+          saveThumbnails(thumbnails);
           notifyActionsUpdated();
         }
         sendResponse({ recording, actions });
@@ -665,6 +695,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
     case 'RESET':
       actions = [];
       stepCounter = 0;
+      thumbnails = {};
       clearSession();
       invalidateReplayState();
       notifyActionsUpdated();
@@ -675,12 +706,19 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       sendResponse({ recording, actions, highlightElements: settings.highlightElements });
       return;
 
-    case 'REMOVE_ACTION':
-      actions.splice(message.index, 1);
+    case 'GET_THUMBNAILS':
+      sendResponse(thumbnails);
+      return;
+
+    case 'REMOVE_ACTION': {
+      const [removed] = actions.splice(message.index, 1);
+      if (removed) delete thumbnails[removed.id];
       saveSession(actions);
+      saveThumbnails(thumbnails);
       invalidateReplayState();
       notifyActionsUpdated();
       return;
+    }
 
     case 'UPDATE_ACTION':
       actions[message.index] = { ...actions[message.index], ...message.patch } as WorkflowAction;
@@ -753,6 +791,10 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       }
 
       pushAction(action, tabId);
+
+      if (message.rect && tabId !== undefined) {
+        captureThumbnailFor(action.id, message.rect, message.dpr ?? 1, tabId);
+      }
 
       if (settings.captureScreenshots && action.type !== 'navigate') {
         pushAction(

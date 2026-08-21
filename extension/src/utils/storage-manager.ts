@@ -45,9 +45,32 @@ export async function clearSession(): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
+    // Thumbnails belong to this recording's steps — meaningless once they do
+    // not exist anymore, so they go with it rather than lingering as orphans.
     tx.objectStore(STORE_NAME).delete('current');
+    tx.objectStore(STORE_NAME).delete('thumbnails');
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function saveThumbnails(thumbnails: Record<string, string>): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(thumbnails, 'thumbnails');
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function loadThumbnails(): Promise<Record<string, string>> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const request = tx.objectStore(STORE_NAME).get('thumbnails');
+    request.onsuccess = () => resolve(request.result ?? {});
+    request.onerror = () => reject(request.error);
   });
 }
 

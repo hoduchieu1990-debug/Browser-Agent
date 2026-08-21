@@ -427,6 +427,24 @@ html.in-side-panel .popup {
   min-width: 0;
 }
 
+.action-thumb {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: zoom-in;
+  background: var(--surface-raised);
+}
+
+/* .action-row has no flex gap of its own (each child spaces itself, like
+   .action-step's margin-right below) — .step-row does, so the thumb needs no
+   extra margin there. */
+.action-row .action-thumb {
+  margin-right: 9px;
+}
+
 .action-type-line {
   display: flex;
   align-items: center;

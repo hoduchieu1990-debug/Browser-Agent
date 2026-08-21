@@ -51,6 +51,7 @@ export function App() {
   const [replayInBackground, setReplayInBackground] = useState(false);
   const [batchDataset, setBatchDataset] = useState<BatchDataset | null>(null);
   const [batchState, setBatchState] = useState<BatchReplayState | null>(null);
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   // Looked up ahead of time: sidePanel.open() must be called straight out of
   // the click, and awaiting the window there would spend the gesture.
   const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
@@ -70,6 +71,9 @@ export function App() {
     });
     chrome.runtime.sendMessage({ type: 'BATCH_GET_DATASET' } satisfies RuntimeMessage, (dataset: BatchDataset | null) => {
       setBatchDataset(dataset);
+    });
+    chrome.runtime.sendMessage({ type: 'GET_THUMBNAILS' } satisfies RuntimeMessage, (saved: Record<string, string>) => {
+      setThumbnails(saved ?? {});
     });
     chrome.windows.getCurrent().then((win) => setCurrentWindowId(win.id ?? null));
 
@@ -105,6 +109,9 @@ export function App() {
       if (message.type === 'RECORDINGS_UPDATED') setRecordings(message.recordings);
       if (message.type === 'REPLAY_UPDATED') setReplayState(message.state);
       if (message.type === 'BATCH_UPDATED') setBatchState(message.state);
+      if (message.type === 'THUMBNAIL_READY') {
+        setThumbnails((prev) => ({ ...prev, [message.actionId]: message.dataUrl }));
+      }
     };
     chrome.runtime.onMessage.addListener(listener);
 
@@ -163,6 +170,7 @@ export function App() {
   const resetActions = () => {
     chrome.runtime.sendMessage({ type: 'RESET' } satisfies RuntimeMessage, (state: RecorderState) => {
       setActions(state.actions);
+      setThumbnails({});
     });
   };
 
@@ -170,6 +178,7 @@ export function App() {
     chrome.runtime.sendMessage({ type: 'LOAD_RECORDING', id } satisfies RuntimeMessage, (state: RecorderState) => {
       setActions(state.actions);
       setReplayState(null);
+      setThumbnails({}); // a saved recording never captured them
       setActiveTab('preview'); // loading is only useful next to Replay/Export
     });
   };
@@ -216,6 +225,7 @@ export function App() {
               actions={actions}
               error={error}
               datasetHeaders={batchDataset?.headers ?? []}
+              thumbnails={thumbnails}
               onToggleRecording={toggleRecording}
               onRemoveAction={removeAction}
               onUpdateAction={updateAction}
@@ -227,6 +237,7 @@ export function App() {
               actions={actions}
               state={replayState}
               background={replayInBackground}
+              thumbnails={thumbnails}
               onBackgroundChange={setReplayInBackground}
               onReplay={startReplay}
             />

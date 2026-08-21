@@ -5,6 +5,7 @@ interface Props {
   actions: WorkflowAction[];
   state: ReplayState | null;
   background: boolean;
+  thumbnails: Record<string, string>;
   onBackgroundChange: (value: boolean) => void;
   onReplay: () => void;
 }
@@ -86,11 +87,27 @@ function capturedInStepOrder(actions: WorkflowAction[], variables: Record<string
   return ordered;
 }
 
+function StepThumb({ dataUrl }: { dataUrl?: string }) {
+  if (!dataUrl) return null;
+  return (
+    <img
+      className="action-thumb"
+      src={dataUrl}
+      alt=""
+      title="Click to view full size"
+      onClick={(e) => {
+        e.stopPropagation();
+        window.open(dataUrl, '_blank');
+      }}
+    />
+  );
+}
+
 // Before Replay has ever run (or after the recording changed since it last
 // did), there is no ReplayStepLog yet — this shows what WOULD run, using the
 // current recording directly, so Preview never has to fall back to showing
 // a stale run's steps just because a fresh one hasn't happened yet.
-function PendingStepLog({ actions }: { actions: WorkflowAction[] }) {
+function PendingStepLog({ actions, thumbnails }: { actions: WorkflowAction[]; thumbnails: Record<string, string> }) {
   return (
     <div className="step-log">
       {actions.map((action, i) => (
@@ -99,6 +116,7 @@ function PendingStepLog({ actions }: { actions: WorkflowAction[] }) {
           <span className="step-index">
             {i + 1}/{actions.length}
           </span>
+          <StepThumb dataUrl={thumbnails[action.id]} />
           <span className="step-body">
             <span className="step-type-line">
               <span className="action-icon">{actionTypeIcon(action.type)}</span>
@@ -114,7 +132,20 @@ function PendingStepLog({ actions }: { actions: WorkflowAction[] }) {
   );
 }
 
-function StepLog({ steps, total }: { steps: ReplayStepLog[]; total: number }) {
+// state.steps' own index is 1-based into the same `actions` array the recorder
+// produced (see runReplay in background.ts), so that is also the key back to
+// this step's thumbnail — ReplayStepLog itself never carries an action id.
+function StepLog({
+  steps,
+  total,
+  actions,
+  thumbnails,
+}: {
+  steps: ReplayStepLog[];
+  total: number;
+  actions: WorkflowAction[];
+  thumbnails: Record<string, string>;
+}) {
   return (
     <div className="step-log">
       {steps.map((step) => (
@@ -123,6 +154,7 @@ function StepLog({ steps, total }: { steps: ReplayStepLog[]; total: number }) {
           <span className="step-index">
             {step.index}/{total}
           </span>
+          <StepThumb dataUrl={thumbnails[actions[step.index - 1]?.id]} />
           <span className="step-body">
             <span className="step-type-line">
               <span className="action-icon">{actionTypeIcon(step.type)}</span>
@@ -140,7 +172,7 @@ function StepLog({ steps, total }: { steps: ReplayStepLog[]; total: number }) {
   );
 }
 
-export function PreviewTab({ actions, state, background, onBackgroundChange, onReplay }: Props) {
+export function PreviewTab({ actions, state, background, thumbnails, onBackgroundChange, onReplay }: Props) {
   const running = state?.running ?? false;
   const variables = state?.variables ?? {};
   const extractCount = actions.filter((a) => a.type.startsWith('extract')).length;
@@ -186,7 +218,7 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
               <span className="panel-duration">⏱ {formatDuration(totalDurationMs)} total</span>
             )}
           </h3>
-          <StepLog steps={state.steps} total={state.total} />
+          <StepLog steps={state.steps} total={state.total} actions={actions} thumbnails={thumbnails} />
         </section>
       ) : (
         !state &&
@@ -196,7 +228,7 @@ export function PreviewTab({ actions, state, background, onBackgroundChange, onR
               Steps
               <span className="panel-count">{actions.length}</span>
             </h3>
-            <PendingStepLog actions={actions} />
+            <PendingStepLog actions={actions} thumbnails={thumbnails} />
           </section>
         )
       )}

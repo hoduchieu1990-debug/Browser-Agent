@@ -1,4 +1,4 @@
-import type { RuntimeMessage, RecorderState, BatchInputType, RecordedActionPayload } from './types';
+import type { RuntimeMessage, RecorderState, BatchInputType, RecordedActionPayload, ThumbnailRect } from './types';
 import { isExtensionUi } from './utils/ui-marker';
 import { attachListeners, type RecorderHandle } from './utils/action-recorder';
 import { attachHighlighter, type HighlighterHandle } from './utils/highlighter';
@@ -51,11 +51,25 @@ function notePageClick(event: MouseEvent): void {
   if (target && !isExtensionUi(target)) lastPageClick = { el: target, at: Date.now() };
 }
 
+// getBoundingClientRect is already viewport-relative, matching what
+// captureVisibleTab photographs — cheap and synchronous, so grabbing it here
+// adds nothing perceptible to the click that is being recorded. The actual
+// screenshot happens later, in the background, off this critical path.
+function rectOf(el: Element): ThumbnailRect {
+  const r = el.getBoundingClientRect();
+  return { x: r.x, y: r.y, width: r.width, height: r.height };
+}
+
 function capture(action: RecordedActionPayload, el: Element): void {
+  // screenshot steps already capture their own full image as the step's
+  // actual output — a second, smaller copy of the same thing would be noise.
+  const thumbnail = action.type !== 'screenshot' ? { rect: rectOf(el), dpr: window.devicePixelRatio || 1 } : {};
+
   chrome.runtime.sendMessage({
     type: 'RECORDED_ACTION',
     action,
     replacesLastClick: takeSupersededClick(el),
+    ...thumbnail,
   } satisfies RuntimeMessage);
 }
 
@@ -117,8 +131,13 @@ function setRecording(value: boolean, highlightElements: boolean): void {
     batchExtractCount = 0;
     lastPageClick = null;
     document.addEventListener('click', notePageClick, true);
-    recorder = attachListeners((action) => {
-      chrome.runtime.sendMessage({ type: 'RECORDED_ACTION', action } satisfies RuntimeMessage);
+    recorder = attachListeners((action, el) => {
+      chrome.runtime.sendMessage({
+        type: 'RECORDED_ACTION',
+        action,
+        rect: rectOf(el),
+        dpr: window.devicePixelRatio || 1,
+      } satisfies RuntimeMessage);
     });
     detachBadge = attachExtractBadge({
       onAddTable: recordTable,

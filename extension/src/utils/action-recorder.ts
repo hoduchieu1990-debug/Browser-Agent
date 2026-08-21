@@ -16,7 +16,7 @@ function selectorWithFallbacks(el: Element): { selector: string; selectorFallbac
   return rest.length ? { selector, selectorFallbacks: rest } : { selector };
 }
 
-export function attachListeners(onAction: (action: RecordedActionPayload) => void): RecorderHandle {
+export function attachListeners(onAction: (action: RecordedActionPayload, el: Element) => void): RecorderHandle {
   let fileParamCount = 0;
   // The picker registers its listeners later than these, so its
   // stopImmediatePropagation can't retroactively stop a handler that already
@@ -33,7 +33,7 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
     // addresses it again, so this bypasses the CSS-selector strategies below.
     const nexacroTarget = findNexacroComponent(event.target as Element | null);
     if (nexacroTarget) {
-      onAction({ type: 'click', selector: nexacroSelector(nexacroTarget.id) });
+      onAction({ type: 'click', selector: nexacroSelector(nexacroTarget.id) }, nexacroTarget.element);
       return;
     }
 
@@ -46,11 +46,11 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
       // selector plus a ${paramN} placeholder the user fills in at run time
       // (browser-agent run ... --param file1=./data.xlsx) instead of skipping.
       const paramName = `file${++fileParamCount}`;
-      onAction({ type: 'uploadFile', ...selectorWithFallbacks(target), value: `\${${paramName}}` });
+      onAction({ type: 'uploadFile', ...selectorWithFallbacks(target), value: `\${${paramName}}` }, target);
       return;
     }
 
-    onAction({ type: 'click', ...selectorWithFallbacks(target) });
+    onAction({ type: 'click', ...selectorWithFallbacks(target) }, target);
   };
 
   const handleChange = (event: Event) => {
@@ -70,7 +70,7 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
       // The component's real DOM element is rarely an <input> — reading its
       // value has to go through the component itself (get_value), not .value.
       runNexacroAction(nexacroTarget.id, 'get_value').then((result) => {
-        onAction({ type: 'input', selector: nexacroSelector(nexacroTarget.id), value: result.value ?? '' });
+        onAction({ type: 'input', selector: nexacroSelector(nexacroTarget.id), value: result.value ?? '' }, nexacroTarget.element);
       });
       return;
     }
@@ -78,16 +78,16 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
     const located = selectorWithFallbacks(target);
 
     if (target instanceof HTMLSelectElement) {
-      onAction({ type: 'select', ...located, value: target.value });
+      onAction({ type: 'select', ...located, value: target.value }, target);
       return;
     }
 
     if (target instanceof HTMLInputElement && target.type === 'password') {
-      onAction({ type: 'input', ...located, value: '${password}' }); // never capture the real password
+      onAction({ type: 'input', ...located, value: '${password}' }, target); // never capture the real password
       return;
     }
 
-    onAction({ type: 'input', ...located, value: target.value });
+    onAction({ type: 'input', ...located, value: target.value }, target);
   };
 
   document.addEventListener('click', handleClick, true);

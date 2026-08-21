@@ -42,6 +42,7 @@ interface Props {
   actions: WorkflowAction[];
   error: string | null;
   datasetHeaders: string[];
+  thumbnails: Record<string, string>;
   onToggleRecording: () => void;
   onRemoveAction: (index: number) => void;
   onUpdateAction: (index: number, patch: Record<string, unknown>) => void;
@@ -53,6 +54,7 @@ export function RecordTab({
   actions,
   error,
   datasetHeaders,
+  thumbnails,
   onToggleRecording,
   onRemoveAction,
   onUpdateAction,
@@ -145,6 +147,18 @@ export function RecordTab({
               <div className="action-item" key={action.id}>
                 <div className="action-row">
                   <div className="action-step">{index + 1}</div>
+                  {thumbnails[action.id] && (
+                    <img
+                      className="action-thumb"
+                      src={thumbnails[action.id]}
+                      alt=""
+                      title="Click to view full size"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(thumbnails[action.id], '_blank');
+                      }}
+                    />
+                  )}
                   <div
                     className="action-info"
                     onClick={configurable ? () => setExpandedId(expanded ? null : action.id) : undefined}

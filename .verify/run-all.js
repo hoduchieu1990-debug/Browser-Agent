@@ -53,6 +53,7 @@ const CHECKS = [
   'preview-stale-check.js',
   'pin-default-icons-check.js',
   'checkbox-radio-check.js',
+  'step-thumbnail-check.js',
 ];
 
 (async () => {

@@ -26,6 +26,15 @@ export const DEFAULT_SETTINGS: RecorderSettings = {
   verboseLogging: false,
 };
 
+// Viewport-relative, in CSS px — the same shape captureVisibleTab-based
+// cropping already expects elsewhere (see utils/capture.ts's CaptureRect).
+export interface ThumbnailRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export type RuntimeMessage =
   | { type: 'START_RECORDING' }
   | { type: 'STOP_RECORDING' }
@@ -37,8 +46,16 @@ export type RuntimeMessage =
   | { type: 'GET_SETTINGS' }
   | { type: 'SET_SETTINGS'; settings: RecorderSettings }
   | { type: 'SET_RECORDING'; value: boolean; highlightElements: boolean }
-  | { type: 'RECORDED_ACTION'; action: RecordedActionPayload; replacesLastClick?: boolean }
+  | {
+      type: 'RECORDED_ACTION';
+      action: RecordedActionPayload;
+      replacesLastClick?: boolean;
+      rect?: ThumbnailRect;
+      dpr?: number;
+    }
   | { type: 'ACTIONS_UPDATED'; actions: WorkflowAction[] }
+  | { type: 'GET_THUMBNAILS' }
+  | { type: 'THUMBNAIL_READY'; actionId: string; dataUrl: string }
   | { type: 'RECORDING_UPDATED'; recording: boolean }
   | { type: 'SHOW_TOAST'; step: number; action: WorkflowAction }
   | { type: 'REPLAY_START'; background: boolean }
