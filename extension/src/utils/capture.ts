@@ -52,33 +52,38 @@ export async function captureElementViaDebugger(tabId: number, pageRect: Capture
   }
 }
 
-// A small, lossy preview per step — just enough to recognize the element at
-// a glance, not a faithful copy. Capped in size so recording a long workflow
-// never comes close to storage.local's quota the way a run of full-size
-// screenshot outputs could.
-const THUMBNAIL_MAX_DIMENSION = 160;
+// The whole visible tab, not a crop of just the element — a tight crop looks
+// like nothing on a dense page (a bare checkbox, an icon with no label) and
+// answers "what does this look like" without answering "where on the page
+// was it". A red box marks the actual target on top of that full picture.
+// Still capped and lossy, so a long recording's worth of these stays well
+// clear of storage quotas.
+const THUMBNAIL_MAX_DIMENSION = 480;
 
 export async function captureThumbnail(windowId: number, rect: CaptureRect, dpr: number): Promise<string> {
   const fullDataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
   const bitmap = await createImageBitmap(await (await fetch(fullDataUrl)).blob());
 
-  const srcX = Math.round(rect.x * dpr);
-  const srcY = Math.round(rect.y * dpr);
-  const srcW = Math.max(1, Math.round(rect.width * dpr));
-  const srcH = Math.max(1, Math.round(rect.height * dpr));
-
-  const scale = Math.min(1, THUMBNAIL_MAX_DIMENSION / Math.max(srcW, srcH));
-  const outW = Math.max(1, Math.round(srcW * scale));
-  const outH = Math.max(1, Math.round(srcH * scale));
+  const scale = Math.min(1, THUMBNAIL_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+  const outW = Math.max(1, Math.round(bitmap.width * scale));
+  const outH = Math.max(1, Math.round(bitmap.height * scale));
 
   const canvas = new OffscreenCanvas(outW, outH);
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not create a canvas to crop the screenshot');
+  if (!ctx) throw new Error('Could not create a canvas to scale the screenshot');
 
-  ctx.drawImage(bitmap, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+  ctx.drawImage(bitmap, 0, 0, outW, outH);
   bitmap.close();
 
-  const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+  const markX = rect.x * dpr * scale;
+  const markY = rect.y * dpr * scale;
+  const markW = Math.max(1, rect.width * dpr * scale);
+  const markH = Math.max(1, rect.height * dpr * scale);
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(markX, markY, markW, markH);
+
+  const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.75 });
   return `data:image/jpeg;base64,${toBase64(await blob.arrayBuffer())}`;
 }
 

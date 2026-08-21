@@ -59,6 +59,33 @@ const PAGE = `<!doctype html><html><body style="padding:24px">
     assert(firstThumbSrc && firstThumbSrc.startsWith('data:image/jpeg'), `expected a jpeg data URL, got ${firstThumbSrc?.slice(0, 30)}`);
     console.log('[ok] Record tab shows a real captured thumbnail per step');
 
+    // --- it must be the whole window (with a marker), not a crop tight to
+    // the tiny 80x32 button — a crop that size would be unrecognizable.
+    // launchPersistentContext ignores setViewportSize for a headed window,
+    // so compare against the window's real, observed size instead of an
+    // assumed one. ---
+    const realWindow = await tab.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+    const realAspect = realWindow.w / realWindow.h;
+    console.log('[real window]', JSON.stringify(realWindow), 'aspect=', realAspect.toFixed(2));
+
+    const dims = await popup.evaluate(
+      (src) =>
+        new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          img.onerror = reject;
+          img.src = src;
+        }),
+      firstThumbSrc,
+    );
+    const aspect = dims.w / dims.h;
+    console.log('[thumbnail dimensions]', JSON.stringify(dims), 'aspect=', aspect.toFixed(2));
+    assert(
+      Math.abs(aspect - realAspect) < 0.1,
+      `expected an aspect ratio near the real window's ${realAspect.toFixed(2)}, got ${aspect.toFixed(2)} (dims ${JSON.stringify(dims)}) — looks cropped to the element instead of the full window`,
+    );
+    console.log('[ok] the captured image is the full window, not a tight crop of the element');
+
     // --- Preview tab shows the same thumbnails before Replay too ---
     await popup.click('text=Preview');
     await popup.waitForTimeout(200);
