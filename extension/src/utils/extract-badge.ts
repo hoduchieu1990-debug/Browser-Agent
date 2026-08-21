@@ -408,7 +408,19 @@ export function attachExtractBadge({
     if (hideTimer === null) hideTimer = window.setTimeout(hide, HIDE_DELAY_MS);
   };
 
-  const processMove = (event: MouseEvent) => {
+  // Deferring this to a requestAnimationFrame callback was tried, on the
+  // theory that a real mouse fires far more mousemove events than the screen
+  // repaints — but rAF scheduled from inside a mousemove handler runs on the
+  // *next* frame, not the current one, adding a real ~16ms of latency on top
+  // of whatever the browser's own event dispatch already costs. That is
+  // invisible while crawling the pointer slowly but reads as a visible gap
+  // between the cursor and the frame during a fast sweep, which is exactly
+  // backwards from the goal. The per-call cost here (ancestor walks, selector
+  // checks) was separately measured at low single-digit milliseconds even on
+  // a pathological page, so there was never a processing-time problem to
+  // solve by batching — handling every event immediately, synchronously, is
+  // both simpler and actually lower latency.
+  const handleMove = (event: MouseEvent) => {
     const target = event.target as Element | null;
 
     if (target && root.contains(target)) {
@@ -455,25 +467,6 @@ export function attachExtractBadge({
     moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
     frameDefault();
     onTargetChange?.(true);
-  };
-
-  // A real mouse fires mousemove far more often than the screen repaints —
-  // running the full detection logic (ancestor walks, selector checks) on
-  // every single one makes fast sweeps feel laggy for no visible benefit.
-  // Coalescing to one pass per animation frame keeps the badge exactly as
-  // responsive (still ~60 updates/sec) while cutting the actual work down to
-  // what a human can perceive; Add always reads the latest currentTable/
-  // currentText/currentBatch, so which element it captures is unaffected.
-  let pendingMove: MouseEvent | null = null;
-  let moveRafId: number | null = null;
-
-  const handleMove = (event: MouseEvent) => {
-    pendingMove = event;
-    if (moveRafId !== null) return;
-    moveRafId = requestAnimationFrame(() => {
-      moveRafId = null;
-      if (pendingMove) processMove(pendingMove);
-    });
   };
 
   const handleScroll = () => {
@@ -573,7 +566,6 @@ export function attachExtractBadge({
 
   return () => {
     cancelHide();
-    if (moveRafId !== null) cancelAnimationFrame(moveRafId);
     frame.remove();
     document.removeEventListener('mousemove', handleMove, true);
     document.removeEventListener('keydown', handleKeydown, true);
