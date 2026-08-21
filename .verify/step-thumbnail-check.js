@@ -59,14 +59,12 @@ const PAGE = `<!doctype html><html><body style="padding:24px">
     assert(firstThumbSrc && firstThumbSrc.startsWith('data:image/jpeg'), `expected a jpeg data URL, got ${firstThumbSrc?.slice(0, 30)}`);
     console.log('[ok] Record tab shows a real captured thumbnail per step');
 
-    // --- it must be the whole window (with a marker), not a crop tight to
-    // the tiny 80x32 button — a crop that size would be unrecognizable.
-    // launchPersistentContext ignores setViewportSize for a headed window,
-    // so compare against the window's real, observed size instead of an
-    // assumed one. ---
+    // --- must stay light and fast: a crop of the element's own area (plus a
+    // little padding), not a photo of the whole window — the aspect ratio
+    // should track the 80x32 button (+12px padding each side = 104x56),
+    // nowhere near the window's own, much wider-or-taller shape. ---
     const realWindow = await tab.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
-    const realAspect = realWindow.w / realWindow.h;
-    console.log('[real window]', JSON.stringify(realWindow), 'aspect=', realAspect.toFixed(2));
+    console.log('[real window]', JSON.stringify(realWindow));
 
     const dims = await popup.evaluate(
       (src) =>
@@ -78,13 +76,15 @@ const PAGE = `<!doctype html><html><body style="padding:24px">
         }),
       firstThumbSrc,
     );
+    console.log('[thumbnail dimensions]', JSON.stringify(dims));
+    assert(dims.w <= 210 && dims.h <= 210, `expected a small crop (<=~200px), got ${JSON.stringify(dims)} — looks like the whole window got captured instead`);
+    const expectedAspect = (80 + 24) / (32 + 24); // button + 12px padding each side
     const aspect = dims.w / dims.h;
-    console.log('[thumbnail dimensions]', JSON.stringify(dims), 'aspect=', aspect.toFixed(2));
     assert(
-      Math.abs(aspect - realAspect) < 0.1,
-      `expected an aspect ratio near the real window's ${realAspect.toFixed(2)}, got ${aspect.toFixed(2)} (dims ${JSON.stringify(dims)}) — looks cropped to the element instead of the full window`,
+      Math.abs(aspect - expectedAspect) < 0.15,
+      `expected an aspect ratio near the padded button's ${expectedAspect.toFixed(2)}, got ${aspect.toFixed(2)} (dims ${JSON.stringify(dims)})`,
     );
-    console.log('[ok] the captured image is the full window, not a tight crop of the element');
+    console.log('[ok] the captured image is a light crop of just the element, not the whole window');
 
     // --- hovering the small thumb reveals a larger inline preview, no new
     // tab (Chrome silently blocks window.open() straight to a data: URL —
