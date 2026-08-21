@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { WorkflowAction } from '../types';
 import { actionSelectorText, actionValueText, actionTypeIcon, batchNodeLabel } from '../utils/action-display';
 import { BatchNodeConfig } from './BatchNodeConfig';
+import { ActionThumb } from './ActionThumb';
 
 const CONFIRM_TIMEOUT_MS = 4000;
 
@@ -147,18 +148,7 @@ export function RecordTab({
               <div className="action-item" key={action.id}>
                 <div className="action-row">
                   <div className="action-step">{index + 1}</div>
-                  {thumbnails[action.id] && (
-                    <img
-                      className="action-thumb"
-                      src={thumbnails[action.id]}
-                      alt=""
-                      title="Click to view full size"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(thumbnails[action.id], '_blank');
-                      }}
-                    />
-                  )}
+                  <ActionThumb dataUrl={thumbnails[action.id]} />
                   <div
                     className="action-info"
                     onClick={configurable ? () => setExpandedId(expanded ? null : action.id) : undefined}

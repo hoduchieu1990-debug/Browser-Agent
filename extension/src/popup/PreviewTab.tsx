@@ -1,5 +1,6 @@
 import type { WorkflowAction, ReplayState, ReplayStepLog } from '../types';
 import { actionSelectorText, actionTypeIcon } from '../utils/action-display';
+import { ActionThumb } from './ActionThumb';
 
 interface Props {
   actions: WorkflowAction[];
@@ -87,22 +88,6 @@ function capturedInStepOrder(actions: WorkflowAction[], variables: Record<string
   return ordered;
 }
 
-function StepThumb({ dataUrl }: { dataUrl?: string }) {
-  if (!dataUrl) return null;
-  return (
-    <img
-      className="action-thumb"
-      src={dataUrl}
-      alt=""
-      title="Click to view full size"
-      onClick={(e) => {
-        e.stopPropagation();
-        window.open(dataUrl, '_blank');
-      }}
-    />
-  );
-}
-
 // Before Replay has ever run (or after the recording changed since it last
 // did), there is no ReplayStepLog yet — this shows what WOULD run, using the
 // current recording directly, so Preview never has to fall back to showing
@@ -116,7 +101,7 @@ function PendingStepLog({ actions, thumbnails }: { actions: WorkflowAction[]; th
           <span className="step-index">
             {i + 1}/{actions.length}
           </span>
-          <StepThumb dataUrl={thumbnails[action.id]} />
+          <ActionThumb dataUrl={thumbnails[action.id]} />
           <span className="step-body">
             <span className="step-type-line">
               <span className="action-icon">{actionTypeIcon(action.type)}</span>
@@ -154,7 +139,7 @@ function StepLog({
           <span className="step-index">
             {step.index}/{total}
           </span>
-          <StepThumb dataUrl={thumbnails[actions[step.index - 1]?.id]} />
+          <ActionThumb dataUrl={thumbnails[actions[step.index - 1]?.id]} />
           <span className="step-body">
             <span className="step-type-line">
               <span className="action-icon">{actionTypeIcon(step.type)}</span>

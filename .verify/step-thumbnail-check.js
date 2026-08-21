@@ -86,6 +86,18 @@ const PAGE = `<!doctype html><html><body style="padding:24px">
     );
     console.log('[ok] the captured image is the full window, not a tight crop of the element');
 
+    // --- hovering the small thumb reveals a larger inline preview, no new
+    // tab (Chrome silently blocks window.open() straight to a data: URL —
+    // it lands on about:blank, which is what this replaces). ---
+    const firstWrap = popup.locator('.action-thumb-wrap').first();
+    const preview = firstWrap.locator('.action-thumb-preview');
+    assert(!(await preview.isVisible()), 'the enlarged preview should be hidden before hovering');
+    await firstWrap.hover();
+    await preview.waitFor({ state: 'visible', timeout: 2000 });
+    const previewSrc = await preview.getAttribute('src');
+    assert.strictEqual(previewSrc, firstThumbSrc, 'the hover preview should show the same captured image as the small thumb');
+    console.log('[ok] hovering the thumbnail reveals an enlarged inline preview (no new-tab navigation involved)');
+
     // --- Preview tab shows the same thumbnails before Replay too ---
     await popup.click('text=Preview');
     await popup.waitForTimeout(200);
