@@ -28,7 +28,9 @@ import {
   loadBatchDataset,
   saveBatchState,
   loadBatchState,
-  saveThumbnails,
+  saveThumbnail,
+  deleteThumbnail,
+  clearThumbnails,
   loadThumbnails,
 } from './utils/storage-manager';
 import { captureElement, captureElementViaDebugger, captureThumbnail, type CaptureRect } from './utils/capture';
@@ -212,7 +214,7 @@ function captureThumbnailFor(actionId: string, rect: ThumbnailRect, dpr: number,
     .then((dataUrl) => {
       if (!dataUrl) return;
       thumbnails[actionId] = dataUrl;
-      saveThumbnails(thumbnails);
+      saveThumbnail(actionId, dataUrl);
       chrome.runtime.sendMessage({ type: 'THUMBNAIL_READY', actionId, dataUrl } satisfies RuntimeMessage).catch(() => {});
     })
     .catch(() => {});
@@ -681,7 +683,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
           thumbnails = {};
           invalidateReplayState();
           saveSession(actions);
-          saveThumbnails(thumbnails);
+          clearThumbnails();
           notifyActionsUpdated();
         }
         sendResponse({ recording, actions });
@@ -712,9 +714,11 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
 
     case 'REMOVE_ACTION': {
       const [removed] = actions.splice(message.index, 1);
-      if (removed) delete thumbnails[removed.id];
+      if (removed) {
+        delete thumbnails[removed.id];
+        deleteThumbnail(removed.id);
+      }
       saveSession(actions);
-      saveThumbnails(thumbnails);
       invalidateReplayState();
       notifyActionsUpdated();
       return;

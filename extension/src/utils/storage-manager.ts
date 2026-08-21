@@ -41,6 +41,19 @@ export async function loadSession(): Promise<WorkflowAction[]> {
   });
 }
 
+// Each thumbnail is its own key ('thumb:<actionId>') rather than one big
+// dictionary under a single key — a long recording used to mean re-writing
+// every previous step's image on every single new capture.
+const THUMB_KEY_PREFIX = 'thumb:';
+
+function thumbKey(actionId: string): string {
+  return `${THUMB_KEY_PREFIX}${actionId}`;
+}
+
+function thumbKeyRange(): IDBKeyRange {
+  return IDBKeyRange.bound(THUMB_KEY_PREFIX, THUMB_KEY_PREFIX + '￿');
+}
+
 export async function clearSession(): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
@@ -48,17 +61,37 @@ export async function clearSession(): Promise<void> {
     // Thumbnails belong to this recording's steps — meaningless once they do
     // not exist anymore, so they go with it rather than lingering as orphans.
     tx.objectStore(STORE_NAME).delete('current');
-    tx.objectStore(STORE_NAME).delete('thumbnails');
+    tx.objectStore(STORE_NAME).delete(thumbKeyRange());
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
-export async function saveThumbnails(thumbnails: Record<string, string>): Promise<void> {
+export async function saveThumbnail(actionId: string, dataUrl: string): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(thumbnails, 'thumbnails');
+    tx.objectStore(STORE_NAME).put(dataUrl, thumbKey(actionId));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function deleteThumbnail(actionId: string): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(thumbKey(actionId));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function clearThumbnails(): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(thumbKeyRange());
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -68,9 +101,19 @@ export async function loadThumbnails(): Promise<Record<string, string>> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
-    const request = tx.objectStore(STORE_NAME).get('thumbnails');
-    request.onsuccess = () => resolve(request.result ?? {});
-    request.onerror = () => reject(request.error);
+    const store = tx.objectStore(STORE_NAME);
+    const keysRequest = store.getAllKeys(thumbKeyRange());
+    const valuesRequest = store.getAll(thumbKeyRange());
+    tx.oncomplete = () => {
+      const result: Record<string, string> = {};
+      const keys = keysRequest.result as string[];
+      const values = valuesRequest.result as string[];
+      keys.forEach((key, i) => {
+        result[key.slice(THUMB_KEY_PREFIX.length)] = values[i];
+      });
+      resolve(result);
+    };
+    tx.onerror = () => reject(tx.error);
   });
 }
 
