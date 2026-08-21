@@ -59,6 +59,12 @@ export function attachListeners(onAction: (action: RecordedActionPayload) => voi
     const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
     if (target instanceof HTMLInputElement && target.type === 'file') return; // handled on click, above
 
+    // A checkbox/radio's .value is almost always a static attribute ("on",
+    // an option id, ...), never the checked state — recording it here would
+    // add a bogus `input` step that replays as a no-op. The click that
+    // toggled it already recorded a real `click` step through handleClick.
+    if (target instanceof HTMLInputElement && (target.type === 'checkbox' || target.type === 'radio')) return;
+
     const nexacroTarget = findNexacroComponent(target);
     if (nexacroTarget) {
       // The component's real DOM element is rarely an <input> — reading its
