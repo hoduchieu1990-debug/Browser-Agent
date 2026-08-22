@@ -50,9 +50,9 @@ export function ScheduleForm({ recording, settings, emailSettings, onAddRecipien
 
   const [saved, setSaved] = useState(false);
 
-  const hasSmtpConfig = emailSettings.host.trim() !== '';
+  const hasEmailAccount = emailSettings.user.trim() !== '';
   const recurrenceValid = recurrenceType === 'once' ? !!date : weekdays.size > 0;
-  const canSubmit = name.trim() !== '' && recurrenceValid && repeatCount >= 1 && hasSmtpConfig && selectedRecipients.size > 0;
+  const canSubmit = name.trim() !== '' && recurrenceValid && repeatCount >= 1 && hasEmailAccount && selectedRecipients.size > 0;
 
   const addRecipient = () => {
     const email = newRecipient.trim();
@@ -120,10 +120,9 @@ export function ScheduleForm({ recording, settings, emailSettings, onAddRecipien
         created from it.
       </p>
 
-      {!hasSmtpConfig && (
+      {!hasEmailAccount && (
         <p className="form-hint schedule-warning">
-          No SMTP server configured yet — set it up once in the <strong>Settings</strong> tab before creating a
-          schedule.
+          No email account set up yet — add one once in the <strong>Settings</strong> tab before creating a schedule.
         </p>
       )}
 

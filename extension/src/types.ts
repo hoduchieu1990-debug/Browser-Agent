@@ -39,8 +39,11 @@ export interface EmailSettings {
   recipients: string[];
 }
 
+// Host/port/secure aren't exposed in the Settings UI (the user only ever
+// changes the mailbox and recipients, not the relay itself) — these are the
+// company's internal relay, changeable here if that ever moves.
 export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
-  host: '',
+  host: 'smtp.samsung.net',
   port: 25,
   secure: false,
   user: '',

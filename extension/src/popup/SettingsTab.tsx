@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { RecorderSettings, EmailSettings } from '../types';
 
 interface Props {
@@ -5,6 +6,8 @@ interface Props {
   onChange: (key: keyof RecorderSettings, value: boolean) => void;
   emailSettings: EmailSettings;
   onEmailSettingsChange: (patch: Partial<EmailSettings>) => void;
+  onAddRecipient: (email: string) => void;
+  onRemoveRecipient: (email: string) => void;
 }
 
 const ITEMS: { key: keyof RecorderSettings; name: string; desc: string }[] = [
@@ -16,7 +19,24 @@ const ITEMS: { key: keyof RecorderSettings; name: string; desc: string }[] = [
   { key: 'verboseLogging', name: 'Verbose Logging', desc: 'Log extension activity to the console' },
 ];
 
-export function SettingsTab({ settings, onChange, emailSettings, onEmailSettingsChange }: Props) {
+export function SettingsTab({
+  settings,
+  onChange,
+  emailSettings,
+  onEmailSettingsChange,
+  onAddRecipient,
+  onRemoveRecipient,
+}: Props) {
+  const [emailExpanded, setEmailExpanded] = useState(false);
+  const [newRecipient, setNewRecipient] = useState('');
+
+  const addRecipient = () => {
+    const email = newRecipient.trim();
+    if (!email) return;
+    onAddRecipient(email);
+    setNewRecipient('');
+  };
+
   return (
     <div className="settings-list">
       {ITEMS.map((item) => (
@@ -34,73 +54,72 @@ export function SettingsTab({ settings, onChange, emailSettings, onEmailSettings
         </div>
       ))}
 
-      <div className="settings-section-title">Email (SMTP) — used by every scheduled report</div>
-
-      <div className="form-group">
-        <label className="form-label">SMTP host</label>
-        <input
-          className="form-input"
-          type="text"
-          placeholder="smtp.samsung.net"
-          value={emailSettings.host}
-          onChange={(e) => onEmailSettingsChange({ host: e.target.value })}
-        />
-      </div>
-
-      <div className="smtp-row">
-        <div className="form-group">
-          <label className="form-label">Port</label>
-          <input
-            className="form-input"
-            type="number"
-            value={emailSettings.port}
-            onChange={(e) => onEmailSettingsChange({ port: parseInt(e.target.value, 10) || 25 })}
-          />
+      <button className="setting-item email-toggle-btn" onClick={() => setEmailExpanded(!emailExpanded)}>
+        <div className="setting-label">
+          <div className="setting-name">✉️ Email</div>
+          <div className="setting-desc">Account and recipients for scheduled reports</div>
         </div>
-        <label className="result-key-item smtp-secure-toggle">
-          <input
-            type="checkbox"
-            checked={emailSettings.secure}
-            onChange={(e) => onEmailSettingsChange({ secure: e.target.checked })}
-          />
-          Secure (TLS)
-        </label>
-      </div>
+        <span className={emailExpanded ? 'email-toggle-chevron open' : 'email-toggle-chevron'}>▾</span>
+      </button>
 
-      <div className="form-group">
-        <label className="form-label">SMTP user (optional)</label>
-        <input
-          className="form-input"
-          type="text"
-          value={emailSettings.user}
-          onChange={(e) => onEmailSettingsChange({ user: e.target.value })}
-        />
-      </div>
+      {emailExpanded && (
+        <div className="schedule-panel">
+          <div className="form-group">
+            <label className="form-label">Email address</label>
+            <input
+              className="form-input"
+              type="text"
+              placeholder="you@samsung.com"
+              value={emailSettings.user}
+              onChange={(e) => onEmailSettingsChange({ user: e.target.value })}
+            />
+          </div>
 
-      <div className="form-group">
-        <label className="form-label">SMTP password (optional)</label>
-        <input
-          className="form-input"
-          type="password"
-          value={emailSettings.pass}
-          onChange={(e) => onEmailSettingsChange({ pass: e.target.value })}
-        />
-      </div>
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input
+              className="form-input"
+              type="password"
+              value={emailSettings.pass}
+              onChange={(e) => onEmailSettingsChange({ pass: e.target.value })}
+            />
+          </div>
 
-      <div className="form-group">
-        <label className="form-label">From (optional)</label>
-        <input
-          className="form-input"
-          type="text"
-          placeholder={emailSettings.user || 'defaults to SMTP user'}
-          value={emailSettings.from}
-          onChange={(e) => onEmailSettingsChange({ from: e.target.value })}
-        />
-      </div>
-
-      <p className="form-hint">
-        Recipients are picked per schedule, from the Saved tab's ⏰ Schedule form.
-      </p>
+          <div className="form-group">
+            <label className="form-label">Recipients</label>
+            {emailSettings.recipients.length > 0 && (
+              <div className="result-key-list">
+                {emailSettings.recipients.map((email) => (
+                  <div className="recipient-row" key={email}>
+                    <span>{email}</span>
+                    <button className="action-delete" onClick={() => onRemoveRecipient(email)}>
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="recipient-add-row">
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Add a new recipient…"
+                value={newRecipient}
+                onChange={(e) => setNewRecipient(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addRecipient();
+                  }
+                }}
+              />
+              <button className="saved-load" onClick={addRecipient}>
+                + Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

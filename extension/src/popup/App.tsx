@@ -229,6 +229,10 @@ export function App() {
     updateEmailSettings({ recipients: [...emailSettings.recipients, email] });
   };
 
+  const removeEmailRecipient = (email: string) => {
+    updateEmailSettings({ recipients: emailSettings.recipients.filter((r) => r !== email) });
+  };
+
   return (
     <div className="popup">
       <Sidebar active={activeTab} onChange={setActiveTab} showBatch={hasBatchNodes} />
@@ -286,6 +290,8 @@ export function App() {
               onChange={updateSetting}
               emailSettings={emailSettings}
               onEmailSettingsChange={updateEmailSettings}
+              onAddRecipient={addEmailRecipient}
+              onRemoveRecipient={removeEmailRecipient}
             />
           )}
           {activeTab === 'about' && <AboutTab />}

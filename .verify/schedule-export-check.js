@@ -42,10 +42,14 @@ const PAGE = `<!doctype html>
 
     const badge = testPage.locator('#__browser_agent_add_badge__');
 
-    // Configure the (now global, Settings-tab) SMTP server once, up front.
+    // Configure the (now global, Settings-tab) email account once, up front —
+    // collapsed behind the "✉️ Email" toggle; host/port/secure are no longer
+    // exposed in the UI (they default to the company relay in types.ts).
     await popup.click('text=Settings');
     await popup.waitForTimeout(200);
-    await popup.locator('.form-input[placeholder="smtp.samsung.net"]').fill('smtp.samsung.net');
+    await popup.locator('.email-toggle-btn').click();
+    await popup.waitForTimeout(150);
+    await popup.locator('.form-input[placeholder="you@samsung.com"]').fill('ops@samsung.com');
     await popup.waitForTimeout(200); // SET_EMAIL_SETTINGS round trip to the background
 
     // Record one extractText action so the recording has a real output name.
@@ -101,7 +105,8 @@ const PAGE = `<!doctype html>
     assert.strictEqual(config.repeatCount, 1);
     assert(config.resultKeys.includes(outputName.trim()), 'expected the recorded output name in resultKeys');
     assert(config.workflow.actions.some((a) => a.type === 'extractText'), 'expected the extractText action in the embedded workflow');
-    assert.strictEqual(config.email.host, 'smtp.samsung.net');
+    assert.strictEqual(config.email.host, 'smtp.samsung.net', 'expected the default relay, unset in the UI');
+    assert.strictEqual(config.email.user, 'ops@samsung.com', 'expected the account set in Settings > Email');
     assert.strictEqual(config.email.to, 'ops@example.com');
     console.log('[ok] downloaded .schedule.json has the expected recurrence/repeatCount/resultKeys/workflow/email');
 
