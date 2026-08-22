@@ -10,7 +10,10 @@ const MARKING_EVENT = '__ba_nexacro_marking__';
 const REQUEST_EVENT = '__ba_nexacro_request__';
 const RESPONSE_EVENT = '__ba_nexacro_response__';
 const BRIDGE_SCRIPT_ID = '__browser_agent_nexacro_bridge__';
-const REQUEST_TIMEOUT_MS = 5000;
+// Longer than the bridge's own internal component-resolve deadline (15s,
+// nexacro-bridge.ts) so a slow-booting app gets to use all of it instead of
+// this timing out first.
+const REQUEST_TIMEOUT_MS = 20000;
 
 export interface NexacroComponentRef {
   id: string;

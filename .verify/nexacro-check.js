@@ -4,40 +4,41 @@ const http = require('http');
 const assert = require('assert');
 
 // A minimal stand-in for a Nexacro-rendered page: real DOM elements (so
-// hover/click/change events fire normally) wired to a fake
-// window.nexacro.getActiveFrame() object model, matching the shape described
-// in the nexacro skill doc (frm.lookup(id), comp.set_value/click/onchange/
-// getDOMElement). Exercises both recording (hover -> component id, not a CSS
-// selector) and replay (the extension actually calling set_value/click
-// through the bridge, not just poking the DOM).
+// hover/click/change events fire normally), ids matching the dotted
+// object-model path real Nexacro N uses (mainframe.form.componentId), wired
+// to a fake window.nexacro.getApplication() tree — the API verified against
+// a live Nexacro N app (demo.tobesoft.com). onclick is deliberately an
+// object, not a function, matching what a real component exposes (calling
+// it unconditionally is exactly the bug the corrected bridge avoids).
+// Exercises both recording (hover -> component id, not a CSS selector) and
+// replay (the extension actually calling set_value/click through the
+// bridge, not just poking the DOM).
+const USERNAME_ID = 'mainframe.form.edtUsername';
+const LOGIN_ID = 'mainframe.form.btnLogin';
 const PAGE = `<!doctype html>
 <html><body style="padding:20px">
-  <div id="edtUsername" tabindex="0" style="border:1px solid #999;width:200px;height:24px;display:inline-block"></div>
-  <div id="btnLogin" style="border:1px solid #999;width:80px;height:24px;display:inline-block;margin-left:8px">Login</div>
+  <div id="${USERNAME_ID}" tabindex="0" style="border:1px solid #999;width:200px;height:24px;display:inline-block"></div>
+  <div id="${LOGIN_ID}" style="border:1px solid #999;width:80px;height:24px;display:inline-block;margin-left:8px">Login</div>
   <div id="result"></div>
   <script>
     window._log = [];
-    const components = {
-      edtUsername: {
-        _type: 'Edit',
-        value: '',
-        set_value(v) { this.value = v; window._log.push(['set_value', 'edtUsername', v]); },
-        get_value() { return this.value; },
-        setFocus() {},
-        onchange() { window._log.push(['onchange', 'edtUsername']); },
-        getDOMElement() { return document.getElementById('edtUsername'); },
-      },
-      btnLogin: {
-        _type: 'Button',
-        click() {
-          window._log.push(['click', 'btnLogin']);
-          document.getElementById('result').textContent = 'clicked:' + components.edtUsername.value;
-        },
-        onclick() {},
-        getDOMElement() { return document.getElementById('btnLogin'); },
-      },
+    const edtUsername = {
+      _type_name: 'TextField',
+      value: '',
+      set_value(v) { this.value = v; window._log.push(['set_value', 'edtUsername', v]); },
+      setFocus() {},
+      onchange() { window._log.push(['onchange', 'edtUsername']); },
     };
-    window.nexacro = { getActiveFrame: () => ({ components, lookup: (id) => components[id] || null }) };
+    const btnLogin = {
+      _type_name: 'Button',
+      click() {
+        window._log.push(['click', 'btnLogin']);
+        document.getElementById('result').textContent = 'clicked:' + edtUsername.value;
+      },
+      onclick: {}, // a real component's onclick is an EventHandler object, not a function
+    };
+    const app = { mainframe: { form: { edtUsername, btnLogin } } };
+    window.nexacro = { getApplication: () => app };
   </script>
 </body></html>`;
 
@@ -81,24 +82,27 @@ const PAGE = `<!doctype html>
     }));
     console.log('[bridge state]', JSON.stringify(bridgeState));
 
-    const marked = await tab.evaluate(() => ({
-      username: document.getElementById('edtUsername').getAttribute('data-ba-nexacro-id'),
-      login: document.getElementById('btnLogin').getAttribute('data-ba-nexacro-id'),
-    }));
-    assert.strictEqual(marked.username, 'edtUsername', 'bridge should mark the textbox with its component id');
-    assert.strictEqual(marked.login, 'btnLogin', 'bridge should mark the button with its component id');
+    const marked = await tab.evaluate(
+      ({ usernameId, loginId }) => ({
+        username: document.getElementById(usernameId).getAttribute('data-ba-nexacro-id'),
+        login: document.getElementById(loginId).getAttribute('data-ba-nexacro-id'),
+      }),
+      { usernameId: USERNAME_ID, loginId: LOGIN_ID },
+    );
+    assert.strictEqual(marked.username, USERNAME_ID, 'bridge should mark the textbox with its component id');
+    assert.strictEqual(marked.login, LOGIN_ID, 'bridge should mark the button with its component id');
     console.log('[ok] bridge marks Nexacro components with data-ba-nexacro-id');
 
     // --- Record: type into the fake TextBox, click the fake Button ---
     // Nexacro's own internal handling (not ours) is what would call
     // set_value() as the user types — dispatching 'change' alone, the way a
     // real DOM input would, never touches the component's own state.
-    await tab.evaluate(() => {
-      window.nexacro.getActiveFrame().lookup('edtUsername').set_value('admin');
-      document.getElementById('edtUsername').dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await tab.evaluate(({ usernameId }) => {
+      window.nexacro.getApplication().mainframe.form.edtUsername.set_value('admin');
+      document.getElementById(usernameId).dispatchEvent(new Event('change', { bubbles: true }));
+    }, { usernameId: USERNAME_ID });
     await tab.waitForTimeout(200); // handleChange's get_value round trip is async
-    await tab.click('#btnLogin');
+    await tab.click(`[id="${LOGIN_ID}"]`);
     await tab.waitForTimeout(200);
 
     await popup.click('.record-btn.stop');
@@ -111,11 +115,11 @@ const PAGE = `<!doctype html>
     const nexacroActions = recorded.filter((a) => typeof a.selector === 'string' && a.selector.startsWith('nexacro:'));
     console.log('[recorded]', JSON.stringify(nexacroActions));
 
-    const inputStep = nexacroActions.find((a) => a.type === 'input' && a.selector === 'nexacro:edtUsername');
-    const clickStep = nexacroActions.find((a) => a.type === 'click' && a.selector === 'nexacro:btnLogin');
-    assert(inputStep, 'expected an input step recorded with selector nexacro:edtUsername');
+    const inputStep = nexacroActions.find((a) => a.type === 'input' && a.selector === `nexacro:${USERNAME_ID}`);
+    const clickStep = nexacroActions.find((a) => a.type === 'click' && a.selector === `nexacro:${LOGIN_ID}`);
+    assert(inputStep, `expected an input step recorded with selector nexacro:${USERNAME_ID}`);
     assert.strictEqual(inputStep.value, 'admin', 'recorded value should come from get_value(), not a raw DOM .value');
-    assert(clickStep, 'expected a click step recorded with selector nexacro:btnLogin');
+    assert(clickStep, `expected a click step recorded with selector nexacro:${LOGIN_ID}`);
     console.log('[ok] recording captures nexacro:<componentId> selectors with correct values, not CSS selectors');
 
     // --- Replay: drive it through the real Preview tab UI, foreground, same

@@ -11,30 +11,34 @@ const execFileAsync = promisify(execFile);
 // too. Unlike the extension, Playwright's page.evaluate() runs in the page's
 // real JS world already, so no bridge script is needed here; player/src/
 // utils/nexacro.ts talks to window.nexacro directly.
+//
+// window.nexacro.getApplication() with a dotted mainframe.form.* tree is the
+// real API (verified against a live Nexacro N app) — window.nexacro.
+// getActiveFrame(), mocked here previously, does not exist on real Nexacro N.
+// onclick is deliberately an object (not a function): a real component
+// exposes it that way, and calling it unconditionally throws.
+const USERNAME_ID = 'mainframe.form.edtUsername';
+const LOGIN_ID = 'mainframe.form.btnLogin';
 const PAGE = `<!doctype html>
 <html><body>
-  <div id="edtUsername"></div>
-  <div id="btnLogin">Login</div>
+  <div id="${USERNAME_ID}"></div>
+  <div id="${LOGIN_ID}">Login</div>
   <div id="result"></div>
   <script>
-    const components = {
-      edtUsername: {
-        _type: 'Edit',
-        value: '',
-        set_value(v) { this.value = v; },
-        get_value() { return this.value; },
-        setFocus() {},
-        onchange() {},
-        getDOMElement() { return document.getElementById('edtUsername'); },
-      },
-      btnLogin: {
-        _type: 'Button',
-        click() { document.getElementById('result').textContent = 'clicked:' + components.edtUsername.value; },
-        onclick() {},
-        getDOMElement() { return document.getElementById('btnLogin'); },
-      },
+    const edtUsername = {
+      _type_name: 'TextField',
+      value: '',
+      set_value(v) { this.value = v; },
+      setFocus() {},
+      onchange() {},
     };
-    window.nexacro = { getActiveFrame: () => ({ components, lookup: (id) => components[id] || null }) };
+    const btnLogin = {
+      _type_name: 'Button',
+      click() { document.getElementById('result').textContent = 'clicked:' + edtUsername.value; },
+      onclick: {},
+    };
+    const app = { mainframe: { form: { edtUsername, btnLogin } } };
+    window.nexacro = { getApplication: () => app };
   </script>
 </body></html>`;
 
@@ -52,8 +56,8 @@ const PAGE = `<!doctype html>
     name: 'nexacro-cli-check',
     actions: [
       { id: 'step-1', type: 'navigate', url: `http://127.0.0.1:${port}/` },
-      { id: 'step-2', type: 'input', selector: 'nexacro:edtUsername', value: 'admin' },
-      { id: 'step-3', type: 'click', selector: 'nexacro:btnLogin' },
+      { id: 'step-2', type: 'input', selector: `nexacro:${USERNAME_ID}`, value: 'admin' },
+      { id: 'step-3', type: 'click', selector: `nexacro:${LOGIN_ID}` },
       { id: 'step-4', type: 'extractText', selector: '#result', output: 'resultText' },
     ],
     exportFormats: [{ type: 'json', output: 'nexacro-result.json', dataKey: 'resultText' }],

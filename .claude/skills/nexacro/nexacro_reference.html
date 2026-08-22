@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexacro Object Model & JavaScript API Reference</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 20px;
+            padding: 0 20px;
+        }
+        
+        nav {
+            position: sticky;
+            top: 20px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        nav h3 {
+            font-size: 14px;
+            text-transform: uppercase;
+            color: #667eea;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        nav ul {
+            list-style: none;
+        }
+        
+        nav li {
+            margin-bottom: 8px;
+        }
+        
+        nav a {
+            color: #555;
+            text-decoration: none;
+            font-size: 13px;
+            display: block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        
+        nav a:hover {
+            background: #f0f0f0;
+            color: #667eea;
+            padding-left: 16px;
+        }
+        
+        main {
+            background: white;
+            border-radius: 8px;
+            padding: 40px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        section {
+            margin-bottom: 50px;
+            scroll-margin-top: 80px;
+        }
+        
+        h2 {
+            color: #667eea;
+            font-size: 24px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        h3 {
+            color: #764ba2;
+            font-size: 18px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+        
+        h4 {
+            color: #555;
+            font-size: 15px;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        p {
+            margin-bottom: 12px;
+            color: #666;
+        }
+        
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 13px;
+            color: #d63384;
+        }
+        
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+            color: #d4d4d4;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        tr:hover {
+            background: #f9f9f9;
+        }
+        
+        .component-card {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .component-card h4 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        
+        .highlight {
+            background: #fffacd;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .tip {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .search-box {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .highlight-match {
+            background: yellow;
+            font-weight: bold;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+            color: #666;
+        }
+        
+        .grid-example {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .grid-example > div {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+        
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin-top: 50px;
+            font-size: 13px;
+        }
+        
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            
+            nav {
+                position: static;
+                max-height: none;
+            }
+            
+            .grid-example {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .top-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #667eea;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            font-size: 20px;
+            z-index: 999;
+            transition: all 0.3s;
+        }
+        
+        .top-button:hover {
+            background: #764ba2;
+            transform: translateY(-5px);
+        }
+        
+        .top-button.show {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Nexacro Object Model & JavaScript API</h1>
+        <p>Complete Reference for Browser Agent Automation</p>
+        <p>Version: Nexacro N V24 / Platform 17 | Source: TOBESOFT Official + Github Samples</p>
+    </header>
+    
+    <div class="container">
+        <nav>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search...">
+            </div>
+            
+            <h3>Guide Sections</h3>
+            <ul>
+                <li><a href="#hierarchy">Object Hierarchy</a></li>
+                <li><a href="#global-api">Global API</a></li>
+                <li><a href="#form">Form Lifecycle</a></li>
+                <li><a href="#components">Components</a></li>
+                <li><a href="#events">Events</a></li>
+                <li><a href="#datasets">Datasets</a></li>
+                <li><a href="#automation">Automation Patterns</a></li>
+                <li><a href="#workflows">Common Workflows</a></li>
+                <li><a href="#debugging">Debugging</a></li>
+            </ul>
+            
+            <h3>Components Quick Ref</h3>
+            <ul>
+                <li><a href="#button-comp">Button</a></li>
+                <li><a href="#textinput-comp">TextInput</a></li>
+                <li><a href="#combo-comp">Combo</a></li>
+                <li><a href="#grid-comp">Grid</a></li>
+                <li><a href="#checkbox-comp">CheckBox</a></li>
+                <li><a href="#radio-comp">Radio</a></li>
+            </ul>
+        </nav>
+        
+        <main>
+            <!-- Object Hierarchy Section -->
+            <section id="hierarchy">
+                <h2>Object Hierarchy</h2>
+                <p>Nexacro follows a hierarchical object model:</p>
+                <pre><code>nexacro.Application (Global)
+├── Forms (Active/Loaded)
+│   ├── Components (Button, TextInput, Grid, etc.)
+│   │   ├── Properties (value, text, visible, etc.)
+│   │   └── Events (onclick, onchange, etc.)
+│   ├── Datasets
+│   └── Variables
+└── Transactions (Service Calls)</code></pre>
+                
+                <h3>Quick Access Patterns</h3>
+                <div class="grid-example">
+                    <div>
+                        <h4>Application Level</h4>
+                        <pre><code>nexacro.getApplication()
+app.mainForm
+app.aaa  // AppVariables</code></pre>
+                    </div>
+                    <div>
+                        <h4>Form Level (this context)</h4>
+                        <pre><code>this.Button00
+this.edtOrderID
+this.dsOrderList</code></pre>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Global API Section -->
+            <section id="global-api">
+                <h2>Global Nexacro API</h2>
+                
+                <h3>getApplication()</h3>
+                <pre><code>var app = nexacro.getApplication();
+var mainForm = app.mainForm;
+app.addVariable("varName", "varValue");
+trace("Debug message");</code></pre>
+                
+                <h3>Data Type Conversion</h3>
+                <pre><code>nexacro.toNumber("123")        // 123
+nexacro.toNumber("text", 0)   // 0 (NaN default)
+nexacro.toNumber(null, 0)     // 0</code></pre>
+                
+                <h3>Logging & Debugging</h3>
+                <pre><code>trace("Message: " + value);   // Nexacro debugger
+console.log("Message");       // Browser console
+eval("code string");          // Dynamic execution (use caution)</code></pre>
+                
+                <div class="tip">
+                    <strong>💡 Tip:</strong> Use <code>trace()</code> for Nexacro-level debugging, <code>console.log()</code> for browser dev tools.
+                </div>
+            </section>
+            
+            <!-- Form Lifecycle Section -->
+            <section id="form">
+                <h2>Form Object & Lifecycle</h2>
+                
+                <h3>Form Event Sequence</h3>
+                <table>
+                    <tr>
+                        <th>Event</th>
+                        <th>Purpose</th>
+                        <th>Parameter</th>
+                    </tr>
+                    <tr>
+                        <td><code>form_onload</code></td>
+                        <td>Initialize form, load datasets</td>
+                        <td><code>e.fromobject</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>form_onshow</code></td>
+                        <td>Refresh UI before display</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><code>form_onactivate</code></td>
+                        <td>Form gets focus</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><code>form_ondeactivate</code></td>
+                        <td>Form loses focus</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><code>form_onclose</code></td>
+                        <td>Cleanup before close</td>
+                        <td><code>e.closequery</code></td>
+                    </tr>
+                </table>
+                
+                <h3>Form Methods</h3>
+                <pre><code>// Navigation
+this.open(strFormName, "modal", {param: "value"});
+this.close(nReturnValue);
+
+// Visibility
+this.show();
+this.hide();
+this.maximize();
+
+// State
+this.setFocus();
+this.setSize(width, height);
+var w = this.getOffsetWidth();</code></pre>
+            </section>
+            
+            <!-- Components Section -->
+            <section id="components">
+                <h2>Component Types & Properties</h2>
+                
+                <h3>Universal Properties (All Components)</h3>
+                <pre><code>component.id                 // Component ID
+component.visible           // Show/hide
+component.enabled           // Enable/disable
+component.text              // Display text
+component.value             // Current value
+component.getOffsetWidth()  // Pixel width
+component.getOffsetHeight() // Pixel height
+component.setFocus()        // Set keyboard focus
+component.click()           // Programmatic click</code></pre>
+                
+                <!-- Button Component -->
+                <div class="component-card" id="button-comp">
+                    <h4>Button Component</h4>
+                    <pre><code>this.Button00.text = "Click Me";
+this.Button00.enabled = true;
+this.Button00.click();
+
+this.Button00_onclick = function(obj:Button, e:ClickEventInfo) {
+    trace("Button clicked");
+};</code></pre>
+                </div>
+                
+                <!-- TextInput Component -->
+                <div class="component-card" id="textinput-comp">
+                    <h4>TextInput / Edit Component</h4>
+                    <pre><code>this.edtOrderID.value = "ORD001";
+this.edtOrderID.readonly = false;
+this.edtOrderID.maxlength = 20;
+this.edtOrderID.setFocus();
+
+this.edtOrderID_onchange = function(obj:Edit, e:ChangeEventInfo) {
+    trace("Value changed to: " + obj.value);
+};
+
+this.edtOrderID_onkeydown = function(obj:Edit, e:KeyEventInfo) {
+    if (e.keycode == 13) {  // Enter
+        this.search();
+    }
+};</code></pre>
+                </div>
+                
+                <!-- Combo Component -->
+                <div class="component-card" id="combo-comp">
+                    <h4>Combo / Dropdown Component</h4>
+                    <pre><code>this.cboStatus.addItem("Active", "ACTIVE");
+this.cboStatus.setIndex(0);
+this.cboStatus.value;  // Get selected value
+
+this.cboStatus_onitemchanged = function(obj:Combo, e:ItemChangeEventInfo) {
+    trace("Selected: " + e.value);
+};</code></pre>
+                </div>
+                
+                <!-- Grid Component -->
+                <div class="component-card" id="grid-comp">
+                    <h4>Grid Component</h4>
+                    <pre><code>this.grdOrderList.selectAll();
+this.grdOrderList.unselectAll();
+this.grdOrderList.setFocusedCell(2, "orderID");
+var value = this.grdOrderList.getCellValue(2, "orderID");
+
+this.grdOrderList_oncelldblclick = function(obj:Grid, e:CellClickEventInfo) {
+    trace("Clicked row=" + e.row + ", col=" + e.col);
+};</code></pre>
+                </div>
+                
+                <!-- CheckBox Component -->
+                <div class="component-card" id="checkbox-comp">
+                    <h4>CheckBox Component</h4>
+                    <pre><code>this.chkActive.value = true;
+this.chkActive.checked;  // Read-only value
+
+this.chkActive_onchanged = function(obj:CheckBox, e:ChangeEventInfo) {
+    trace("Checked: " + obj.value);
+};</code></pre>
+                </div>
+                
+                <!-- Radio Component -->
+                <div class="component-card" id="radio-comp">
+                    <h4>Radio / RadioButton Component</h4>
+                    <pre><code>this.radMale.value = "M";
+this.radMale.selected;  // Is this radio selected?
+
+this.radMale_onchanged = function(obj:Radio, e:ChangeEventInfo) {
+    if (obj.value == "M") trace("Male selected");
+};</code></pre>
+                </div>
+            </section>
+            
+            <!-- Events Section -->
+            <section id="events">
+                <h2>Event System & Handlers</h2>
+                
+                <h3>Event Handler Pattern</h3>
+                <pre><code>componentName_eventName = function(obj:ComponentType, e:EventInfoType) {
+    // obj = Component reference
+    // e = Event details
+};
+
+// Examples
+this.Button00_onclick = function(obj:Button, e:ClickEventInfo) { };
+this.edtOrderID_onchange = function(obj:Edit, e:ChangeEventInfo) { };
+this.grdOrderList_oncelldblclick = function(obj:Grid, e:CellClickEventInfo) { };</code></pre>
+                
+                <h3>Common Event Info Properties</h3>
+                <table>
+                    <tr>
+                        <th>Property</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>e.keycode</code></td>
+                        <td>Number</td>
+                        <td>13=Enter, 27=Escape, 32=Space</td>
+                    </tr>
+                    <tr>
+                        <td><code>e.ctrlKey</code></td>
+                        <td>Boolean</td>
+                        <td>Ctrl key pressed?</td>
+                    </tr>
+                    <tr>
+                        <td><code>e.value</code></td>
+                        <td>String/Number</td>
+                        <td>New value (change events)</td>
+                    </tr>
+                    <tr>
+                        <td><code>e.postvalue</code></td>
+                        <td>String/Number</td>
+                        <td>Previous value</td>
+                    </tr>
+                    <tr>
+                        <td><code>e.row</code></td>
+                        <td>Number</td>
+                        <td>Grid row index</td>
+                    </tr>
+                    <tr>
+                        <td><code>e.col</code></td>
+                        <td>Number</td>
+                        <td>Grid column index</td>
+                    </tr>
+                </table>
+                
+                <div class="warning">
+                    <strong>⚠️ Warning:</strong> Return <code>false</code> from event handler to prevent default behavior.
+                </div>
+            </section>
+            
+            <!-- Datasets Section -->
+            <section id="datasets">
+                <h2>Data Binding & Datasets</h2>
+                
+                <h3>Dataset Operations</h3>
+                <pre><code>// Row count
+var count = this.dsOrderList.getRowCount();
+
+// Add row
+var nRow = this.dsOrderList.addRow();
+
+// Set/get values
+this.dsOrderList.setColumn(nRow, "orderID", "ORD001");
+var value = this.dsOrderList.getColumn(nRow, "orderID");
+
+// Row as object
+var rowObj = this.dsOrderList.getRowObject(nRow);
+this.dsOrderList.setRowObject(nRow, {orderID: "ORD002", amount: 2000});
+
+// Clear data
+this.dsOrderList.clearData();
+this.dsOrderList.deleteRow(nRow);</code></pre>
+                
+                <h3>Data Filtering & Search</h3>
+                <pre><code>// Find row
+var nRow = this.dsOrderList.findRowExpr("orderID == 'ORD001'");
+
+// Filter
+this.dsOrderList.filter("amount > 1000");
+this.dsOrderList.clearFilter();
+
+// Sort
+this.dsOrderList.sort("orderDate desc");
+this.dsOrderList.sort("amount asc");</code></pre>
+                
+                <h3>Service Transaction</h3>
+                <pre><code>this.transaction(
+    "OrderSearch",      // Service ID
+    "/api/orders",      // URL
+    dsRequest,          // Input dataset
+    dsResponse,         // Output dataset
+    callback,           // Callback function
+    "POST"              // HTTP method
+);
+
+function callback(strSvcId, nErrorCode, strErrorMsg) {
+    if (nErrorCode == 0) {
+        // Success: dsResponse has data
+        trace("Rows: " + this.dsResponse.getRowCount());
+    } else {
+        trace("Error: " + strErrorMsg);
+    }
+}</code></pre>
+            </section>
+            
+            <!-- Automation Patterns Section -->
+            <section id="automation">
+                <h2>Browser Agent Automation Patterns</h2>
+                
+                <h3>Pattern 1: Button Click & Wait</h3>
+                <pre><code>// Playwright
+await page.click('#Button_Search');
+await page.waitForLoadState('networkidle');
+
+// Or wait for specific condition
+await page.waitForFunction(() => {
+    var app = window.nexacro.getApplication();
+    return app.mainForm.dsResults.getRowCount() > 0;
+}, { timeout: 10000 });</code></pre>
+                
+                <h3>Pattern 2: Fill Form & Submit</h3>
+                <pre><code>// Fill multiple fields
+await page.fill('#edtOrderID', 'ORD001');
+await page.fill('#edtCustomer', 'ACME Corp');
+
+// Select dropdown
+await page.click('#cboStatus');
+await page.click('text=Completed');
+
+// Check checkbox
+await page.click('#chkActive');
+
+// Submit
+await page.click('#Button_Submit');
+await page.waitForLoadState('networkidle');</code></pre>
+                
+                <h3>Pattern 3: Extract Grid Data</h3>
+                <pre><code>const gridData = await page.evaluate(() => {
+    const app = window.nexacro.getApplication();
+    const ds = app.mainForm.dsOrderList;
+    const rows = [];
+    
+    for (let i = 0; i < ds.getRowCount(); i++) {
+        rows.push({
+            orderID: ds.getColumn(i, 'orderID'),
+            amount: ds.getColumn(i, 'amount'),
+            status: ds.getColumn(i, 'status')
+        });
+    }
+    return rows;
+});
+
+console.log(gridData);</code></pre>
+                
+                <div class="tip">
+                    <strong>💡 Tip:</strong> Always use <code>evaluate()</code> for complex data extraction to minimize round-trips.
+                </div>
+            </section>
+            
+            <!-- Workflows Section -->
+            <section id="workflows">
+                <h2>Common RPA Workflows</h2>
+                
+                <h3>Search & Display Results</h3>
+                <pre><code>// 1. Input criteria
+await page.fill('#edtOrderID', 'ORD001');
+
+// 2. Search
+await page.click('#Button_Search');
+
+// 3. Wait for results
+await page.waitForFunction(() => {
+    const app = window.nexacro.getApplication();
+    return app.mainForm.dsOrderList.getRowCount() > 0;
+}, { timeout: 10000 });
+
+// 4. Extract results
+const results = await page.evaluate(() => {
+    // ... extraction code ...
+});
+
+console.log(results);</code></pre>
+                
+                <h3>CRUD: Create Record</h3>
+                <pre><code>// New
+await page.click('#Button_New');
+
+// Fill form
+await page.fill('#edtOrderID', 'ORD999');
+await page.fill('#edtAmount', '5000');
+
+// Save
+await page.click('#Button_Save');
+await page.waitForLoadState('networkidle');</code></pre>
+                
+                <h3>CRUD: Update Record</h3>
+                <pre><code>// Select row
+await page.click('#grdOrderList_cell_0_0');
+
+// Edit
+await page.dblclick('#grdOrderList_cell_0_0');
+
+// Modify
+await page.fill('#edtAmount', '6000');
+
+// Save
+await page.click('#Button_Save');
+await page.waitForLoadState('networkidle');</code></pre>
+                
+                <h3>CRUD: Delete Record</h3>
+                <pre><code>// Select
+await page.click('#grdOrderList_cell_0_0');
+
+// Delete
+await page.click('#Button_Delete');
+
+// Confirm
+await page.click('button:has-text("Confirm")');
+await page.waitForLoadState('networkidle');</code></pre>
+                
+                <h3>Multi-Step Wizard</h3>
+                <pre><code>// Step 1
+await page.fill('#edtStep1_Field', 'Value1');
+await page.click('#Button_Next');
+await page.waitForSelector('[data-step="2"]');
+
+// Step 2
+await page.fill('#edtStep2_Field', 'Value2');
+await page.click('#Button_Next');
+
+// Final
+await page.click('#Button_Finish');
+await page.waitForLoadState('networkidle');</code></pre>
+            </section>
+            
+            <!-- Element Selection Section -->
+            <section id="selection">
+                <h2>Element Selection Strategies</h2>
+                
+                <h3>By Component ID (Recommended)</h3>
+                <pre><code>// CSS
+await page.click('#Button_Search');
+await page.fill('#edtOrderID', 'value');
+
+// XPath
+await page.click("//button[@id='Button_Search']");</code></pre>
+                
+                <h3>By Component Type</h3>
+                <pre><code>// All buttons
+[data-component='Button']
+
+// All text inputs
+[data-component='Edit']
+
+// Grid cells
+[data-component='Grid'] [data-row='0'][data-col='2']</code></pre>
+                
+                <h3>By Text Content</h3>
+                <pre><code>// Playwright text selector
+button:has-text("Search")
+
+// XPath
+//button[contains(text(), 'Search')]</code></pre>
+                
+                <div class="success">
+                    <strong>✓ Best Practice:</strong> Use component IDs when possible; they're stable and reliable.
+                </div>
+            </section>
+            
+            <!-- Debugging Section -->
+            <section id="debugging">
+                <h2>Debugging & Inspection</h2>
+                
+                <h3>Inspect Objects in Browser Console</h3>
+                <pre><code>var app = window.nexacro.getApplication();
+var form = app.mainForm;
+
+// List components
+console.log(Object.keys(form));
+
+// Inspect component
+console.log(form.Button00.text);
+console.log(form.edtOrderID.value);
+
+// List dataset rows
+var ds = form.dsOrderList;
+for (let i = 0; i < ds.getRowCount(); i++) {
+    console.log(ds.getRowObject(i));
+}</code></pre>
+                
+                <h3>Playwright Debugging</h3>
+                <pre><code>// Pause execution
+await page.pause();
+
+// Screenshot
+await page.screenshot({ path: 'screenshot.png' });
+
+// Console log
+await page.evaluate(() => {
+    console.log("From Nexacro page");
+});</code></pre>
+                
+                <h3>Retry Strategies</h3>
+                <pre><code>async function retryClick(page, selector, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            await page.click(selector, { timeout: 5000 });
+            return;
+        } catch (e) {
+            console.log(`Retry ${i+1}: ${e.message}`);
+            if (i === maxRetries - 1) throw e;
+            await page.waitForTimeout(1000);
+        }
+    }
+}</code></pre>
+            </section>
+            
+            <!-- Best Practices Section -->
+            <section id="bestpractices">
+                <h2>Best Practices & Tips</h2>
+                
+                <h3>Wait Strategies</h3>
+                <ul>
+                    <li><code>waitForLoadState('networkidle')</code> - For API transactions</li>
+                    <li><code>waitForSelector(selector)</code> - For element appearance</li>
+                    <li><code>waitForFunction(fn)</code> - For custom conditions</li>
+                    <li><code>waitForTimeout(ms)</code> - Last resort delay</li>
+                </ul>
+                
+                <h3>Common Pitfalls</h3>
+                <table>
+                    <tr>
+                        <th>Problem</th>
+                        <th>Solution</th>
+                    </tr>
+                    <tr>
+                        <td>Element not found</td>
+                        <td>Verify ID; wait for form load; check for typos</td>
+                    </tr>
+                    <tr>
+                        <td>Wrong value selected</td>
+                        <td>Use API method instead of clicking: <code>setIndex()</code></td>
+                    </tr>
+                    <tr>
+                        <td>Transaction hangs</td>
+                        <td>Add error callback; check network; increase timeout</td>
+                    </tr>
+                    <tr>
+                        <td>Modal blocks action</td>
+                        <td>Add dialog handler: <code>page.on('dialog', ...)</code></td>
+                    </tr>
+                    <tr>
+                        <td>Dropdown options hidden</td>
+                        <td>Wait longer; try keyboard navigation</td>
+                    </tr>
+                </table>
+            </section>
+            
+            <!-- Component Selector Reference -->
+            <section id="reference">
+                <h2>Quick Reference: Component Selector Map</h2>
+                <table>
+                    <tr>
+                        <th>Component</th>
+                        <th>Selector</th>
+                        <th>Key Property</th>
+                        <th>Key Event</th>
+                    </tr>
+                    <tr>
+                        <td>Button</td>
+                        <td><code>#buttonID</code></td>
+                        <td><code>.text</code></td>
+                        <td><code>.onclick</code></td>
+                    </tr>
+                    <tr>
+                        <td>TextEdit</td>
+                        <td><code>#editID</code></td>
+                        <td><code>.value</code></td>
+                        <td><code>.onchange</code></td>
+                    </tr>
+                    <tr>
+                        <td>Combo</td>
+                        <td><code>#comboID</code></td>
+                        <td><code>.value</code></td>
+                        <td><code>.onitemchanged</code></td>
+                    </tr>
+                    <tr>
+                        <td>Grid</td>
+                        <td><code>#gridID</code></td>
+                        <td><code>.focusedRow</code></td>
+                        <td><code>.oncelldblclick</code></td>
+                    </tr>
+                    <tr>
+                        <td>CheckBox</td>
+                        <td><code>#checkID</code></td>
+                        <td><code>.value</code></td>
+                        <td><code>.onchanged</code></td>
+                    </tr>
+                    <tr>
+                        <td>Radio</td>
+                        <td><code>#radioID</code></td>
+                        <td><code>.value</code></td>
+                        <td><code>.onchanged</code></td>
+                    </tr>
+                    <tr>
+                        <td>Static</td>
+                        <td><code>#staticID</code></td>
+                        <td><code>.text</code></td>
+                        <td>N/A</td>
+                    </tr>
+                </table>
+            </section>
+            
+            <!-- Resources Section -->
+            <section id="resources">
+                <h2>Resources & References</h2>
+                <ul>
+                    <li><a href="https://docs.tobesoft.com/" target="_blank">TOBESOFT Official Documentation</a></li>
+                    <li><a href="https://github.com/TOBESOFT-DOCS/sample_Nexacro_N_V24" target="_blank">Github: sample_Nexacro_N_V24</a></li>
+                    <li><a href="https://github.com/TOBESOFT-DOCS/sample_nexacroplatform_17" target="_blank">Github: sample_nexacroplatform_17</a></li>
+                    <li><a href="https://github.com/nexacro-spring/" target="_blank">Github: nexacro-spring (Integration)</a></li>
+                    <li><a href="https://playwright.dev/" target="_blank">Playwright Documentation</a></li>
+                </ul>
+            </section>
+        </main>
+    </div>
+    
+    <div id="topButton" class="top-button">↑</div>
+    
+    <footer>
+        <p>Nexacro Object Model & JavaScript API Reference | Compiled from TOBESOFT Official Documentation & Github Samples</p>
+        <p>For Agent Browser Automation | Version: Nexacro N V24, Platform 17+</p>
+    </footer>
+    
+    <script>
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const sections = document.querySelectorAll('section');
+        
+        searchInput.addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
+            
+            sections.forEach(section => {
+                const text = section.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    section.style.display = 'block';
+                } else if (searchTerm.length > 0) {
+                    section.style.display = 'none';
+                } else {
+                    section.style.display = 'block';
+                }
+            });
+        });
+        
+        // Smooth scroll to top
+        const topButton = document.getElementById('topButton');
+        
+        window.addEventListener('scroll', function() {
+            if (window.scrollY > 300) {
+                topButton.classList.add('show');
+            } else {
+                topButton.classList.remove('show');
+            }
+        });
+        
+        topButton.addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        
+        // Navigation link smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
