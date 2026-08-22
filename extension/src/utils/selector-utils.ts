@@ -44,8 +44,13 @@ function isStableToken(token: string): boolean {
 
 // The two-character floor above is aimed at minified class noise; an id may
 // legitimately be a single letter and is still far better than a position.
+// The upper bound used to sit at 40, which looked reasonable against typical
+// hand-written ids but rejects Nexacro's own convention outright: its ids are
+// the component's full dotted path (mainframe.WorkFrame.form...TextField00),
+// routinely 100-150+ characters — genuinely stable, just verbose. 250 leaves
+// headroom for that without accepting something pathological.
 function isStableId(id: string): boolean {
-  return id.length >= 1 && id.length <= 40 && !GENERATED_TOKEN.test(id) && !/^\d+$/.test(id);
+  return id.length >= 1 && id.length <= 250 && !GENERATED_TOKEN.test(id) && !/^\d+$/.test(id);
 }
 
 // Playwright's own syntax for "the Nth element matching this selector". CSS has

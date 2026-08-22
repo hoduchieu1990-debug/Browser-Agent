@@ -54,6 +54,7 @@ const CHECKS = [
   'pin-default-icons-check.js',
   'checkbox-radio-check.js',
   'step-thumbnail-check.js',
+  'nexacro-long-id-check.js',
 ];
 
 (async () => {
