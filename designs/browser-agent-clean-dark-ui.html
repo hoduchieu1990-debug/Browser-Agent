@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser Agent - Clean Dark UI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Dark Colors */
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            
+            /* Accent */
+            --accent-primary: #3498db;
+            --accent-secondary: #2ecc71;
+            --accent-danger: #e74c3c;
+            
+            /* Text */
+            --text-primary: #ecf0f1;
+            --text-secondary: #bdc3c7;
+            --text-tertiary: #95a5a6;
+            
+            /* Borders */
+            --border-color: #2c3e50;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1e;
+            padding: 20px;
+            min-height: 100vh;
+            color: var(--text-primary);
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* ===== EXTENSION POPUP ===== */
+        .extension-popup {
+            width: 420px;
+            background: var(--bg-primary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 680px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Header */
+        .popup-header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .popup-header-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-badge {
+            width: 32px;
+            height: 32px;
+            background: var(--accent-primary);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .popup-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .popup-header-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: none;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .header-btn:hover {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        /* Tabs */
+        .popup-tabs {
+            display: flex;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0;
+            gap: 0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: var(--accent-primary);
+            border-bottom-color: var(--accent-primary);
+            background: rgba(52, 152, 219, 0.05);
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+            background: rgba(52, 152, 219, 0.03);
+        }
+
+        /* Content */
+        .popup-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            scroll-behavior: smooth;
+        }
+
+        .popup-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .popup-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .popup-content::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 3px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Recording Controls */
+        .recording-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .record-btn {
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .record-btn.start {
+            background: var(--accent-secondary);
+            color: white;
+        }
+
+        .record-btn.start:hover {
+            opacity: 0.9;
+        }
+
+        .record-btn.stop {
+            background: var(--accent-danger);
+            color: white;
+        }
+
+        .record-btn.stop:hover {
+            opacity: 0.9;
+        }
+
+        .record-btn.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Recording Status */
+        .recording-status {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .recording-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-danger);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Actions List */
+        .actions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .action-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            transition: all 0.2s;
+        }
+
+        .action-item:hover {
+            border-color: var(--accent-primary);
+            background: rgba(52, 152, 219, 0.05);
+        }
+
+        .action-info {
+            flex: 1;
+        }
+
+        .action-type {
+            font-weight: 600;
+            color: var(--accent-primary);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .action-selector {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 3px;
+        }
+
+        .action-value {
+            font-size: 11px;
+            color: var(--accent-secondary);
+            margin-bottom: 3px;
+        }
+
+        .action-timestamp {
+            font-size: 10px;
+            color: var(--text-tertiary);
+        }
+
+        .action-delete {
+            background: var(--accent-danger);
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
+
+        .action-delete:hover {
+            opacity: 0.8;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            color: var(--text-tertiary);
+            padding: 30px 20px;
+            font-size: 12px;
+        }
+
+        .empty-state-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+            opacity: 0.6;
+        }
+
+        /* Export Form */
+        .export-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-input,
+        .form-select {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: inherit;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .form-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            background: rgba(52, 152, 219, 0.05);
+        }
+
+        .export-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .export-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .export-option:hover {
+            background: rgba(52, 152, 219, 0.05);
+            border-color: var(--accent-primary);
+        }
+
+        .export-option input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: var(--accent-primary);
+        }
+
+        .export-option label {
+            cursor: pointer;
+            font-size: 11px;
+            color: var(--text-primary);
+        }
+
+        .export-btn {
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .export-btn:hover {
+            opacity: 0.9;
+        }
+
+        .export-btn:active {
+            opacity: 0.85;
+        }
+
+        /* Settings */
+        .settings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+
+        .setting-item:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .setting-label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .setting-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+
+        .setting-desc {
+            font-size: 10px;
+            color: var(--text-tertiary);
+        }
+
+        .toggle {
+            width: 44px;
+            height: 24px;
+            background: var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            position: relative;
+        }
+
+        .toggle.on {
+            background: var(--accent-secondary);
+        }
+
+        .toggle-circle {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: all 0.2s;
+        }
+
+        .toggle.on .toggle-circle {
+            left: 22px;
+        }
+
+        /* Footer */
+        .popup-footer {
+            border-top: 1px solid var(--border-color);
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .action-count {
+            background: var(--accent-primary);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 10px;
+        }
+
+        /* Info Section */
+        .info-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-height: 680px;
+            overflow-y: auto;
+            padding-right: 16px;
+        }
+
+        .info-section::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .info-section::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .info-section::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 3px;
+        }
+
+        .info-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+
+        .info-card:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .info-card h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .info-card p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .info-card p:last-child {
+            margin-bottom: 0;
+        }
+
+        .feature-list {
+            margin-top: 8px;
+            padding-left: 16px;
+        }
+
+        .feature-list li {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            list-style: disc;
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .color-item {
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 10px;
+            color: white;
+            font-weight: 600;
+        }
+
+        .color-primary {
+            background: var(--accent-primary);
+        }
+
+        .color-secondary {
+            background: var(--accent-secondary);
+        }
+
+        .color-danger {
+            background: var(--accent-danger);
+        }
+
+        .color-text {
+            background: var(--text-secondary);
+        }
+
+        .color-border {
+            background: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .color-bg {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Extension Popup -->
+        <div class="extension-popup">
+            <!-- Header -->
+            <div class="popup-header">
+                <div class="popup-header-content">
+                    <div class="logo-badge">BA</div>
+                    <h2>Browser Agent</h2>
+                </div>
+                <div class="popup-header-buttons">
+                    <button class="header-btn" title="Settings">⚙️</button>
+                    <button class="header-btn" title="Help">❓</button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="popup-tabs">
+                <button class="tab active" onclick="switchTab(event, 'recording')">Record</button>
+                <button class="tab" onclick="switchTab(event, 'preview')">Preview</button>
+                <button class="tab" onclick="switchTab(event, 'export')">Export</button>
+                <button class="tab" onclick="switchTab(event, 'settings')">Settings</button>
+            </div>
+
+            <!-- Content -->
+            <div class="popup-content">
+                <!-- Recording Tab -->
+                <div id="recording" class="tab-panel active">
+                    <div class="recording-controls">
+                        <button class="record-btn start" onclick="startRecording(event)">
+                            ⭕ Start
+                        </button>
+                        <button class="record-btn stop disabled" onclick="stopRecording(event)">
+                            ⏹️ Stop
+                        </button>
+                    </div>
+
+                    <div class="recording-status">
+                        <div class="recording-dot"></div>
+                        <span>Ready to record</span>
+                    </div>
+
+                    <div class="actions-list">
+                        <div class="action-item">
+                            <div class="action-info">
+                                <div class="action-type">Navigate</div>
+                                <div class="action-selector">https://example.com/upload</div>
+                                <div class="action-timestamp">10:45:23</div>
+                            </div>
+                            <button class="action-delete">✕</button>
+                        </div>
+
+                        <div class="action-item">
+                            <div class="action-info">
+                                <div class="action-type">Click</div>
+                                <div class="action-selector">button#upload-btn</div>
+                                <div class="action-timestamp">10:45:25</div>
+                            </div>
+                            <button class="action-delete">✕</button>
+                        </div>
+
+                        <div class="action-item">
+                            <div class="action-info">
+                                <div class="action-type">Upload File</div>
+                                <div class="action-selector">input#file-input</div>
+                                <div class="action-value">data.xlsx</div>
+                                <div class="action-timestamp">10:45:26</div>
+                            </div>
+                            <button class="action-delete">✕</button>
+                        </div>
+
+                        <div class="action-item">
+                            <div class="action-info">
+                                <div class="action-type">Wait</div>
+                                <div class="action-selector">3000ms</div>
+                                <div class="action-timestamp">10:45:29</div>
+                            </div>
+                            <button class="action-delete">✕</button>
+                        </div>
+
+                        <div class="action-item">
+                            <div class="action-info">
+                                <div class="action-type">Extract Table</div>
+                                <div class="action-selector">table.results</div>
+                                <div class="action-value">15 rows</div>
+                                <div class="action-timestamp">10:45:30</div>
+                            </div>
+                            <button class="action-delete">✕</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Tab -->
+                <div id="preview" class="tab-panel">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <strong>Workflow Preview</strong>
+                        <p style="margin-top: 8px;">5 actions recorded</p>
+                    </div>
+                </div>
+
+                <!-- Export Tab -->
+                <div id="export" class="tab-panel">
+                    <div class="export-form">
+                        <div class="form-group">
+                            <label class="form-label">Workflow Name</label>
+                            <input type="text" class="form-input" placeholder="e.g., upload-data" value="my-workflow">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-input" placeholder="What this workflow does" value="Upload Excel and extract results">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Export Formats</label>
+                            <div class="export-options">
+                                <label class="export-option">
+                                    <input type="checkbox" checked>
+                                    <span>JSON</span>
+                                </label>
+                                <label class="export-option">
+                                    <input type="checkbox" checked>
+                                    <span>YAML</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button class="export-btn">
+                            📥 Export
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div id="settings" class="tab-panel">
+                    <div class="settings-list">
+                        <div class="setting-item">
+                            <div class="setting-label">
+                                <div class="setting-name">Auto-dismiss Popups</div>
+                                <div class="setting-desc">Close banners & alerts</div>
+                            </div>
+                            <button class="toggle on" onclick="toggleSetting(event)">
+                                <div class="toggle-circle"></div>
+                            </button>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-label">
+                                <div class="setting-name">Capture Screenshots</div>
+                                <div class="setting-desc">Save after actions</div>
+                            </div>
+                            <button class="toggle" onclick="toggleSetting(event)">
+                                <div class="toggle-circle"></div>
+                            </button>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-label">
+                                <div class="setting-name">Highlight Elements</div>
+                                <div class="setting-desc">Show highlights</div>
+                            </div>
+                            <button class="toggle on" onclick="toggleSetting(event)">
+                                <div class="toggle-circle"></div>
+                            </button>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-label">
+                                <div class="setting-name">Verbose Logging</div>
+                                <div class="setting-desc">Detailed logs</div>
+                            </div>
+                            <button class="toggle" onclick="toggleSetting(event)">
+                                <div class="toggle-circle"></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="popup-footer">
+                <span>Actions: <span class="action-count">5</span></span>
+                <span>v1.0.0</span>
+            </div>
+        </div>
+
+        <!-- Info Section -->
+        <div class="info-section">
+            <!-- Overview -->
+            <div class="info-card">
+                <h3>📱 Clean Dark Theme</h3>
+                <p>Simple, professional dark interface with minimal distractions and excellent readability.</p>
+                <ul class="feature-list">
+                    <li>Dark navy background</li>
+                    <li>Blue accent color</li>
+                    <li>Clear typography</li>
+                    <li>Consistent spacing</li>
+                    <li>Smooth transitions</li>
+                </ul>
+            </div>
+
+            <!-- Color Palette -->
+            <div class="info-card">
+                <h3>🎨 Color Palette</h3>
+                <p>Carefully selected colors for clarity and professionalism.</p>
+                <div class="color-grid">
+                    <div class="color-item color-primary">Primary<br>#3498db</div>
+                    <div class="color-item color-secondary">Secondary<br>#2ecc71</div>
+                    <div class="color-item color-danger">Danger<br>#e74c3c</div>
+                    <div class="color-item color-text">Text<br>#bdc3c7</div>
+                    <div class="color-item color-border">Border<br>#2c3e50</div>
+                    <div class="color-item color-bg">Background<br>#16213e</div>
+                </div>
+            </div>
+
+            <!-- Components -->
+            <div class="info-card">
+                <h3>🧩 Components</h3>
+                <p><strong>Recording Panel:</strong> Start/Stop buttons, action list, status indicator</p>
+                <p style="margin-top: 8px;"><strong>Export Panel:</strong> Form inputs, format selection, export button</p>
+                <p style="margin-top: 8px;"><strong>Settings:</strong> Toggle switches for configuration options</p>
+            </div>
+
+            <!-- Design System -->
+            <div class="info-card">
+                <h3>⚙️ Design System</h3>
+                <p><strong>Spacing:</strong> 4px, 8px, 12px, 16px grid</p>
+                <p style="margin-top: 8px;"><strong>Border Radius:</strong> 4-12px</p>
+                <p style="margin-top: 8px;"><strong>Typography:</strong> 10-16px font sizes</p>
+                <p style="margin-top: 8px;"><strong>Transitions:</strong> 0.2s smooth</p>
+            </div>
+
+            <!-- Usage Guide -->
+            <div class="info-card">
+                <h3>🚀 How to Use</h3>
+                <p><strong>Recording:</strong> Click Start, interact with webpage, click Stop</p>
+                <p style="margin-top: 8px;"><strong>Preview:</strong> Review recorded actions</p>
+                <p style="margin-top: 8px;"><strong>Export:</strong> Save workflow as JSON or YAML</p>
+                <p style="margin-top: 8px;"><strong>Settings:</strong> Configure extension behavior</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(event, tabName) {
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function startRecording(event) {
+            event.target.classList.add('disabled');
+            document.querySelector('.record-btn.stop').classList.remove('disabled');
+        }
+
+        function stopRecording(event) {
+            document.querySelector('.record-btn.start').classList.remove('disabled');
+            event.target.classList.add('disabled');
+        }
+
+        function toggleSetting(event) {
+            event.target.classList.toggle('on');
+        }
+    </script>
+</body>
+</html>

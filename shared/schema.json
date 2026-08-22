@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Browser Agent Workflow Schema",
+  "type": "object",
+  "required": ["version", "name", "actions"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(\\.\\d+)?$",
+      "description": "Workflow format version (e.g., 1.0.0)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Workflow name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Workflow description"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "creator": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "params": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": {
+            "enum": ["string", "number", "boolean", "file"]
+          },
+          "required": { "type": "boolean", "default": true },
+          "description": { "type": "string" },
+          "default": {},
+          "fileType": {
+            "type": "string",
+            "description": "For file type: xlsx, csv, pdf, etc"
+          },
+          "options": {
+            "type": "array",
+            "description": "For enum values"
+          }
+        }
+      }
+    },
+    "globalSettings": {
+      "type": "object",
+      "properties": {
+        "autoDismissPopup": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "mode": { "enum": ["smart", "manual"], "default": "smart" },
+            "selectors": { "type": "array", "items": { "type": "string" } },
+            "timeout": { "type": "number", "default": 2000 },
+            "retryCount": { "type": "number", "default": 2 }
+          }
+        },
+        "handleBrowserAlerts": {
+          "type": "object",
+          "properties": {
+            "alert": { "enum": ["accept", "dismiss"] },
+            "confirm": { "enum": ["accept", "dismiss"] },
+            "prompt": { "enum": ["accept", "dismiss"] }
+          }
+        },
+        "defaultTimeout": { "type": "number", "default": 10000 },
+        "defaultWaitTime": { "type": "number", "default": 1000 }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": {
+            "enum": [
+              "navigate",
+              "click",
+              "input",
+              "select",
+              "uploadFile",
+              "wait",
+              "waitForSelector",
+              "extractTable",
+              "extractJson",
+              "extractText",
+              "dismissPopup",
+              "screenshot",
+              "scroll",
+              "batchInput",
+              "batchClick",
+              "batchSearch",
+              "batchExtract"
+            ]
+          },
+          "url": { "type": "string", "description": "For navigate action" },
+          "selector": { "type": "string", "description": "CSS or XPath selector" },
+          "selectors": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Candidate selectors for dismissPopup"
+          },
+          "selectorFallbacks": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Alternative selectors tried in order when the main one no longer matches"
+          },
+          "value": { "type": "string", "description": "Value to input/select" },
+          "filename": { "type": "string", "description": "Output file for screenshot action" },
+          "position": {
+            "enum": ["top", "bottom", "center"],
+            "description": "Scroll target position"
+          },
+          "pixels": { "type": "number", "description": "Scroll distance in pixels" },
+          "path": { "type": "string", "description": "Dotted path into extracted JSON" },
+          "duration": { "type": "number", "description": "Wait duration in ms" },
+          "timeout": { "type": "number", "description": "Max wait time in ms" },
+          "headers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Column headers for table extraction"
+          },
+          "output": { "type": "string", "description": "Variable name to store result" },
+          "waitBefore": { "type": "number", "description": "Wait before action (ms)" },
+          "waitAfter": { "type": "number", "description": "Wait after action (ms)" },
+          "retry": {
+            "type": "object",
+            "properties": {
+              "count": { "type": "number" },
+              "delayMs": { "type": "number" }
+            }
+          },
+          "onError": { "enum": ["fail", "skip", "ignore"], "default": "fail" },
+          "note": { "type": "string", "description": "User-facing label for this step, display only" },
+          "inputType": { "enum": ["text", "fileUpload", "select"], "description": "Batch Input element kind" },
+          "column": { "type": "string", "description": "Dataset column a Batch Input reads its value from" },
+          "replaceMode": {
+            "enum": ["replace", "append", "keepExisting"],
+            "default": "replace",
+            "description": "How a Batch Input treats the field's existing value"
+          },
+          "waitCondition": {
+            "type": "object",
+            "required": ["type", "timeout"],
+            "properties": {
+              "type": { "enum": ["elementAppears"] },
+              "selector": { "type": "string" },
+              "timeout": { "type": "number" }
+            },
+            "description": "Batch Search: how to detect the result is ready"
+          },
+          "extractType": {
+            "enum": ["text", "attribute", "value"],
+            "description": "Batch Extract: what to read off the element"
+          },
+          "attribute": { "type": "string", "description": "Attribute name, required when extractType is 'attribute'" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "exportFormats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "output", "dataKey"],
+        "properties": {
+          "type": { "enum": ["excel", "csv", "json"] },
+          "output": { "type": "string" },
+          "dataKey": { "type": "string" }
+        }
+      }
+    },
+    "dataSource": {
+      "type": "object",
+      "required": ["type", "fileName"],
+      "properties": {
+        "type": { "enum": ["excel"] },
+        "fileName": { "type": "string" }
+      },
+      "description": "Label only — the actual dataset is attached at run time"
+    }
+  },
+  "additionalProperties": false
+}

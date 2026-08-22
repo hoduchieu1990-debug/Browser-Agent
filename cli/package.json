@@ -1,0 +1,20 @@
+{
+  "name": "@browser-agent/cli",
+  "version": "0.1.0",
+  "bin": {
+    "browser-agent": "./bin/browser-agent.js"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@browser-agent/player": "0.1.0",
+    "@browser-agent/shared": "0.1.0",
+    "commander": "^12.0.0",
+    "chalk": "^4.1.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

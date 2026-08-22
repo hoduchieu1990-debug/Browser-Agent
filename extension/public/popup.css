@@ -1,0 +1,1304 @@
+/* Slate neutrals with an indigo accent — colour carries meaning here, so the
+   action types and step states are hued rather than uniformly grey. */
+:root {
+  --background: #eef1f7; /* canvas */
+  --surface: #fbfcfe; /* cards sit just above the canvas */
+  --surface-raised: #ffffff;
+  --foreground: #1e293b;
+  --muted: #e3e8f0;
+  --muted-foreground: #64748b;
+  --border: #d5dde8;
+  --input: #cbd5e1;
+  --ring: #818cf8;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-foreground: #ffffff;
+  --primary-soft: #e0e7ff;
+
+  --accent: #e3e8f0;
+  --accent-foreground: #1e293b;
+
+  --success: #15803d;
+  --success-soft: #dcfce7;
+  --warning: #b45309;
+  --warning-soft: #fef3c7;
+  --destructive: #dc2626;
+  --destructive-soft: #fee2e2;
+
+  --sidebar: #e6ebf3;
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  /* Deliberately not capped to the viewport: Chrome opens a popup in a small
+     frame and grows it to fit, so anything sized off vw here would lock it to
+     that first, tiny frame. Panel widths are handled under .in-side-panel. */
+  width: 460px;
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Chrome caps extension popups at 600px tall; take all of it */
+.popup {
+  display: flex;
+  height: 600px;
+}
+
+/* Docked to the side, width and height are the user's to set — stretch to
+   whatever they drag it to instead of holding the popup's fixed box. */
+html.in-side-panel body {
+  width: 100%;
+  min-width: 0;
+}
+
+html.in-side-panel .popup {
+  height: 100vh;
+}
+
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: 68px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  background: linear-gradient(180deg, #e8edf6 0%, #e1e8f2 100%);
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-brand {
+  /* the app's own logo — it must outweigh every nav icon below it */
+  width: 44px;
+  height: 44px;
+  margin-bottom: 10px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.4);
+  color: var(--primary-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.sidebar-item {
+  width: 100%;
+  padding: 8px 2px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.sidebar-item svg {
+  width: 17px;
+  height: 17px;
+}
+
+.sidebar-item:hover {
+  background: rgba(79, 70, 229, 0.09);
+  color: var(--primary);
+}
+
+.sidebar-item.active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
+}
+
+/* ---------- Main column ---------- */
+.popup-main {
+  flex: 1;
+  /* Both explicit: a flex item defaults to min-*: auto, which refuses to
+     shrink below its content. Without these the tab's own scroller never
+     takes effect — the whole page grows instead and its scrollbar eats a
+     strip of the panel's right edge. */
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 14px;
+  height: 48px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.breadcrumb-parent,
+.breadcrumb-separator {
+  color: var(--muted-foreground);
+}
+
+.breadcrumb-current {
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.action-count {
+  flex-shrink: 0;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.popup-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+/* ---------- Buttons ---------- */
+.record-btn,
+.export-btn,
+.replay-btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.recording-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.record-btn {
+  padding: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.record-btn.start {
+  background: var(--success);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(21, 128, 61, 0.3);
+}
+
+.record-btn.stop {
+  /* solid, not the soft tint — while recording, Stop is the one live action
+     and must read as at least as bold as Start does when idle */
+  background: var(--destructive);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.35);
+}
+
+.record-btn:disabled,
+.export-btn:disabled,
+.replay-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* whichever of Start/Stop isn't the current action goes fully neutral,
+   instead of the same hue just faded, so the two states read distinctly */
+.record-btn.start:disabled,
+.record-btn.stop:disabled {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  box-shadow: none;
+  opacity: 1;
+}
+
+.record-btn:not(:disabled):hover,
+.export-btn:not(:disabled):hover,
+.replay-btn:not(:disabled):hover {
+  opacity: 0.9;
+}
+
+.recording-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+/* while recording, the whole status bar goes red rather than just the dot */
+.recording-status:has(.live) {
+  border-color: #f4b8b8;
+  background: var(--destructive-soft);
+  color: #b91c1c;
+}
+
+.recording-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.recording-dot.live {
+  background: var(--destructive);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Banners ---------- */
+.error-banner,
+.note-banner,
+.extract-hint {
+  padding: 9px 11px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.error-banner {
+  border-color: #f4b8b8;
+  background: var(--destructive-soft);
+  color: #b91c1c;
+}
+
+.note-banner {
+  border-color: #edd08a;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 10px;
+}
+
+.extract-hint {
+  border-color: #c7d2fe;
+  background: var(--primary-soft);
+  color: #4338ca;
+}
+
+/* ---------- Action list ---------- */
+.actions-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.reset-btn {
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--muted-foreground);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.reset-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.reset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reset-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.reset-btn.danger {
+  border-color: var(--destructive);
+  color: var(--destructive);
+}
+
+.reset-btn.danger:hover:not(:disabled) {
+  background: var(--destructive-soft);
+  color: var(--destructive);
+}
+
+.actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.action-item {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.action-item:hover {
+  border-color: #c7d2fe;
+  background: #f7f8ff;
+}
+
+.action-row {
+  display: flex;
+  align-items: flex-start;
+}
+
+.action-step {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  margin-right: 9px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.action-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-block;
+  line-height: 0;
+}
+
+.action-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: zoom-in;
+  background: var(--surface-raised);
+}
+
+/* Hidden until hovered — shows the same image at a size actually worth
+   looking at, positioned so it stays inside a ~460px popup (or a narrower
+   side panel) instead of running off the edge. */
+.action-thumb-preview {
+  display: none;
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  left: 34px;
+  width: min(220px, 80vw);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.35);
+  background: var(--surface-raised);
+}
+
+.action-thumb-wrap:hover .action-thumb-preview {
+  display: block;
+}
+
+/* .action-row has no flex gap of its own (each child spaces itself, like
+   .action-step's margin-right below) — .step-row does, so the thumb needs no
+   extra margin there. */
+.action-row .action-thumb-wrap {
+  margin-right: 9px;
+}
+
+.action-type-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.action-icon {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.action-type {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* a hue per kind of step, so a long list is scannable without reading it */
+.action-type[data-type="navigate"] {
+  color: #0369a1;
+}
+
+.action-type[data-type="click"] {
+  color: #4f46e5;
+}
+
+.action-type[data-type="input"],
+.action-type[data-type="select"] {
+  color: #b45309;
+}
+
+.action-type[data-type="uploadFile"] {
+  color: #c2410c;
+}
+
+.action-type[data-type="extractText"],
+.action-type[data-type="extractTable"],
+.action-type[data-type="extractJson"] {
+  color: #15803d;
+}
+
+.action-type[data-type="screenshot"] {
+  color: #a21caf;
+}
+
+.action-type[data-type^="batch"] {
+  color: #be185d;
+}
+
+/* the row containing the type/selector opens the config panel when it's a
+   batch node — a real cursor keeps that discoverable */
+.action-item:has(.action-batch-config) .action-info {
+  cursor: pointer;
+}
+
+.action-batch-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 2px 28px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.action-batch-config label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.action-batch-config select,
+.action-batch-config input {
+  font: 500 12px var(--font-sans, inherit);
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--foreground);
+  min-width: 100px;
+}
+
+/* A quiet, always-present field — most steps never need it, so it should
+   read as blank space until typed into rather than another form control. */
+.action-note {
+  display: block;
+  width: 100%;
+  margin: 6px 0 0 28px;
+  padding: 3px 0;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  background: transparent;
+  font: 400 11px var(--font-sans, inherit);
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+
+.action-note:hover,
+.action-note:focus {
+  border-bottom-color: var(--border);
+  outline: none;
+}
+
+.action-note:not(:placeholder-shown) {
+  font-style: normal;
+  color: var(--foreground);
+}
+
+.action-selector {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-value {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--success);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-delete {
+  flex-shrink: 0;
+  margin-left: 8px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.action-delete:hover {
+  border-color: var(--destructive);
+  color: var(--destructive);
+  background: var(--destructive-soft);
+}
+
+/* ---------- Empty state ---------- */
+.empty-state {
+  text-align: center;
+  padding: 30px 16px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.empty-state-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.empty-state strong {
+  display: block;
+  color: var(--foreground);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+/* ---------- Saved recordings ---------- */
+.saved-list,
+.job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.job-list {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.saved-item,
+.job-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  padding: 10px;
+}
+
+.saved-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.saved-item:hover,
+.job-item:hover {
+  border-color: #c7d2fe;
+  background: #f7f8ff;
+}
+
+.job-item.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.saved-info {
+  min-width: 0;
+}
+
+.saved-name,
+.job-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-meta,
+.job-meta {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 1px;
+}
+
+.saved-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.saved-load {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.saved-load:hover {
+  background: var(--accent);
+}
+
+/* ---------- Replay ---------- */
+.replay-btn {
+  width: 100%;
+  padding: 9px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: var(--primary-foreground);
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+}
+
+.replay-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.replay-option input {
+  margin: 2px 0 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.replay-option-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.replay-status {
+  margin: 10px 0 12px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+/* ---------- Panels ----------
+   A replay shows two different things — what it did, and what it came back
+   with. Run together they read as one long list, so each gets its own titled
+   region. */
+.panel {
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+/* The two panels answer different questions — what the run did, and what it
+   brought back — so they are tinted apart rather than left to a shared grey. */
+.panel-results {
+  border-color: #c7d2fe;
+}
+
+.panel-results .panel-title {
+  background: var(--primary-soft);
+  color: #4338ca;
+}
+
+.panel-results .panel-count {
+  background: #c7d2fe;
+  color: #4338ca;
+}
+
+.panel-body {
+  padding: 11px;
+}
+
+.panel-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-duration {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Step log ---------- */
+.step-log {
+  background: var(--surface-raised);
+  max-height: 210px;
+  overflow-y: auto;
+}
+
+.step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.step-row:last-child {
+  border-bottom: none;
+}
+
+.step-icon {
+  flex-shrink: 0;
+  width: 11px;
+  text-align: center;
+}
+
+.step-index {
+  flex-shrink: 0;
+  width: 30px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.step-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.step-duration {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.step-type-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step-type {
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.step-target {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-message {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.step-done .step-icon {
+  color: var(--success);
+}
+
+.step-running .step-icon {
+  color: var(--muted-foreground);
+}
+
+.step-skipped .step-icon {
+  color: #b45309;
+}
+
+.step-failed {
+  background: var(--destructive-soft);
+}
+
+.step-failed .step-icon,
+.step-failed .step-message {
+  color: #b91c1c;
+}
+
+/* ---------- Results ---------- */
+.result-block {
+  margin-bottom: 14px;
+}
+
+.panel-body > .result-block:last-child {
+  margin-bottom: 0;
+}
+
+.result-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 6px;
+}
+
+.result-value {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
+.result-image-wrap {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--muted);
+  text-align: center;
+}
+
+.result-image {
+  max-width: 100%;
+  display: block;
+  margin: 0 auto;
+  border-radius: var(--radius-sm);
+}
+
+.result-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+  max-height: 240px;
+  background: var(--surface-raised);
+}
+
+.result-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-table th,
+.result-table td {
+  padding: 7px 10px;
+  text-align: left;
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-table th {
+  position: sticky;
+  top: 0;
+  background: var(--primary-soft);
+  color: #4338ca;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.result-table td {
+  color: var(--foreground);
+}
+
+.result-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.progress-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+  margin: 4px 0 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.2s ease;
+}
+
+.result-meta {
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Forms ---------- */
+.export-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.form-input {
+  padding: 8px 10px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.form-input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.form-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+/* ---------- About ---------- */
+.about-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 28px 12px;
+}
+
+.about-logo {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  box-shadow: 0 3px 10px rgba(79, 70, 229, 0.4);
+  color: var(--primary-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.about-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.about-version {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.about-panel .form-group {
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.about-email {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.about-email:hover {
+  text-decoration: underline;
+}
+
+.form-hint code {
+  font-family: var(--font-mono);
+}
+
+.export-btn {
+  padding: 9px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: var(--primary-foreground);
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+}
+
+/* ---------- Settings ---------- */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.setting-item:hover {
+  border-color: #c7d2fe;
+  background: #f7f8ff;
+}
+
+.setting-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.setting-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.setting-desc {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 21px;
+  border: none;
+  border-radius: 999px;
+  background: var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.toggle.on {
+  background: var(--success);
+}
+
+.toggle-circle {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fbfbfc;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition: left 0.15s;
+}
+
+.toggle.on .toggle-circle {
+  left: 19px;
+}
+
+/* ---------- Scrollbars ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 3px solid var(--background);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ring);
+}
+
+/* ---------- Narrow (docked to the side) ----------
+   Must stay last in the file: a media query carries no extra specificity, so
+   these only win by coming after the rules they adjust.
+
+   A 68px rail down the side is a fifth of a narrow panel, taken from the very
+   content it exists to show. Lay the nav across the top instead, where a
+   full-height panel has room to spare, and give the steps, tables and
+   screenshots the whole width back. */
+@media (max-width: 400px) {
+  html.in-side-panel .popup {
+    flex-direction: column;
+  }
+
+  html.in-side-panel .sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 2px;
+    padding: 5px 4px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  html.in-side-panel .sidebar-brand {
+    display: none; /* the header underneath already names the panel */
+  }
+
+  html.in-side-panel .sidebar-item {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 2px;
+    gap: 2px;
+    font-size: 9px;
+  }
+
+  html.in-side-panel .sidebar-item svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  html.in-side-panel .popup-header {
+    height: 40px;
+    padding: 0 12px;
+  }
+
+  html.in-side-panel .popup-content {
+    padding: 12px;
+  }
+}
