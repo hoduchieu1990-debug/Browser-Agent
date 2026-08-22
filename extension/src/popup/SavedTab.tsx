@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import type { SavedRecording, RecorderSettings } from '../types';
+import type { SavedRecording, RecorderSettings, EmailSettings } from '../types';
 import { ScheduleForm } from './ScheduleForm';
 
 interface Props {
   recordings: SavedRecording[];
   settings: RecorderSettings;
+  emailSettings: EmailSettings;
+  onAddRecipient: (email: string) => void;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -21,7 +23,7 @@ function summarise(recording: SavedRecording): string {
   return parts.join(' · ');
 }
 
-export function SavedTab({ recordings, settings, onLoad, onDelete }: Props) {
+export function SavedTab({ recordings, settings, emailSettings, onAddRecipient, onLoad, onDelete }: Props) {
   const [schedulingId, setSchedulingId] = useState<string | null>(null);
 
   if (recordings.length === 0) {
@@ -60,7 +62,13 @@ export function SavedTab({ recordings, settings, onLoad, onDelete }: Props) {
             </div>
           </div>
           {schedulingId === recording.id && (
-            <ScheduleForm recording={recording} settings={settings} onClose={() => setSchedulingId(null)} />
+            <ScheduleForm
+              recording={recording}
+              settings={settings}
+              emailSettings={emailSettings}
+              onAddRecipient={onAddRecipient}
+              onClose={() => setSchedulingId(null)}
+            />
           )}
         </div>
       ))}

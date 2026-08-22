@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { SavedRecording, RecorderSettings, ScheduleConfig, ScheduleRecurrence } from '../types';
+import type { SavedRecording, RecorderSettings, EmailSettings, ScheduleConfig, ScheduleRecurrence } from '../types';
 import { buildWorkflow } from '../utils/workflow-builder';
 import { extractableOutputs } from '../utils/result-keys';
 
 interface Props {
   recording: SavedRecording;
   settings: RecorderSettings;
+  emailSettings: EmailSettings;
+  onAddRecipient: (email: string) => void;
   onClose: () => void;
 }
 
@@ -31,7 +33,7 @@ function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
   return next;
 }
 
-export function ScheduleForm({ recording, settings, onClose }: Props) {
+export function ScheduleForm({ recording, settings, emailSettings, onAddRecipient, onClose }: Props) {
   const outputs = extractableOutputs(recording.actions);
 
   const [name, setName] = useState(recording.name);
@@ -42,18 +44,23 @@ export function ScheduleForm({ recording, settings, onClose }: Props) {
   const [repeatCount, setRepeatCount] = useState(1);
   const [resultKeys, setResultKeys] = useState<Set<string>>(new Set(outputs));
 
-  const [smtpHost, setSmtpHost] = useState('');
-  const [smtpPort, setSmtpPort] = useState(25);
-  const [smtpSecure, setSmtpSecure] = useState(false);
-  const [smtpUser, setSmtpUser] = useState('');
-  const [smtpPass, setSmtpPass] = useState('');
-  const [emailTo, setEmailTo] = useState('');
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
+  const [newRecipient, setNewRecipient] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
 
   const [saved, setSaved] = useState(false);
 
+  const hasSmtpConfig = emailSettings.host.trim() !== '';
   const recurrenceValid = recurrenceType === 'once' ? !!date : weekdays.size > 0;
-  const canSubmit = name.trim() !== '' && recurrenceValid && repeatCount >= 1 && smtpHost.trim() !== '' && emailTo.trim() !== '';
+  const canSubmit = name.trim() !== '' && recurrenceValid && repeatCount >= 1 && hasSmtpConfig && selectedRecipients.size > 0;
+
+  const addRecipient = () => {
+    const email = newRecipient.trim();
+    if (!email) return;
+    onAddRecipient(email);
+    setSelectedRecipients(toggleInSet(selectedRecipients, email));
+    setNewRecipient('');
+  };
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -71,12 +78,13 @@ export function ScheduleForm({ recording, settings, onClose }: Props) {
       resultKeys: [...resultKeys],
       stopOnError: true,
       email: {
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpSecure,
-        user: smtpUser || undefined,
-        pass: smtpPass || undefined,
-        to: emailTo,
+        host: emailSettings.host,
+        port: emailSettings.port,
+        secure: emailSettings.secure,
+        user: emailSettings.user || undefined,
+        pass: emailSettings.pass || undefined,
+        from: emailSettings.from || undefined,
+        to: [...selectedRecipients].join(', '),
         subject: emailSubject || undefined,
       },
       state: { timesTriggered: 0 },
@@ -111,6 +119,13 @@ export function ScheduleForm({ recording, settings, onClose }: Props) {
         This snapshots the job as it is right now — editing the saved recording later won't change schedules already
         created from it.
       </p>
+
+      {!hasSmtpConfig && (
+        <p className="form-hint schedule-warning">
+          No SMTP server configured yet — set it up once in the <strong>Settings</strong> tab before creating a
+          schedule.
+        </p>
+      )}
 
       <div className="form-group">
         <label className="form-label">Schedule name</label>
@@ -194,51 +209,39 @@ export function ScheduleForm({ recording, settings, onClose }: Props) {
       </div>
 
       <div className="form-group">
-        <label className="form-label">SMTP host</label>
-        <input
-          className="form-input"
-          type="text"
-          placeholder="smtp.samsung.net"
-          value={smtpHost}
-          onChange={(e) => setSmtpHost(e.target.value)}
-        />
-      </div>
-
-      <div className="smtp-row">
-        <div className="form-group">
-          <label className="form-label">Port</label>
+        <label className="form-label">Send report to</label>
+        {emailSettings.recipients.length > 0 && (
+          <div className="result-key-list">
+            {emailSettings.recipients.map((email) => (
+              <label className="result-key-item" key={email}>
+                <input
+                  type="checkbox"
+                  checked={selectedRecipients.has(email)}
+                  onChange={() => setSelectedRecipients(toggleInSet(selectedRecipients, email))}
+                />
+                {email}
+              </label>
+            ))}
+          </div>
+        )}
+        <div className="recipient-add-row">
           <input
             className="form-input"
-            type="number"
-            value={smtpPort}
-            onChange={(e) => setSmtpPort(parseInt(e.target.value, 10) || 25)}
+            type="text"
+            placeholder="Add a new recipient…"
+            value={newRecipient}
+            onChange={(e) => setNewRecipient(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addRecipient();
+              }
+            }}
           />
+          <button className="saved-load" onClick={addRecipient}>
+            + Add
+          </button>
         </div>
-        <label className="result-key-item smtp-secure-toggle">
-          <input type="checkbox" checked={smtpSecure} onChange={(e) => setSmtpSecure(e.target.checked)} />
-          Secure (TLS)
-        </label>
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">SMTP user (optional)</label>
-        <input className="form-input" type="text" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} />
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">SMTP password (optional)</label>
-        <input className="form-input" type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} />
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">Send report to</label>
-        <input
-          className="form-input"
-          type="text"
-          placeholder="you@company.com"
-          value={emailTo}
-          onChange={(e) => setEmailTo(e.target.value)}
-        />
       </div>
 
       <div className="form-group">

@@ -1,9 +1,18 @@
-import type { WorkflowAction, RecorderSettings, SavedRecording, ReplayState, BatchDataset, BatchReplayState } from '../types';
-import { DEFAULT_SETTINGS } from '../types';
+import type {
+  WorkflowAction,
+  RecorderSettings,
+  EmailSettings,
+  SavedRecording,
+  ReplayState,
+  BatchDataset,
+  BatchReplayState,
+} from '../types';
+import { DEFAULT_SETTINGS, DEFAULT_EMAIL_SETTINGS } from '../types';
 
 const DB_NAME = 'browser-agent';
 const STORE_NAME = 'session';
 const SETTINGS_KEY = 'browser-agent-settings';
+const EMAIL_SETTINGS_KEY = 'browser-agent-email-settings';
 const RECORDINGS_KEY = 'browser-agent-recordings';
 const REPLAY_STATE_KEY = 'browser-agent-replay-state';
 const BATCH_DATASET_KEY = 'browser-agent-batch-dataset';
@@ -124,6 +133,15 @@ export async function saveSettings(settings: RecorderSettings): Promise<void> {
 export async function loadSettings(): Promise<RecorderSettings> {
   const result = await chrome.storage.local.get(SETTINGS_KEY);
   return { ...DEFAULT_SETTINGS, ...(result[SETTINGS_KEY] as Partial<RecorderSettings> | undefined) };
+}
+
+export async function saveEmailSettings(settings: EmailSettings): Promise<void> {
+  await chrome.storage.local.set({ [EMAIL_SETTINGS_KEY]: settings });
+}
+
+export async function loadEmailSettings(): Promise<EmailSettings> {
+  const result = await chrome.storage.local.get(EMAIL_SETTINGS_KEY);
+  return { ...DEFAULT_EMAIL_SETTINGS, ...(result[EMAIL_SETTINGS_KEY] as Partial<EmailSettings> | undefined) };
 }
 
 export async function loadRecordings(): Promise<SavedRecording[]> {

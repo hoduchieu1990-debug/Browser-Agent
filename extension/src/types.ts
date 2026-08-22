@@ -26,6 +26,29 @@ export const DEFAULT_SETTINGS: RecorderSettings = {
   verboseLogging: false,
 };
 
+// One SMTP account shared by every schedule, configured once in Settings —
+// only the recipient list is picked per schedule (ScheduleForm.tsx).
+export interface EmailSettings {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  from: string;
+  /** Addresses used before, offered as a pick-list when creating a schedule. */
+  recipients: string[];
+}
+
+export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
+  host: '',
+  port: 25,
+  secure: false,
+  user: '',
+  pass: '',
+  from: '',
+  recipients: [],
+};
+
 // Viewport-relative, in CSS px — the same shape captureVisibleTab-based
 // cropping already expects elsewhere (see utils/capture.ts's CaptureRect).
 export interface ThumbnailRect {
@@ -45,6 +68,8 @@ export type RuntimeMessage =
   | { type: 'CLOSE_POPUP'; windowId: number }
   | { type: 'GET_SETTINGS' }
   | { type: 'SET_SETTINGS'; settings: RecorderSettings }
+  | { type: 'GET_EMAIL_SETTINGS' }
+  | { type: 'SET_EMAIL_SETTINGS'; settings: EmailSettings }
   | { type: 'SET_RECORDING'; value: boolean; highlightElements: boolean }
   | {
       type: 'RECORDED_ACTION';

@@ -2,6 +2,7 @@ import type {
   WorkflowAction,
   RuntimeMessage,
   RecorderSettings,
+  EmailSettings,
   ReplayState,
   ReplayStepLog,
   SavedRecording,
@@ -11,13 +12,15 @@ import type {
   DataRow,
   ThumbnailRect,
 } from './types';
-import { DEFAULT_SETTINGS } from './types';
+import { DEFAULT_SETTINGS, DEFAULT_EMAIL_SETTINGS } from './types';
 import {
   saveSession,
   loadSession,
   clearSession,
   saveSettings,
   loadSettings,
+  saveEmailSettings,
+  loadEmailSettings,
   loadRecordings,
   addRecording,
   deleteRecording,
@@ -44,6 +47,7 @@ let recording = false;
 let actions: WorkflowAction[] = [];
 let stepCounter = 0;
 let settings: RecorderSettings = DEFAULT_SETTINGS;
+let emailSettings: EmailSettings = DEFAULT_EMAIL_SETTINGS;
 let replayState: ReplayState | null = null;
 let replaying = false;
 let recordingHost: string | null = null;
@@ -65,6 +69,9 @@ loadSettings().then((saved) => {
   // The panel's enabled/behaviour flags live in the browser, not our storage,
   // and reset when the extension reloads — restate them from the saved choice.
   applyPinSide(settings.pinSide);
+});
+loadEmailSettings().then((saved) => {
+  emailSettings = saved;
 });
 loadBatchDataset().then((saved) => {
   batchDataset = saved;
@@ -745,6 +752,16 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
 
     case 'GET_SETTINGS':
       sendResponse(settings);
+      return;
+
+    case 'GET_EMAIL_SETTINGS':
+      sendResponse(emailSettings);
+      return;
+
+    case 'SET_EMAIL_SETTINGS':
+      emailSettings = message.settings;
+      saveEmailSettings(emailSettings);
+      sendResponse(emailSettings);
       return;
 
     case 'REPLAY_START':

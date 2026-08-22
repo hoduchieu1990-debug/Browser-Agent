@@ -18,7 +18,13 @@ const PAGE = `<!doctype html>
   const port = server.address().port;
 
   const extensionPath = path.join(__dirname, '..', 'extension', 'dist');
-  const context = await chromium.launchPersistentContext(path.join(__dirname, 'profile'), {
+  // A dedicated profile, not the shared .verify/profile/ used by many other
+  // checks — that one accumulates 50+ saved recordings across a full suite
+  // run and something about that load made the service worker occasionally
+  // drop the GET_EMAIL_SETTINGS response (App.tsx now falls back to
+  // DEFAULT_EMAIL_SETTINGS either way, but isolating this test avoids
+  // depending on that fallback ever being exercised for real).
+  const context = await chromium.launchPersistentContext(path.join(__dirname, 'schedule-export-profile'), {
     headless: false,
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
   });
@@ -35,6 +41,12 @@ const PAGE = `<!doctype html>
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
 
     const badge = testPage.locator('#__browser_agent_add_badge__');
+
+    // Configure the (now global, Settings-tab) SMTP server once, up front.
+    await popup.click('text=Settings');
+    await popup.waitForTimeout(200);
+    await popup.locator('.form-input[placeholder="smtp.samsung.net"]').fill('smtp.samsung.net');
+    await popup.waitForTimeout(200); // SET_EMAIL_SETTINGS round trip to the background
 
     // Record one extractText action so the recording has a real output name.
     await testPage.bringToFront();
@@ -61,10 +73,11 @@ const PAGE = `<!doctype html>
     console.log('[available result key]', outputName.trim());
     assert(outputName.trim().length > 0, 'expected the recorded extractText output name to be listed');
 
-    // pick a weekday so the weekly recurrence is valid, then fill SMTP + recipient
+    // pick a weekday so the weekly recurrence is valid, then add+select a recipient
     await popup.locator('.weekday-chip').first().click();
-    await popup.locator('.form-input[placeholder="smtp.samsung.net"]').fill('smtp.samsung.net');
-    await popup.locator('.form-input[placeholder="you@company.com"]').fill('ops@example.com');
+    await popup.locator('.form-input[placeholder="Add a new recipient…"]').fill('ops@example.com');
+    await popup.locator('.recipient-add-row button', { hasText: 'Add' }).click();
+    await popup.waitForTimeout(150);
 
     const [download] = await Promise.all([
       popup.waitForEvent('download'),

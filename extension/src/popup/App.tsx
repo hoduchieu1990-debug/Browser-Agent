@@ -4,12 +4,13 @@ import type {
   RuntimeMessage,
   RecorderState,
   RecorderSettings,
+  EmailSettings,
   ReplayState,
   SavedRecording,
   BatchDataset,
   BatchReplayState,
 } from '../types';
-import { DEFAULT_SETTINGS } from '../types';
+import { DEFAULT_SETTINGS, DEFAULT_EMAIL_SETTINGS } from '../types';
 import { Header } from './Header';
 import { Sidebar, type TabKey } from './Sidebar';
 import { RecordTab } from './RecordTab';
@@ -44,6 +45,7 @@ export function App() {
   const [recording, setRecording] = useState(false);
   const [actions, setActions] = useState<WorkflowAction[]>([]);
   const [settings, setSettings] = useState<RecorderSettings>(DEFAULT_SETTINGS);
+  const [emailSettings, setEmailSettings] = useState<EmailSettings>(DEFAULT_EMAIL_SETTINGS);
   const [activeTab, setActiveTab] = useState<TabKey>('recording');
   const [error, setError] = useState<string | null>(null);
   const [replayState, setReplayState] = useState<ReplayState | null>(null);
@@ -65,6 +67,9 @@ export function App() {
     });
     chrome.runtime.sendMessage({ type: 'GET_SETTINGS' } satisfies RuntimeMessage, (s: RecorderSettings) => {
       setSettings(s);
+    });
+    chrome.runtime.sendMessage({ type: 'GET_EMAIL_SETTINGS' } satisfies RuntimeMessage, (s: EmailSettings) => {
+      setEmailSettings(s ?? DEFAULT_EMAIL_SETTINGS);
     });
     chrome.runtime.sendMessage({ type: 'GET_RECORDINGS' } satisfies RuntimeMessage, (list: SavedRecording[]) => {
       setRecordings(list);
@@ -213,6 +218,17 @@ export function App() {
     chrome.runtime.sendMessage({ type: 'SET_SETTINGS', settings: next } satisfies RuntimeMessage);
   };
 
+  const updateEmailSettings = (patch: Partial<EmailSettings>) => {
+    const next = { ...emailSettings, ...patch };
+    setEmailSettings(next);
+    chrome.runtime.sendMessage({ type: 'SET_EMAIL_SETTINGS', settings: next } satisfies RuntimeMessage);
+  };
+
+  const addEmailRecipient = (email: string) => {
+    if (!email.trim() || emailSettings.recipients.includes(email)) return;
+    updateEmailSettings({ recipients: [...emailSettings.recipients, email] });
+  };
+
   return (
     <div className="popup">
       <Sidebar active={activeTab} onChange={setActiveTab} showBatch={hasBatchNodes} />
@@ -243,7 +259,14 @@ export function App() {
             />
           )}
           {activeTab === 'saved' && (
-            <SavedTab recordings={recordings} settings={settings} onLoad={loadRecording} onDelete={removeRecording} />
+            <SavedTab
+              recordings={recordings}
+              settings={settings}
+              emailSettings={emailSettings}
+              onAddRecipient={addEmailRecipient}
+              onLoad={loadRecording}
+              onDelete={removeRecording}
+            />
           )}
           {activeTab === 'export' && <ExportTab actions={actions} recordings={recordings} settings={settings} />}
           {activeTab === 'batch' && (
@@ -257,7 +280,14 @@ export function App() {
               onStop={stopBatch}
             />
           )}
-          {activeTab === 'settings' && <SettingsTab settings={settings} onChange={updateSetting} />}
+          {activeTab === 'settings' && (
+            <SettingsTab
+              settings={settings}
+              onChange={updateSetting}
+              emailSettings={emailSettings}
+              onEmailSettingsChange={updateEmailSettings}
+            />
+          )}
           {activeTab === 'about' && <AboutTab />}
         </div>
       </div>
