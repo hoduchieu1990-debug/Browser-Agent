@@ -243,7 +243,7 @@ export function App() {
             />
           )}
           {activeTab === 'saved' && (
-            <SavedTab recordings={recordings} onLoad={loadRecording} onDelete={removeRecording} />
+            <SavedTab recordings={recordings} settings={settings} onLoad={loadRecording} onDelete={removeRecording} />
           )}
           {activeTab === 'export' && <ExportTab actions={actions} recordings={recordings} settings={settings} />}
           {activeTab === 'batch' && (

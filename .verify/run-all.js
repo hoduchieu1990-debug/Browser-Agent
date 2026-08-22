@@ -55,6 +55,10 @@ const CHECKS = [
   'checkbox-radio-check.js',
   'step-thumbnail-check.js',
   'nexacro-long-id-check.js',
+  'schedule-due-check.js',
+  'schedule-cli-check.js',
+  'schedule-list-check.js',
+  'schedule-export-check.js',
 ];
 
 (async () => {

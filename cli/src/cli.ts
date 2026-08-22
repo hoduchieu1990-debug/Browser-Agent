@@ -3,6 +3,7 @@ import { runCommand } from './commands/run';
 import { validateCommand } from './commands/validate';
 import { listCommand } from './commands/list';
 import { showCommand } from './commands/show';
+import { scheduleCommand } from './commands/schedule';
 
 export function buildCli(): Command {
   const program = new Command();
@@ -15,6 +16,7 @@ export function buildCli(): Command {
   program.addCommand(validateCommand);
   program.addCommand(listCommand);
   program.addCommand(showCommand);
+  program.addCommand(scheduleCommand);
 
   return program;
 }

@@ -1,7 +1,10 @@
-import type { SavedRecording } from '../types';
+import { useState } from 'react';
+import type { SavedRecording, RecorderSettings } from '../types';
+import { ScheduleForm } from './ScheduleForm';
 
 interface Props {
   recordings: SavedRecording[];
+  settings: RecorderSettings;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -18,7 +21,9 @@ function summarise(recording: SavedRecording): string {
   return parts.join(' · ');
 }
 
-export function SavedTab({ recordings, onLoad, onDelete }: Props) {
+export function SavedTab({ recordings, settings, onLoad, onDelete }: Props) {
+  const [schedulingId, setSchedulingId] = useState<string | null>(null);
+
   if (recordings.length === 0) {
     return (
       <div className="empty-state">
@@ -32,20 +37,31 @@ export function SavedTab({ recordings, onLoad, onDelete }: Props) {
   return (
     <div className="saved-list">
       {recordings.map((recording) => (
-        <div className="saved-item" key={recording.id}>
-          <div className="saved-info">
-            <div className="saved-name">{recording.name}</div>
-            <div className="saved-meta">{formatTime(recording.createdAt)}</div>
-            <div className="saved-meta">{summarise(recording)}</div>
+        <div key={recording.id}>
+          <div className="saved-item">
+            <div className="saved-info">
+              <div className="saved-name">{recording.name}</div>
+              <div className="saved-meta">{formatTime(recording.createdAt)}</div>
+              <div className="saved-meta">{summarise(recording)}</div>
+            </div>
+            <div className="saved-actions">
+              <button className="saved-load" onClick={() => onLoad(recording.id)}>
+                Load
+              </button>
+              <button
+                className="saved-schedule"
+                onClick={() => setSchedulingId(schedulingId === recording.id ? null : recording.id)}
+              >
+                ⏰ Schedule
+              </button>
+              <button className="action-delete" onClick={() => onDelete(recording.id)}>
+                ✕
+              </button>
+            </div>
           </div>
-          <div className="saved-actions">
-            <button className="saved-load" onClick={() => onLoad(recording.id)}>
-              Load
-            </button>
-            <button className="action-delete" onClick={() => onDelete(recording.id)}>
-              ✕
-            </button>
-          </div>
+          {schedulingId === recording.id && (
+            <ScheduleForm recording={recording} settings={settings} onClose={() => setSchedulingId(null)} />
+          )}
         </div>
       ))}
     </div>

@@ -725,7 +725,8 @@ html.in-side-panel .popup {
   flex-shrink: 0;
 }
 
-.saved-load {
+.saved-load,
+.saved-schedule {
   padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -737,7 +738,8 @@ html.in-side-panel .popup {
   cursor: pointer;
 }
 
-.saved-load:hover {
+.saved-load:hover,
+.saved-schedule:hover {
   background: var(--accent);
 }
 
@@ -1162,6 +1164,85 @@ html.in-side-panel .popup {
   background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   color: var(--primary-foreground);
   box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+}
+
+/* ---------- Schedule form ---------- */
+.schedule-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 8px 0 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.recurrence-type-picker,
+.smtp-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.recurrence-type-btn,
+.weekday-chip {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.recurrence-type-btn.selected,
+.weekday-chip.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.weekday-picker {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.result-key-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.result-key-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.smtp-secure-toggle {
+  padding-bottom: 8px;
+  white-space: nowrap;
+}
+
+.schedule-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.schedule-form-actions .export-btn {
+  flex: 1;
+}
+
+.schedule-cancel-btn {
+  width: auto;
+  padding: 0 12px;
 }
 
 /* ---------- Settings ---------- */

@@ -456,6 +456,54 @@ browser-agent run-batch manifest.json
 0 * * * * browser-agent run /path/to/workflow.json
 ```
 
+### `browser-agent schedule` — recurring runs with an emailed report
+
+Recordings scheduled from the extension's Saved tab (⏰ Schedule) are
+written as `.schedule.json` files (a snapshot of the workflow, a
+recurrence rule, a repeat count, and SMTP report settings) to
+`Downloads/BrowserAgent-Schedules/` by default. `browser-agent schedule`
+is the daemon that watches that folder and fires them.
+
+```bash
+# One-time check + exit (useful for testing, or invoking from an external scheduler)
+browser-agent schedule run --once
+
+# Persistent daemon: polls every 60s and keeps running until stopped
+browser-agent schedule run
+
+# Custom folder / poll interval
+browser-agent schedule run --dir "D:\Shared\BrowserAgent-Schedules" --interval 30
+
+# Status of every configured schedule (name, recurrence, last run, last status)
+browser-agent schedule list
+```
+
+Each fire runs the embedded workflow `repeatCount` times back-to-back
+(stopping immediately if a repeat run fails), then emails the selected
+result values via SMTP, using the settings entered when the schedule was
+created.
+
+#### Running it in the background automatically (Windows)
+
+Since the daemon needs to be running for schedules to fire, and nobody
+wants to keep a terminal window open, register it as a Task Scheduler
+entry that starts at logon (one-time setup):
+
+```powershell
+# From the cli/ directory, as the user who'll be logged in when schedules should run:
+.\scripts\install-schedule-daemon.ps1
+
+# To remove it later:
+.\scripts\install-schedule-daemon.ps1 -Uninstall
+```
+
+This creates a Task Scheduler task ("At log on" trigger) that runs
+`node <cli/dist/index.js> schedule run` with no visible window, so once
+it's installed, opening a schedule from the extension is the only step
+left — nothing else to start manually. See the script itself for the
+exact `schtasks` invocation if you'd rather set it up by hand or on a
+different trigger (e.g. "At startup" for a shared machine).
+
 ---
 
 ## 9. Docker Usage
