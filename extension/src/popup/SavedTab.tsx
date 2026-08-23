@@ -1,12 +1,7 @@
-import { useState } from 'react';
-import type { SavedRecording, RecorderSettings, EmailSettings } from '../types';
-import { ScheduleForm } from './ScheduleForm';
+import type { SavedRecording, RuntimeMessage } from '../types';
 
 interface Props {
   recordings: SavedRecording[];
-  settings: RecorderSettings;
-  emailSettings: EmailSettings;
-  onAddRecipient: (email: string) => void;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -23,9 +18,11 @@ function summarise(recording: SavedRecording): string {
   return parts.join(' · ');
 }
 
-export function SavedTab({ recordings, settings, emailSettings, onAddRecipient, onLoad, onDelete }: Props) {
-  const [schedulingId, setSchedulingId] = useState<string | null>(null);
+function openReport(recordingId: string): void {
+  chrome.runtime.sendMessage({ type: 'OPEN_REPORT', recordingId } satisfies RuntimeMessage);
+}
 
+export function SavedTab({ recordings, onLoad, onDelete }: Props) {
   if (recordings.length === 0) {
     return (
       <div className="empty-state">
@@ -39,37 +36,23 @@ export function SavedTab({ recordings, settings, emailSettings, onAddRecipient, 
   return (
     <div className="saved-list">
       {recordings.map((recording) => (
-        <div key={recording.id}>
-          <div className="saved-item">
-            <div className="saved-info">
-              <div className="saved-name">{recording.name}</div>
-              <div className="saved-meta">{formatTime(recording.createdAt)}</div>
-              <div className="saved-meta">{summarise(recording)}</div>
-            </div>
-            <div className="saved-actions">
-              <button className="saved-load" onClick={() => onLoad(recording.id)}>
-                Load
-              </button>
-              <button
-                className="saved-schedule"
-                onClick={() => setSchedulingId(schedulingId === recording.id ? null : recording.id)}
-              >
-                ⏰ Schedule
-              </button>
-              <button className="action-delete" onClick={() => onDelete(recording.id)}>
-                ✕
-              </button>
-            </div>
+        <div className="saved-item" key={recording.id}>
+          <div className="saved-info">
+            <div className="saved-name">{recording.name}</div>
+            <div className="saved-meta">{formatTime(recording.createdAt)}</div>
+            <div className="saved-meta">{summarise(recording)}</div>
           </div>
-          {schedulingId === recording.id && (
-            <ScheduleForm
-              recording={recording}
-              settings={settings}
-              emailSettings={emailSettings}
-              onAddRecipient={onAddRecipient}
-              onClose={() => setSchedulingId(null)}
-            />
-          )}
+          <div className="saved-actions">
+            <button className="saved-load" onClick={() => onLoad(recording.id)}>
+              Load
+            </button>
+            <button className="saved-schedule" onClick={() => openReport(recording.id)}>
+              📊 Report
+            </button>
+            <button className="action-delete" onClick={() => onDelete(recording.id)}>
+              ✕
+            </button>
+          </div>
         </div>
       ))}
     </div>

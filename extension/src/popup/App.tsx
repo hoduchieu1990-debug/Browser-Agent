@@ -262,16 +262,7 @@ export function App() {
               onReplay={startReplay}
             />
           )}
-          {activeTab === 'saved' && (
-            <SavedTab
-              recordings={recordings}
-              settings={settings}
-              emailSettings={emailSettings}
-              onAddRecipient={addEmailRecipient}
-              onLoad={loadRecording}
-              onDelete={removeRecording}
-            />
-          )}
+          {activeTab === 'saved' && <SavedTab recordings={recordings} onLoad={loadRecording} onDelete={removeRecording} />}
           {activeTab === 'export' && <ExportTab actions={actions} recordings={recordings} settings={settings} />}
           {activeTab === 'batch' && (
             <BatchTab

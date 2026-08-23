@@ -414,6 +414,18 @@ async function openPopupWindow(windowId?: number): Promise<void> {
   popupWindowId = win.id ?? null;
 }
 
+// A standalone window (not tracked/reused like openPopupWindow's popup) —
+// the user can have more than one Report compose window open at once, and
+// closing one shouldn't affect any other.
+async function openReportWindow(recordingId: string): Promise<void> {
+  await chrome.windows.create({
+    url: chrome.runtime.getURL(`popup.html?report=${encodeURIComponent(recordingId)}`),
+    type: 'popup',
+    width: 720,
+    height: 680,
+  });
+}
+
 // Two ways to photograph an element, each with a blind spot: captureVisibleTab
 // dies on a window that is not on screen ("image readback failed"), while the
 // devtools route puts a "being debugged" bar on the window it attaches to.
@@ -756,6 +768,10 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
 
     case 'GET_EMAIL_SETTINGS':
       sendResponse(emailSettings);
+      return;
+
+    case 'OPEN_REPORT':
+      openReportWindow(message.recordingId);
       return;
 
     case 'SET_EMAIL_SETTINGS':

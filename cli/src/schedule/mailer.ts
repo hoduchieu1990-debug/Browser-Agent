@@ -1,14 +1,7 @@
 import * as nodemailer from 'nodemailer';
-import type { ScheduleEmailConfig } from '@browser-agent/shared';
+import type { ScheduleEmailConfig, MailMessage } from '@browser-agent/shared';
 
-export interface MailMessage {
-  to: string;
-  from?: string;
-  subject: string;
-  text: string;
-  html?: string;
-  attachments?: { filename: string; path: string }[];
-}
+export type { MailMessage };
 
 export interface Mailer {
   send(message: MailMessage): Promise<void>;

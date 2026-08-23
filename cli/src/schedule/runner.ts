@@ -2,10 +2,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { WorkflowPlayer, runBatch } from '@browser-agent/player';
-import type { ScheduleEmailConfig } from '@browser-agent/shared';
+import { buildReportEmail, type ScheduleEmailConfig } from '@browser-agent/shared';
 import { computeDueSlot } from './due';
 import { createSmtpMailer, type Mailer } from './mailer';
-import { buildReportEmail } from './report';
 import { readSchedule, writeSchedule } from './store';
 
 export interface TickOptions {

@@ -1259,6 +1259,97 @@ html.in-side-panel .popup {
   flex: 1;
 }
 
+/* ---------- Report composer (separate compose window) ---------- */
+html.report-window body {
+  width: 100%;
+  min-width: 0;
+}
+
+.report-composer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 14px;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.report-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.report-tabs {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-tab {
+  padding: 8px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted-foreground);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.report-tab.selected {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.report-tab-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 2px;
+}
+
+.report-content-textarea {
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.report-preview-frame {
+  width: 100%;
+  flex: 1;
+  min-height: 260px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.report-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  font-size: 11px;
+  color: var(--foreground);
+  width: fit-content;
+}
+
+.report-composer .schedule-form-actions {
+  flex-shrink: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
 /* ---------- Settings ---------- */
 .email-toggle-btn {
   width: 100%;

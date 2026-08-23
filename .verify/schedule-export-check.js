@@ -67,25 +67,51 @@ const PAGE = `<!doctype html>
     await popup.click('text=Stop');
     await popup.waitForTimeout(400);
 
-    // Open Saved tab, open the Schedule form for the just-saved recording.
+    // Open Saved tab, click "Report" — this opens a genuinely separate
+    // Chrome window (background.ts's openReportWindow), not an inline form.
     await popup.click('text=Saved');
     await popup.waitForTimeout(200);
-    await popup.locator('.saved-schedule').first().click();
-    await popup.waitForTimeout(200);
+    const [reportPage] = await Promise.all([
+      context.waitForEvent('page'),
+      popup.locator('.saved-schedule').first().click(),
+    ]);
+    reportPage.on('console', (msg) => { if (msg.type() === 'error') console.log('REPORTPAGE-CONSOLE-ERR>', msg.text()); });
+    reportPage.on('pageerror', (err) => console.log('REPORTPAGE-ERROR>', err.message));
+    await reportPage.waitForLoadState();
+    await reportPage.waitForTimeout(300);
 
-    const outputName = await popup.locator('.result-key-item').first().textContent();
+    // "To" (recipient add) is in the always-visible header.
+    await reportPage.locator('.form-input[placeholder="Add a new recipient…"]').fill('ops@example.com');
+    await reportPage.locator('.recipient-add-row button', { hasText: 'Add' }).click();
+    await reportPage.waitForTimeout(150);
+
+    // Schedule tab is active by default — pick a weekday there.
+    await reportPage.locator('.weekday-chip').first().click();
+
+    // Content tab — type a custom intro message.
+    await reportPage.locator('.report-tab', { hasText: 'Content' }).click();
+    await reportPage.locator('.report-content-textarea').fill('Hi team, here is today\'s report:');
+
+    // Format tab — result keys + attach as CSV. Scoped to .report-tab-body:
+    // the header's recipient checkboxes reuse the same .result-key-item
+    // class and would otherwise be matched first (DOM order).
+    await reportPage.locator('.report-tab', { hasText: 'Format' }).click();
+    const outputName = await reportPage.locator('.report-tab-body .result-key-item').first().textContent();
     console.log('[available result key]', outputName.trim());
     assert(outputName.trim().length > 0, 'expected the recorded extractText output name to be listed');
+    await reportPage.locator('.report-tab-body .result-key-item', { hasText: 'Attach results as a file' }).click();
 
-    // pick a weekday so the weekly recurrence is valid, then add+select a recipient
-    await popup.locator('.weekday-chip').first().click();
-    await popup.locator('.form-input[placeholder="Add a new recipient…"]').fill('ops@example.com');
-    await popup.locator('.recipient-add-row button', { hasText: 'Add' }).click();
-    await popup.waitForTimeout(150);
+    // Review tab — the preview should reflect what was just typed.
+    await reportPage.locator('.report-tab', { hasText: 'Review' }).click();
+    const previewFrame = reportPage.frameLocator('.report-preview-frame');
+    const previewText = await previewFrame.locator('body').innerText();
+    assert(previewText.includes("Hi team, here is today's report:"), 'preview should show the typed content message');
+    assert(previewText.includes(outputName.trim()), 'preview table should show the selected result key as a column header');
+    console.log('[ok] Review tab preview reflects the typed content and selected result key');
 
     const [download] = await Promise.all([
-      popup.waitForEvent('download'),
-      popup.locator('.export-btn', { hasText: 'Create schedule' }).click(),
+      context.waitForEvent('download'),
+      reportPage.locator('.export-btn', { hasText: 'Create report' }).click(),
     ]);
     // Playwright's download capture assigns its own temp filename to
     // extension-initiated downloads regardless of the `filename` option
@@ -98,7 +124,7 @@ const PAGE = `<!doctype html>
     await download.saveAs(out);
 
     const config = JSON.parse(fs.readFileSync(out, 'utf-8'));
-    console.log('[schedule config]', JSON.stringify({ recurrence: config.recurrence, repeatCount: config.repeatCount, resultKeys: config.resultKeys, actionTypes: config.workflow.actions.map((a) => a.type) }));
+    console.log('[schedule config]', JSON.stringify({ recurrence: config.recurrence, repeatCount: config.repeatCount, resultKeys: config.resultKeys, content: config.content, attachment: config.attachment, actionTypes: config.workflow.actions.map((a) => a.type) }));
 
     assert.strictEqual(config.recurrence.type, 'weekly', 'expected the default weekly recurrence type');
     assert(Array.isArray(config.recurrence.weekdays) && config.recurrence.weekdays.length === 1, 'expected exactly one weekday selected');
@@ -108,7 +134,10 @@ const PAGE = `<!doctype html>
     assert.strictEqual(config.email.host, 'smtp.samsung.net', 'expected the default relay, unset in the UI');
     assert.strictEqual(config.email.user, 'ops@samsung.com', 'expected the account set in Settings > Email');
     assert.strictEqual(config.email.to, 'ops@example.com');
-    console.log('[ok] downloaded .schedule.json has the expected recurrence/repeatCount/resultKeys/workflow/email');
+    assert.strictEqual(config.content, "Hi team, here is today's report:");
+    assert.deepStrictEqual(config.attachment, { format: 'csv' });
+    assert(config.workflow.exportFormats.length === 1 && config.workflow.exportFormats[0].type === 'csv', 'attaching should set the embedded workflow\'s exportFormats');
+    console.log('[ok] downloaded .schedule.json has the expected recurrence/repeatCount/resultKeys/content/attachment/workflow/email');
 
     fs.unlinkSync(out);
   } finally {

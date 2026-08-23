@@ -73,6 +73,7 @@ export type RuntimeMessage =
   | { type: 'SET_SETTINGS'; settings: RecorderSettings }
   | { type: 'GET_EMAIL_SETTINGS' }
   | { type: 'SET_EMAIL_SETTINGS'; settings: EmailSettings }
+  | { type: 'OPEN_REPORT'; recordingId: string }
   | { type: 'SET_RECORDING'; value: boolean; highlightElements: boolean }
   | {
       type: 'RECORDED_ACTION';

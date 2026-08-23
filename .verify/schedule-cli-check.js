@@ -119,6 +119,51 @@ function baseConfig(id, workflow, repeatCount) {
   console.log('[ok] schedule state records lastStatus=partial');
 
   server2.close();
+
+  // --- Fixture 3: content message + CSV attachment, repeatCount = 1 ---
+  const server3 = http.createServer((req, res) => {
+    if (req.url !== '/') { res.writeHead(404); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end('<!doctype html><html><body><span id="result">42</span></body></html>');
+  });
+  await new Promise((r) => server3.listen(0, '127.0.0.1', r));
+  const port3 = server3.address().port;
+
+  const workflow3 = makeWorkflow(port3);
+  // What the extension does at creation time when "attach results file" is
+  // checked (ReportComposer.tsx) — set here directly since this test drives
+  // the CLI daemon, not the UI.
+  workflow3.exportFormats = [{ type: 'csv', output: 'value.csv', dataKey: 'value' }];
+
+  const config3 = baseConfig('sched-content', workflow3, 1);
+  config3.content = 'Hi team, here is today\'s report:';
+  config3.attachment = { format: 'csv' };
+  const fixture3 = path.join(runDir, 'content-attachment.schedule.json');
+  fs.writeFileSync(fixture3, JSON.stringify(config3, null, 2));
+
+  const sent3 = [];
+  let attachmentExistedAtSendTime = null;
+  await tick(fixture3, {
+    mailerFactory: () => ({
+      send: async (msg) => {
+        // Real nodemailer reads attachment files during this same call —
+        // checking existence here (before tick()'s own cleanup runs in its
+        // finally block, right after this resolves) is what actually mirrors
+        // that, not checking after tick() has fully returned.
+        attachmentExistedAtSendTime = msg.attachments?.[0]?.path ? fs.existsSync(msg.attachments[0].path) : false;
+        sent3.push(msg);
+      },
+    }),
+  });
+
+  assert.strictEqual(sent3.length, 1, 'expected exactly one email');
+  assert(sent3[0].text.startsWith("Hi team, here is today's report:"), 'email text should lead with the custom content message');
+  assert(Array.isArray(sent3[0].attachments) && sent3[0].attachments.length === 1, 'expected one attachment');
+  assert.strictEqual(sent3[0].attachments[0].filename, 'value.csv');
+  assert.strictEqual(attachmentExistedAtSendTime, true, 'the attached file should exist on disk at send time (before cleanup)');
+  console.log('[ok] custom content message leads the email, and the CSV attachment is real and present at send time');
+
+  server3.close();
   fs.rmSync(runDir, { recursive: true, force: true });
 
   console.log('PASS: schedule-cli-check');

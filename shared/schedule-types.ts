@@ -31,6 +31,10 @@ export interface ScheduleState {
   lastRunDurationMs?: number;
 }
 
+export interface ScheduleAttachment {
+  format: 'csv' | 'excel';
+}
+
 export interface ScheduleConfig {
   id: string;
   name: string;
@@ -43,6 +47,10 @@ export interface ScheduleConfig {
   resultKeys: string[];
   /** If a repeat run fails, stop the remaining repeats instead of continuing. */
   stopOnError: boolean;
+  /** Free-text message shown before the results table. */
+  content?: string;
+  /** Omitted — no attached file; set — attach the same results as CSV/Excel. */
+  attachment?: ScheduleAttachment;
   email: ScheduleEmailConfig;
   state: ScheduleState;
 }
