@@ -13,6 +13,7 @@ extension/public/icons/
 .verify/profile-fresh/
 .verify/edge-profile/
 .verify/schedule-export-profile/
+.verify/report-real-preview-profile/
 .verify/*.png
 .verify/*.json
 .verify/*.csv

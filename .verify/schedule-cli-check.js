@@ -118,7 +118,13 @@ function baseConfig(id, workflow, times) {
   workflow3.exportFormats = [{ type: 'csv', output: 'value.csv', dataKey: 'value' }];
 
   const config3 = baseConfig('sched-content', workflow3, ['08:00']);
-  config3.content = 'Hi team, here is today\'s report:';
+  // The canvas format: an ordered block list, not a single content string —
+  // matches what ReportComposer.tsx now writes (defaultReportBlocks() plus
+  // whatever the user added/edited).
+  config3.contentBlocks = [
+    { id: 'b1', type: 'paragraph', text: "Hi team, here is today's report:" },
+    { id: 'b2', type: 'results' },
+  ];
   config3.attachment = { format: 'csv' };
   const fixture3 = path.join(runDir, 'content-attachment.schedule.json');
   fs.writeFileSync(fixture3, JSON.stringify(config3, null, 2));
@@ -140,7 +146,10 @@ function baseConfig(id, workflow, times) {
   });
 
   assert.strictEqual(sent3.length, 1, 'expected exactly one email');
-  assert(sent3[0].text.startsWith("Hi team, here is today's report:"), 'email text should lead with the custom content message');
+  // The fixed name/date header now always leads (the canvas's blocks are the
+  // customizable body beneath it), so check for the paragraph block's text
+  // rather than a strict startsWith.
+  assert(sent3[0].text.includes("Hi team, here is today's report:"), 'email text should include the custom paragraph block\'s message');
   assert(Array.isArray(sent3[0].attachments) && sent3[0].attachments.length === 1, 'expected one attachment');
   assert.strictEqual(sent3[0].attachments[0].filename, 'value.csv');
   assert.strictEqual(attachmentExistedAtSendTime, true, 'the attached file should exist on disk at send time (before cleanup)');

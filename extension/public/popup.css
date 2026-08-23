@@ -1265,12 +1265,13 @@ html.report-window body {
   min-width: 0;
 }
 
+/* Single scrolling page: a sticky header (identity: name/to/subject), a
+   sticky footer (submit), and every other section stacked in between —
+   the user asked for one page to choose everything on, not tabs. */
 .report-composer {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 14px;
-  gap: 10px;
   overflow: hidden;
 }
 
@@ -1278,42 +1279,58 @@ html.report-window body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-bottom: 10px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
   flex-shrink: 0;
 }
 
-.report-tabs {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.report-tab {
-  padding: 8px 14px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: none;
-  color: var(--muted-foreground);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.report-tab.selected {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-}
-
-.report-tab-body {
+.report-body {
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px;
+}
+
+.report-section {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  padding: 4px 2px;
+}
+
+.report-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.report-section-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.report-section-preview {
+  border-color: var(--primary);
+  background: var(--surface);
 }
 
 .report-content-textarea {
@@ -1322,12 +1339,73 @@ html.report-window body {
   line-height: 1.5;
 }
 
-.report-preview-frame {
-  width: 100%;
-  flex: 1;
-  min-height: 260px;
+.report-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.report-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.report-block-type {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.report-block-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.report-block-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.report-block-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.report-block-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.report-block-add-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.report-preview-frame {
+  width: 100%;
+  min-height: 420px;
+  border: none;
   background: #fff;
 }
 
@@ -1358,21 +1436,50 @@ html.report-window body {
   color: var(--destructive);
 }
 
-.report-preview-headers {
+.report-preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.report-preview-status {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+/* The report itself, styled like an actual document — a raised "paper" card
+   rather than a plain form section, since this is the complete template the
+   recipient will see, not another set of inputs. */
+.report-template {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  background: #fff;
+}
+
+.report-template-headers {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
   background: var(--surface-raised);
   font-size: 12px;
 }
 
-.report-composer .schedule-form-actions {
-  flex-shrink: 0;
-  padding-top: 10px;
+.report-template-attachments {
+  padding: 10px 16px;
   border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.report-footer {
+  flex-shrink: 0;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
 }
 
 /* ---------- Settings ---------- */

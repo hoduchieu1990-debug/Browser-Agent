@@ -86,30 +86,28 @@ const PAGE = `<!doctype html>
     await reportPage.waitForTimeout(150);
     await reportPage.locator('.report-header .form-input').last().fill('Daily numbers');
 
-    // Schedule tab is active by default — pick a weekday, and add a SECOND
-    // time (a default one already exists) to prove "repeat" now means
+    // Everything lives on one page now (no tabs) — pick a weekday, and add a
+    // SECOND time (a default one already exists) to prove "repeat" now means
     // multiple independent times of day, not a repeat count.
     await reportPage.locator('.weekday-chip').first().click();
     await reportPage.locator('input[type="time"]').fill('17:30');
     await reportPage.locator('button', { hasText: '+ Add time' }).click();
     await reportPage.waitForTimeout(150);
 
-    // Content tab — type a custom intro message.
-    await reportPage.locator('.report-tab', { hasText: 'Content' }).click();
+    // Canvas section — type a custom intro message into the default
+    // paragraph block (defaultReportBlocks() starts every report with one).
     await reportPage.locator('.report-content-textarea').fill('Hi team, here is today\'s report:');
 
-    // Format tab — result keys + attach as CSV. Scoped to .report-tab-body:
+    // Format section — result keys + attach as CSV. Scoped to .report-body:
     // the header's recipient checkboxes reuse the same .result-key-item
     // class and would otherwise be matched first (DOM order).
-    await reportPage.locator('.report-tab', { hasText: 'Format' }).click();
-    const outputName = await reportPage.locator('.report-tab-body .result-key-item').first().textContent();
+    const outputName = await reportPage.locator('.report-body .result-key-item').first().textContent();
     console.log('[available result key]', outputName.trim());
     assert(outputName.trim().length > 0, 'expected the recorded extractText output name to be listed');
-    await reportPage.locator('.report-tab-body .result-key-item', { hasText: 'Attach results as a file' }).click();
+    await reportPage.locator('.report-body .result-key-item', { hasText: 'Attach results as a file' }).click();
 
-    // Review tab — full email info: From/To/Subject headers plus the body preview.
-    await reportPage.locator('.report-tab', { hasText: 'Review' }).click();
-    const headerText = await reportPage.locator('.report-preview-headers').innerText();
+    // Report preview section — full email info: From/To/Subject headers plus the body preview.
+    const headerText = await reportPage.locator('.report-template-headers').innerText();
     console.log('[preview headers]', headerText.replace(/\n/g, ' | '));
     assert(headerText.includes('ops@samsung.com'), 'preview headers should show the From account set in Settings');
     assert(headerText.includes('ops@example.com'), 'preview headers should show the selected To recipient');
@@ -119,7 +117,7 @@ const PAGE = `<!doctype html>
     const previewText = await previewFrame.locator('body').innerText();
     assert(previewText.includes("Hi team, here is today's report:"), 'preview body should show the typed content message');
     assert(previewText.includes(outputName.trim()), 'preview body should show the selected result key');
-    console.log('[ok] Review tab shows full email info (From/To/Subject headers + body) reflecting what was typed');
+    console.log('[ok] Report preview shows full email info (From/To/Subject headers + body) reflecting what was typed');
 
     const [download] = await Promise.all([
       context.waitForEvent('download'),
@@ -136,7 +134,7 @@ const PAGE = `<!doctype html>
     await download.saveAs(out);
 
     const config = JSON.parse(fs.readFileSync(out, 'utf-8'));
-    console.log('[schedule config]', JSON.stringify({ recurrence: config.recurrence, resultKeys: config.resultKeys, content: config.content, attachment: config.attachment, actionTypes: config.workflow.actions.map((a) => a.type) }));
+    console.log('[schedule config]', JSON.stringify({ recurrence: config.recurrence, resultKeys: config.resultKeys, contentBlocks: config.contentBlocks, attachment: config.attachment, actionTypes: config.workflow.actions.map((a) => a.type) }));
 
     assert.strictEqual(config.recurrence.type, 'weekly', 'expected the default weekly recurrence type');
     assert(Array.isArray(config.recurrence.weekdays) && config.recurrence.weekdays.length === 1, 'expected exactly one weekday selected');
@@ -147,7 +145,11 @@ const PAGE = `<!doctype html>
     assert.strictEqual(config.email.user, 'ops@samsung.com', 'expected the account set in Settings > Email');
     assert.strictEqual(config.email.to, 'ops@example.com');
     assert.strictEqual(config.email.subject, 'Daily numbers');
-    assert.strictEqual(config.content, "Hi team, here is today's report:");
+    assert(
+      config.contentBlocks.some((b) => b.type === 'paragraph' && b.text === "Hi team, here is today's report:"),
+      'expected the typed canvas paragraph block in contentBlocks',
+    );
+    assert(config.contentBlocks.some((b) => b.type === 'results'), 'expected the results block to still be present');
     assert.deepStrictEqual(config.attachment, { format: 'csv' });
     assert(config.workflow.exportFormats.length === 1 && config.workflow.exportFormats[0].type === 'csv', 'attaching should set the embedded workflow\'s exportFormats');
     console.log('[ok] downloaded .schedule.json has the expected recurrence times/resultKeys/subject/content/attachment/workflow/email');

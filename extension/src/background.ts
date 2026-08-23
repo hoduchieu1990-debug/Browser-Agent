@@ -27,6 +27,8 @@ import {
   saveReplayState,
   loadReplayState,
   clearReplayState,
+  saveReportPreviewState,
+  loadReportPreviewState,
   saveBatchDataset,
   loadBatchDataset,
   saveBatchState,
@@ -50,6 +52,10 @@ let settings: RecorderSettings = DEFAULT_SETTINGS;
 let emailSettings: EmailSettings = DEFAULT_EMAIL_SETTINGS;
 let replayState: ReplayState | null = null;
 let replaying = false;
+// Keyed by recording id: more than one Report compose window can be open at
+// once, each running a preview for a different job.
+const reportPreviewStates: Record<string, ReplayState> = {};
+const reportPreviewRunning = new Set<string>();
 let recordingHost: string | null = null;
 let batchDataset: BatchDataset | null = null;
 let batchState: BatchReplayState | null = null;
@@ -346,12 +352,30 @@ async function publishReplayState(state: ReplayState): Promise<void> {
   chrome.runtime.sendMessage({ type: 'REPLAY_UPDATED', state } satisfies RuntimeMessage).catch(() => {});
 }
 
+async function publishReportPreviewState(recordingId: string, state: ReplayState): Promise<void> {
+  reportPreviewStates[recordingId] = state;
+  await saveReportPreviewState(recordingId, state);
+  chrome.runtime
+    .sendMessage({ type: 'REPORT_PREVIEW_UPDATED', recordingId, state } satisfies RuntimeMessage)
+    .catch(() => {});
+}
+
 // Runs the workflow where the user never sees it. A minimized window rather
 // than an inactive tab, because captureVisibleTab only ever photographs the
 // active tab of a window — from an inactive tab it fails outright, while a
 // minimized window still renders and returns a real frame.
 async function openHiddenWindow(): Promise<chrome.windows.Window> {
   return chrome.windows.create({ url: 'about:blank', focused: false, state: 'minimized' });
+}
+
+// A Report compose window's real-preview run needs the target site to
+// actually finish loading its dynamic content (ad-heavy pages, lazy-loaded
+// sections) the way it does for a normal foreground replay — a minimized
+// window is enough for a one-off screenshot but not reliable for that, so
+// this stays unminimized and is pushed off-screen instead, purely so the
+// user never sees it pop up while their recording runs for real.
+async function openReportPreviewWindow(): Promise<chrome.windows.Window> {
+  return chrome.windows.create({ url: 'about:blank', focused: false, width: 1280, height: 900, left: -3000, top: 0 });
 }
 
 let popupWindowId: number | null = null;
@@ -421,8 +445,10 @@ async function openReportWindow(recordingId: string): Promise<void> {
   await chrome.windows.create({
     url: chrome.runtime.getURL(`popup.html?report=${encodeURIComponent(recordingId)}`),
     type: 'popup',
-    width: 720,
-    height: 680,
+    // Wide enough for the single-page layout (every section stacked, plus a
+    // full-width report preview) to read comfortably without feeling cramped.
+    width: 900,
+    height: 860,
   });
 }
 
@@ -456,11 +482,20 @@ async function captureForStep(
   throw lastError;
 }
 
-async function runReplay(inBackground: boolean): Promise<void> {
+// Parameterized over both the actions to run and where progress is published
+// so the main popup's replay and a Report compose window's own preview run
+// (runReportPreview below) share this one implementation without either
+// being able to overwrite the other's state.
+async function runReplay(
+  runActions: WorkflowAction[],
+  inBackground: boolean,
+  publish: (state: ReplayState) => Promise<void>,
+  openWindow: () => Promise<chrome.windows.Window> = openHiddenWindow,
+): Promise<void> {
   const startedAt = Date.now();
   const state: ReplayState = {
     running: true,
-    total: actions.length,
+    total: runActions.length,
     steps: [],
     variables: {},
     startedAt,
@@ -468,14 +503,14 @@ async function runReplay(inBackground: boolean): Promise<void> {
   };
 
   const finish = (error?: string) =>
-    publishReplayState({ ...state, running: false, error, updatedAt: Date.now() });
+    publish({ ...state, running: false, error, updatedAt: Date.now() });
 
-  if (inBackground && !actions.some((a) => a.type === 'navigate')) {
+  if (inBackground && !runActions.some((a) => a.type === 'navigate')) {
     await finish('This recording has no starting URL, so it cannot run in the background. Re-record it.');
     return;
   }
 
-  const hiddenWindow = inBackground ? await openHiddenWindow() : null;
+  const hiddenWindow = inBackground ? await openWindow() : null;
   const tab = hiddenWindow ? hiddenWindow.tabs?.[0] : await getActiveTab();
   if (!tab?.id) {
     await finish(inBackground ? 'Could not open a background window.' : 'No active tab found.');
@@ -488,10 +523,10 @@ async function runReplay(inBackground: boolean): Promise<void> {
     if (hiddenWindow?.id !== undefined) await chrome.windows.remove(hiddenWindow.id).catch(() => {});
   };
 
-  await publishReplayState(state);
+  await publish(state);
 
-  for (let i = 0; i < actions.length; i++) {
-    const action = actions[i];
+  for (let i = 0; i < runActions.length; i++) {
+    const action = runActions[i];
     const stepStart = Date.now();
 
     state.steps = [
@@ -499,7 +534,7 @@ async function runReplay(inBackground: boolean): Promise<void> {
       { index: i + 1, type: action.type, target: actionTarget(action), status: 'running' },
     ];
     state.updatedAt = Date.now();
-    await publishReplayState(state);
+    await publish(state);
 
     const settle = (patch: Partial<ReplayStepLog>) => {
       state.steps = state.steps.map((s) =>
@@ -536,7 +571,7 @@ async function runReplay(inBackground: boolean): Promise<void> {
         }
       }
 
-      await publishReplayState(state);
+      await publish(state);
       await delay(STEP_SETTLE_MS);
     } catch (error) {
       const message = (error as Error).message;
@@ -786,7 +821,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       notifyRecordingState();
       detachFromActiveTab();
       replaying = true;
-      runReplay(message.background).finally(() => {
+      runReplay(actions, message.background, publishReplayState).finally(() => {
         replaying = false;
       });
       return;
@@ -794,6 +829,40 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
     case 'GET_REPLAY_STATE':
       // storage, not memory: the worker may have been restarted since the replay
       loadReplayState().then((stored) => sendResponse(markStalled(stored ?? replayState)));
+      return true; // async sendResponse
+
+    // Always in its own off-screen window (openReportPreviewWindow): a
+    // Report compose window has no "active tab" of its own to run against,
+    // and must not disturb whatever the user is doing in their real tabs or
+    // interrupt an in-progress recording.
+    case 'REPLAY_REPORT_PREVIEW': {
+      const { recordingId } = message;
+      if (reportPreviewRunning.has(recordingId)) {
+        // A step that never responds (chrome.tabs.sendMessage has no timeout
+        // of its own) leaves runReplay's promise permanently pending, so its
+        // .finally() below never fires and this guard would otherwise stay
+        // set forever — the same staleness markStalled already detects for
+        // display purposes means it is safe to let a fresh attempt start.
+        const stalled = markStalled(reportPreviewStates[recordingId] ?? null);
+        if (stalled?.running !== false) return; // still genuinely in progress
+        reportPreviewRunning.delete(recordingId);
+      }
+      reportPreviewRunning.add(recordingId);
+      runReplay(
+        message.actions,
+        true,
+        (state) => publishReportPreviewState(recordingId, state),
+        openReportPreviewWindow,
+      ).finally(() => {
+        reportPreviewRunning.delete(recordingId);
+      });
+      return;
+    }
+
+    case 'GET_REPORT_PREVIEW_STATE':
+      loadReportPreviewState(message.recordingId).then((stored) =>
+        sendResponse(markStalled(stored ?? reportPreviewStates[message.recordingId] ?? null)),
+      );
       return true; // async sendResponse
 
     case 'SET_SETTINGS': {

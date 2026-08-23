@@ -15,6 +15,7 @@ const SETTINGS_KEY = 'browser-agent-settings';
 const EMAIL_SETTINGS_KEY = 'browser-agent-email-settings';
 const RECORDINGS_KEY = 'browser-agent-recordings';
 const REPLAY_STATE_KEY = 'browser-agent-replay-state';
+const REPORT_PREVIEW_STATES_KEY = 'browser-agent-report-preview-states';
 const BATCH_DATASET_KEY = 'browser-agent-batch-dataset';
 const BATCH_STATE_KEY = 'browser-agent-batch-state';
 const MAX_RECORDINGS = 50;
@@ -178,6 +179,24 @@ export async function loadReplayState(): Promise<ReplayState | null> {
 // longer exists and have to go, not linger until the next replay overwrites them.
 export async function clearReplayState(): Promise<void> {
   await chrome.storage.local.remove(REPLAY_STATE_KEY);
+}
+
+// A separate channel from REPLAY_STATE_KEY, keyed by recording id: a Report
+// compose window runs its own preview independently of whatever the main
+// popup is doing, and more than one Report window can be open for different
+// recordings at once — neither the main popup nor another Report window may
+// overwrite this one's progress/results.
+export async function saveReportPreviewState(recordingId: string, state: ReplayState): Promise<void> {
+  const result = await chrome.storage.local.get(REPORT_PREVIEW_STATES_KEY);
+  const all = (result[REPORT_PREVIEW_STATES_KEY] as Record<string, ReplayState> | undefined) ?? {};
+  all[recordingId] = state;
+  await chrome.storage.local.set({ [REPORT_PREVIEW_STATES_KEY]: all });
+}
+
+export async function loadReportPreviewState(recordingId: string): Promise<ReplayState | null> {
+  const result = await chrome.storage.local.get(REPORT_PREVIEW_STATES_KEY);
+  const all = (result[REPORT_PREVIEW_STATES_KEY] as Record<string, ReplayState> | undefined) ?? {};
+  return all[recordingId] ?? null;
 }
 
 export async function saveBatchDataset(dataset: BatchDataset | null): Promise<void> {

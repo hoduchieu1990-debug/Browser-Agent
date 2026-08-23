@@ -59,6 +59,7 @@ const CHECKS = [
   'schedule-cli-check.js',
   'schedule-list-check.js',
   'schedule-export-check.js',
+  'report-real-preview-check.js',
 ];
 
 (async () => {

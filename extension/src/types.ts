@@ -91,6 +91,13 @@ export type RuntimeMessage =
   | { type: 'REPLAY_STEP'; action: WorkflowAction & { resolvedValue?: string } }
   | { type: 'REPLAY_UPDATED'; state: ReplayState }
   | { type: 'GET_REPLAY_STATE' }
+  // A Report compose window's own preview run — always in a hidden window,
+  // independent of whatever the main popup is recording/replaying, and
+  // keyed by recording id so it neither collides with the main popup's own
+  // replay state nor with another Report window open for a different job.
+  | { type: 'REPLAY_REPORT_PREVIEW'; recordingId: string; actions: WorkflowAction[] }
+  | { type: 'REPORT_PREVIEW_UPDATED'; recordingId: string; state: ReplayState }
+  | { type: 'GET_REPORT_PREVIEW_STATE'; recordingId: string }
   | { type: 'GET_RECORDINGS' }
   | { type: 'LOAD_RECORDING'; id: string }
   | { type: 'DELETE_RECORDING'; id: string }
