@@ -66,9 +66,12 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
   const [name, setName] = useState(recording.name);
   const [recurrenceType, setRecurrenceType] = useState<'once' | 'weekly'>('weekly');
   const [date, setDate] = useState(todayIso());
-  const [time, setTime] = useState('09:00');
   const [weekdays, setWeekdays] = useState<Set<number>>(new Set());
-  const [repeatCount, setRepeatCount] = useState(1);
+  // Each entry is its own independent trigger during the day — "08:00,
+  // 12:00, 17:00" runs (and emails) three separate times, not one run
+  // repeated three times back to back.
+  const [times, setTimes] = useState<string[]>(['09:00']);
+  const [newTime, setNewTime] = useState('09:00');
 
   const [content, setContent] = useState('');
 
@@ -84,13 +87,31 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
     setNewRecipient('');
   };
 
+  const addTime = () => {
+    if (!newTime || times.includes(newTime)) return;
+    setTimes([...times, newTime].sort());
+  };
+
+  const removeTime = (time: string) => {
+    setTimes(times.filter((t) => t !== time));
+  };
+
   const hasEmailAccount = emailSettings.user.trim() !== '';
-  const recurrenceValid = recurrenceType === 'once' ? !!date : weekdays.size > 0;
-  const canSubmit = name.trim() !== '' && recurrenceValid && repeatCount >= 1 && hasEmailAccount && selectedRecipients.size > 0;
+  const hasRecurrenceDay = recurrenceType === 'once' ? !!date : weekdays.size > 0;
+  const hasTimes = times.length > 0;
+
+  const missing: string[] = [];
+  if (name.trim() === '') missing.push('a report name');
+  if (!hasRecurrenceDay) missing.push(recurrenceType === 'once' ? 'a date' : 'at least one day');
+  if (!hasTimes) missing.push('at least one time');
+  if (!hasEmailAccount) missing.push('an email account (set up in Settings)');
+  if (selectedRecipients.size === 0) missing.push('at least one recipient');
+
+  const canSubmit = missing.length === 0;
 
   function buildConfig(): ScheduleConfig {
     const recurrence: ScheduleRecurrence =
-      recurrenceType === 'once' ? { type: 'once', date, time } : { type: 'weekly', weekdays: [...weekdays], time };
+      recurrenceType === 'once' ? { type: 'once', date, times } : { type: 'weekly', weekdays: [...weekdays], times };
 
     const attachment: ScheduleAttachment | undefined = attachEnabled ? { format: attachFormat } : undefined;
     const ext = attachFormat === 'excel' ? 'xlsx' : 'csv';
@@ -110,9 +131,7 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
       name,
       workflow,
       recurrence,
-      repeatCount,
       resultKeys: [...resultKeys],
-      stopOnError: true,
       content: content || undefined,
       attachment,
       email: {
@@ -151,13 +170,8 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
 
   const previewConfig = buildConfig();
   const placeholderBatch: ReportBatchResult = {
-    rows: Array.from({ length: Math.max(1, repeatCount) }, (_, i) => ({ index: i + 1, success: true })),
-    data: Object.fromEntries(
-      [...resultKeys].map((key) => [
-        key,
-        Array.from({ length: Math.max(1, repeatCount) }, () => ({ [key]: '(sample value)' })),
-      ]),
-    ),
+    rows: [{ index: 1, success: true }],
+    data: Object.fromEntries([...resultKeys].map((key) => [key, [{ [key]: '(sample value)' }]])),
     files: {},
   };
   const preview = buildReportEmail(previewConfig, placeholderBatch);
@@ -279,19 +293,30 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
             )}
 
             <div className="form-group">
-              <label className="form-label">Time</label>
-              <input className="form-input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Repeat count (runs each time it fires)</label>
-              <input
-                className="form-input"
-                type="number"
-                min={1}
-                value={repeatCount}
-                onChange={(e) => setRepeatCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
-              />
+              <label className="form-label">Times of day (each one runs and emails independently)</label>
+              {times.length > 0 && (
+                <div className="weekday-picker">
+                  {times.map((t) => (
+                    <span key={t} className="report-attachment-chip">
+                      {t}
+                      <button className="time-remove-btn" onClick={() => removeTime(t)}>
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="recipient-add-row">
+                <input
+                  className="form-input"
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                />
+                <button className="saved-load" onClick={addTime}>
+                  + Add time
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -359,6 +384,11 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
         {tab === 'review' && (
           <>
             <p className="form-hint">Sample data — actual runs will fill in real values.</p>
+            <div className="report-preview-headers">
+              <div><strong>From:</strong> {preview.from || '(SMTP account, set in Settings)'}</div>
+              <div><strong>To:</strong> {preview.to || '(no recipient selected)'}</div>
+              <div><strong>Subject:</strong> {preview.subject}</div>
+            </div>
             <iframe className="report-preview-frame" srcDoc={preview.html} sandbox="" title="Email preview" />
             {preview.attachments && preview.attachments.length > 0 && (
               <div className="result-key-list">
@@ -373,6 +403,9 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
         )}
       </div>
 
+      {!canSubmit && (
+        <p className="form-hint schedule-warning">Still needed: {missing.join(', ')}.</p>
+      )}
       <div className="schedule-form-actions">
         <button className="action-delete schedule-cancel-btn" onClick={() => window.close()}>
           Cancel

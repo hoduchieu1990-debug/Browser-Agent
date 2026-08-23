@@ -21,7 +21,10 @@ export function createSmtpMailer(email: ScheduleEmailConfig): Mailer {
   return {
     async send(message: MailMessage): Promise<void> {
       await transport.sendMail({
-        from: message.from ?? email.from ?? email.user,
+        // buildReportEmail (shared/report-email.ts) already resolves From to
+        // email.from || email.user — resolved once there so the Review tab's
+        // preview and the real send never disagree.
+        from: message.from,
         to: message.to,
         subject: message.subject,
         text: message.text,

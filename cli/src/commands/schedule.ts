@@ -16,9 +16,10 @@ function defaultScheduleDir(): string {
 }
 
 function describeRecurrence(recurrence: ScheduleRecurrence): string {
-  if (recurrence.type === 'once') return `once on ${recurrence.date} at ${recurrence.time}`;
+  const times = recurrence.times.join(', ');
+  if (recurrence.type === 'once') return `once on ${recurrence.date} at ${times}`;
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return `weekly on ${recurrence.weekdays.map((d) => days[d]).join(',')} at ${recurrence.time}`;
+  return `weekly on ${recurrence.weekdays.map((d) => days[d]).join(',')} at ${times}`;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -59,7 +60,7 @@ const listSubcommand = new Command('list')
     for (const file of files) {
       const config = readSchedule(file);
       console.log(chalk.bold(config.name), `(${config.id})`);
-      console.log(`  recurrence: ${describeRecurrence(config.recurrence)}, repeat: ${config.repeatCount}x`);
+      console.log(`  recurrence: ${describeRecurrence(config.recurrence)}`);
       console.log(`  last run: ${config.state.lastRunAt ?? 'never'} — ${config.state.lastStatus ?? '-'}`);
       if (config.state.lastError) console.log(chalk.red(`  last error: ${config.state.lastError}`));
       console.log(`  times triggered: ${config.state.timesTriggered}`);

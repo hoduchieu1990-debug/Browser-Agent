@@ -11,10 +11,8 @@ function fixtureConfig(id, name, lastStatus) {
     id,
     name,
     workflow: { version: '1.0.0', name, actions: [], exportFormats: [] },
-    recurrence: { type: 'weekly', weekdays: [1, 3], time: '09:00' },
-    repeatCount: 1,
+    recurrence: { type: 'weekly', weekdays: [1, 3], times: ['09:00'] },
     resultKeys: ['total'],
-    stopOnError: true,
     email: { host: '127.0.0.1', port: 2525, secure: false, to: 'ops@example.com' },
     state: { timesTriggered: 3, lastRunAt: '2026-08-17T09:00:00.000Z', lastStatus },
   };

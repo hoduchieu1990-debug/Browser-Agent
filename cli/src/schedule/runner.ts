@@ -51,18 +51,17 @@ export async function tick(scheduleFilePath: string, options: TickOptions = {}):
         throw new Error(`Workflow validation failed: ${validation.errors.map((e) => e.message).join('; ')}`);
       }
 
-      const batch = await runBatch(
-        player,
-        config.workflow,
-        Array.from({ length: config.repeatCount }, () => ({})),
-        { outputDir, stopOnError: config.stopOnError },
-      );
+      // Each configured time is its own independent trigger now — exactly
+      // one run per tick, not a batch of repeats. Still routed through
+      // runBatch (with a single row) rather than player.run() directly, to
+      // reuse its exportFormats -> attachment-file wiring unchanged.
+      const batch = await runBatch(player, config.workflow, [{}], { outputDir, stopOnError: true });
 
       const mailer = (options.mailerFactory ?? createSmtpMailer)(config.email);
       await mailer.send(buildReportEmail(config, batch));
 
-      config.state.lastStatus = batch.failed === 0 ? 'success' : batch.succeeded === 0 ? 'failed' : 'partial';
-      config.state.lastError = batch.failed > 0 ? batch.rows.find((r) => !r.success)?.error : undefined;
+      config.state.lastStatus = batch.failed === 0 ? 'success' : 'failed';
+      config.state.lastError = batch.rows[0]?.error;
     } catch (error) {
       config.state.lastStatus = 'failed';
       config.state.lastError = (error as Error).message;

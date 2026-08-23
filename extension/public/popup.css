@@ -1344,6 +1344,31 @@ html.report-window body {
   width: fit-content;
 }
 
+.time-remove-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.time-remove-btn:hover {
+  color: var(--destructive);
+}
+
+.report-preview-headers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  font-size: 12px;
+}
+
 .report-composer .schedule-form-actions {
   flex-shrink: 0;
   padding-top: 10px;

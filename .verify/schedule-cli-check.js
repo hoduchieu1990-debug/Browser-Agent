@@ -4,18 +4,11 @@ const path = require('path');
 const http = require('http');
 const { tick } = require('../cli/dist/schedule/runner.js');
 
-function pad(n) {
-  return String(n).padStart(2, '0');
-}
-
-// "A minute ago" in local time, formatted the way ScheduleRecurrence expects
-// (YYYY-MM-DD / HH:mm) — makes the schedule already due the instant it's read.
-function aMinuteAgo() {
-  const d = new Date(Date.now() - 60_000);
-  return {
-    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
-  };
+// Wednesday, 2026-08-19 — a fixed date/times so every case is deterministic
+// regardless of when this actually runs (matches schedule-due-check.js's convention).
+const TEST_DATE = '2026-08-19';
+function at(hh, mm) {
+  return new Date(2026, 7, 19, hh, mm, 0);
 }
 
 function makeWorkflow(port) {
@@ -30,16 +23,13 @@ function makeWorkflow(port) {
   };
 }
 
-function baseConfig(id, workflow, repeatCount) {
-  const { date, time } = aMinuteAgo();
+function baseConfig(id, workflow, times) {
   return {
     id,
     name: `Test schedule ${id}`,
     workflow,
-    recurrence: { type: 'once', date, time },
-    repeatCount,
+    recurrence: { type: 'once', date: TEST_DATE, times },
     resultKeys: ['value'],
-    stopOnError: true,
     email: { host: '127.0.0.1', port: 2525, secure: false, to: 'ops@example.com' },
     state: { timesTriggered: 0 },
   };
@@ -49,9 +39,10 @@ function baseConfig(id, workflow, repeatCount) {
   const runDir = path.join(__dirname, 'schedule-cli-run');
   fs.mkdirSync(runDir, { recursive: true });
 
-  // --- Fixture 1: every request succeeds, repeatCount = 2 ---
+  // --- Fixture 1: two independent times the same day -> two separate emails ---
   let requestCount1 = 0;
   const server1 = http.createServer((req, res) => {
+    if (req.url !== '/') { res.writeHead(404); res.end(); return; }
     requestCount1++;
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(`<!doctype html><html><body><span id="result">value-${requestCount1}</span></body></html>`);
@@ -59,68 +50,59 @@ function baseConfig(id, workflow, repeatCount) {
   await new Promise((r) => server1.listen(0, '127.0.0.1', r));
   const port1 = server1.address().port;
 
-  const fixture1 = path.join(runDir, 'success.schedule.json');
-  fs.writeFileSync(fixture1, JSON.stringify(baseConfig('sched-success', makeWorkflow(port1), 2), null, 2));
+  const fixture1 = path.join(runDir, 'two-times.schedule.json');
+  fs.writeFileSync(fixture1, JSON.stringify(baseConfig('sched-two-times', makeWorkflow(port1), ['08:00', '09:00']), null, 2));
 
   const sent1 = [];
-  await tick(fixture1, { mailerFactory: () => ({ send: async (msg) => sent1.push(msg) }) });
+  const mailerFactory1 = () => ({ send: async (msg) => sent1.push(msg) });
 
-  assert.strictEqual(sent1.length, 1, 'expected exactly one email to be sent');
-  assert(sent1[0].text.includes('value-1') && sent1[0].text.includes('value-2'), 'email should contain both repeat runs\' values');
-  console.log('[ok] one email sent, containing both repeat runs\' extracted values');
+  await tick(fixture1, { now: at(8, 30), mailerFactory: mailerFactory1 });
+  assert.strictEqual(sent1.length, 1, 'the 08:00 trigger should have sent exactly one email');
+  assert(sent1[0].text.includes('value: value-1'), 'first email should contain the first run\'s value');
+  console.log('[ok] the first of two daily times fires and emails on its own');
 
-  const stateAfterFirst = JSON.parse(fs.readFileSync(fixture1, 'utf-8')).state;
-  assert.strictEqual(stateAfterFirst.timesTriggered, 1);
-  assert.strictEqual(stateAfterFirst.lastStatus, 'success');
-  console.log('[ok] schedule state persisted: timesTriggered=1, lastStatus=success');
+  // Still within the 08:00 slot (09:00 hasn't passed yet) — must not re-fire.
+  await tick(fixture1, { now: at(8, 45), mailerFactory: mailerFactory1 });
+  assert.strictEqual(sent1.length, 1, 'no second email before the next configured time arrives');
 
-  // Firing again immediately must NOT send a second email for the same slot.
-  await tick(fixture1, { mailerFactory: () => ({ send: async (msg) => sent1.push(msg) }) });
-  assert.strictEqual(sent1.length, 1, 'ticking again for the same slot must not send a second email');
-  console.log('[ok] re-ticking the same due slot does not double-fire');
+  await tick(fixture1, { now: at(9, 15), mailerFactory: mailerFactory1 });
+  assert.strictEqual(sent1.length, 2, 'the 09:00 trigger should send its own, separate email');
+  assert(sent1[1].text.includes('value: value-2'), 'second email should contain the second run\'s value, from an independent run');
+  console.log('[ok] a later time-of-day the same day fires its own independent run and email');
+
+  const stateAfterBoth = JSON.parse(fs.readFileSync(fixture1, 'utf-8')).state;
+  assert.strictEqual(stateAfterBoth.timesTriggered, 2);
+  assert.strictEqual(stateAfterBoth.lastStatus, 'success');
+  console.log('[ok] schedule state reflects both triggers');
 
   server1.close();
 
-  // --- Fixture 2: second run fails (element missing on 2nd request), repeatCount = 3 ---
-  let requestCount2 = 0;
+  // --- Fixture 2: the run itself fails (element never appears) ---
   const server2 = http.createServer((req, res) => {
-    // A real navigation can trigger extra requests (favicon.ico, etc.) — only
-    // the document request itself should advance the "which run is this" counter.
-    if (req.url !== '/') {
-      res.writeHead(404);
-      res.end();
-      return;
-    }
-    requestCount2++;
+    if (req.url !== '/') { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    if (requestCount2 === 2) {
-      res.end('<!doctype html><html><body><span id="other">no result here</span></body></html>');
-    } else {
-      res.end(`<!doctype html><html><body><span id="result">value-${requestCount2}</span></body></html>`);
-    }
+    res.end('<!doctype html><html><body><span id="other">no result here</span></body></html>');
   });
   await new Promise((r) => server2.listen(0, '127.0.0.1', r));
   const port2 = server2.address().port;
 
-  const fixture2 = path.join(runDir, 'partial-fail.schedule.json');
-  fs.writeFileSync(fixture2, JSON.stringify(baseConfig('sched-partial', makeWorkflow(port2), 3), null, 2));
+  const fixture2 = path.join(runDir, 'failure.schedule.json');
+  fs.writeFileSync(fixture2, JSON.stringify(baseConfig('sched-fail', makeWorkflow(port2), ['08:00']), null, 2));
 
   const sent2 = [];
-  await tick(fixture2, { mailerFactory: () => ({ send: async (msg) => sent2.push(msg) }) });
+  await tick(fixture2, { now: at(8, 0), mailerFactory: () => ({ send: async (msg) => sent2.push(msg) }) });
 
-  assert.strictEqual(sent2.length, 1, 'expected exactly one email even when a repeat run fails');
-  assert(sent2[0].text.includes('value-1'), 'email should include the first (successful) run');
-  assert(sent2[0].text.includes('Stopped early'), 'email should note the run stopped early after a failure');
-  assert(!sent2[0].text.includes('value-3'), 'the 3rd repeat must never have run (stopOnError=true stops immediately)');
-  console.log('[ok] a failing repeat run stops the remaining repeats and is reflected in the email');
+  assert.strictEqual(sent2.length, 1, 'a failing run should still send exactly one email, reporting the failure');
+  assert(sent2[0].text.includes('FAILED'), 'email should say the run failed');
+  console.log('[ok] a failing run is reported by email instead of silently dropped');
 
-  const stateAfterPartial = JSON.parse(fs.readFileSync(fixture2, 'utf-8')).state;
-  assert.strictEqual(stateAfterPartial.lastStatus, 'partial');
-  console.log('[ok] schedule state records lastStatus=partial');
+  const stateAfterFail = JSON.parse(fs.readFileSync(fixture2, 'utf-8')).state;
+  assert.strictEqual(stateAfterFail.lastStatus, 'failed');
+  console.log('[ok] schedule state records lastStatus=failed');
 
   server2.close();
 
-  // --- Fixture 3: content message + CSV attachment, repeatCount = 1 ---
+  // --- Fixture 3: content message + CSV attachment ---
   const server3 = http.createServer((req, res) => {
     if (req.url !== '/') { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -135,7 +117,7 @@ function baseConfig(id, workflow, repeatCount) {
   // the CLI daemon, not the UI.
   workflow3.exportFormats = [{ type: 'csv', output: 'value.csv', dataKey: 'value' }];
 
-  const config3 = baseConfig('sched-content', workflow3, 1);
+  const config3 = baseConfig('sched-content', workflow3, ['08:00']);
   config3.content = 'Hi team, here is today\'s report:';
   config3.attachment = { format: 'csv' };
   const fixture3 = path.join(runDir, 'content-attachment.schedule.json');
@@ -144,6 +126,7 @@ function baseConfig(id, workflow, repeatCount) {
   const sent3 = [];
   let attachmentExistedAtSendTime = null;
   await tick(fixture3, {
+    now: at(8, 0),
     mailerFactory: () => ({
       send: async (msg) => {
         // Real nodemailer reads attachment files during this same call —

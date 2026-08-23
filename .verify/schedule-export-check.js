@@ -82,11 +82,17 @@ const PAGE = `<!doctype html>
 
     // "To" (recipient add) is in the always-visible header.
     await reportPage.locator('.form-input[placeholder="Add a new recipient…"]').fill('ops@example.com');
-    await reportPage.locator('.recipient-add-row button', { hasText: 'Add' }).click();
+    await reportPage.locator('.report-header .recipient-add-row button', { hasText: 'Add' }).click();
     await reportPage.waitForTimeout(150);
+    await reportPage.locator('.report-header .form-input').last().fill('Daily numbers');
 
-    // Schedule tab is active by default — pick a weekday there.
+    // Schedule tab is active by default — pick a weekday, and add a SECOND
+    // time (a default one already exists) to prove "repeat" now means
+    // multiple independent times of day, not a repeat count.
     await reportPage.locator('.weekday-chip').first().click();
+    await reportPage.locator('input[type="time"]').fill('17:30');
+    await reportPage.locator('button', { hasText: '+ Add time' }).click();
+    await reportPage.waitForTimeout(150);
 
     // Content tab — type a custom intro message.
     await reportPage.locator('.report-tab', { hasText: 'Content' }).click();
@@ -101,13 +107,19 @@ const PAGE = `<!doctype html>
     assert(outputName.trim().length > 0, 'expected the recorded extractText output name to be listed');
     await reportPage.locator('.report-tab-body .result-key-item', { hasText: 'Attach results as a file' }).click();
 
-    // Review tab — the preview should reflect what was just typed.
+    // Review tab — full email info: From/To/Subject headers plus the body preview.
     await reportPage.locator('.report-tab', { hasText: 'Review' }).click();
+    const headerText = await reportPage.locator('.report-preview-headers').innerText();
+    console.log('[preview headers]', headerText.replace(/\n/g, ' | '));
+    assert(headerText.includes('ops@samsung.com'), 'preview headers should show the From account set in Settings');
+    assert(headerText.includes('ops@example.com'), 'preview headers should show the selected To recipient');
+    assert(headerText.includes('Daily numbers') || headerText.includes('[Browser Agent]'), 'preview headers should show a subject');
+
     const previewFrame = reportPage.frameLocator('.report-preview-frame');
     const previewText = await previewFrame.locator('body').innerText();
-    assert(previewText.includes("Hi team, here is today's report:"), 'preview should show the typed content message');
-    assert(previewText.includes(outputName.trim()), 'preview table should show the selected result key as a column header');
-    console.log('[ok] Review tab preview reflects the typed content and selected result key');
+    assert(previewText.includes("Hi team, here is today's report:"), 'preview body should show the typed content message');
+    assert(previewText.includes(outputName.trim()), 'preview body should show the selected result key');
+    console.log('[ok] Review tab shows full email info (From/To/Subject headers + body) reflecting what was typed');
 
     const [download] = await Promise.all([
       context.waitForEvent('download'),
@@ -124,20 +136,21 @@ const PAGE = `<!doctype html>
     await download.saveAs(out);
 
     const config = JSON.parse(fs.readFileSync(out, 'utf-8'));
-    console.log('[schedule config]', JSON.stringify({ recurrence: config.recurrence, repeatCount: config.repeatCount, resultKeys: config.resultKeys, content: config.content, attachment: config.attachment, actionTypes: config.workflow.actions.map((a) => a.type) }));
+    console.log('[schedule config]', JSON.stringify({ recurrence: config.recurrence, resultKeys: config.resultKeys, content: config.content, attachment: config.attachment, actionTypes: config.workflow.actions.map((a) => a.type) }));
 
     assert.strictEqual(config.recurrence.type, 'weekly', 'expected the default weekly recurrence type');
     assert(Array.isArray(config.recurrence.weekdays) && config.recurrence.weekdays.length === 1, 'expected exactly one weekday selected');
-    assert.strictEqual(config.repeatCount, 1);
+    assert.deepStrictEqual([...config.recurrence.times].sort(), ['09:00', '17:30'], 'expected both configured times of day — the default plus the one just added');
     assert(config.resultKeys.includes(outputName.trim()), 'expected the recorded output name in resultKeys');
     assert(config.workflow.actions.some((a) => a.type === 'extractText'), 'expected the extractText action in the embedded workflow');
     assert.strictEqual(config.email.host, 'smtp.samsung.net', 'expected the default relay, unset in the UI');
     assert.strictEqual(config.email.user, 'ops@samsung.com', 'expected the account set in Settings > Email');
     assert.strictEqual(config.email.to, 'ops@example.com');
+    assert.strictEqual(config.email.subject, 'Daily numbers');
     assert.strictEqual(config.content, "Hi team, here is today's report:");
     assert.deepStrictEqual(config.attachment, { format: 'csv' });
     assert(config.workflow.exportFormats.length === 1 && config.workflow.exportFormats[0].type === 'csv', 'attaching should set the embedded workflow\'s exportFormats');
-    console.log('[ok] downloaded .schedule.json has the expected recurrence/repeatCount/resultKeys/content/attachment/workflow/email');
+    console.log('[ok] downloaded .schedule.json has the expected recurrence times/resultKeys/subject/content/attachment/workflow/email');
 
     fs.unlinkSync(out);
   } finally {

@@ -48,59 +48,44 @@ function escapeHtml(value: string): string {
 // one function means the preview is exactly what actually gets sent, given
 // the same inputs.
 //
-// batch.data[key] only ever gets an entry pushed for a SUCCESSFUL run (see
-// accumulate() in player/src/batch.ts), in row order — walking batch.rows
-// while only advancing a separate success counter is what keeps a value
-// lined up with the run that actually produced it once some runs fail.
+// Each configured time-of-day is its own independent trigger, so `batch`
+// always has exactly one row (see runner.ts's tick()) — this is "did this
+// one run succeed" rendering, not a table of repeats.
 export function buildReportEmail(config: ScheduleConfig, batch: ReportBatchResult): MailMessage {
   const dateLabel = new Date().toLocaleString();
   const subject = config.email.subject || `[Browser Agent] ${config.name} — ${dateLabel}`;
 
-  let successIndex = 0;
-  const rowsText: string[] = [];
-  const rowsHtml: string[] = [];
+  const row = batch.rows[0];
+  let bodyText: string;
+  let bodyHtml: string;
 
-  for (const row of batch.rows) {
-    if (row.success) {
-      const values = config.resultKeys.map((key) => {
-        const entry = batch.data[key]?.[successIndex] as Record<string, unknown> | undefined;
-        return formatValue(entry?.[key]);
-      });
-      successIndex++;
-
-      rowsText.push(`Run ${row.index}: ${config.resultKeys.map((key, i) => `${key}=${values[i]}`).join(', ')}`);
-      rowsHtml.push(`<tr><td>${row.index}</td>${values.map((v) => `<td>${escapeHtml(v)}</td>`).join('')}</tr>`);
-    } else {
-      const error = row.error ?? 'unknown error';
-      rowsText.push(`Run ${row.index}: FAILED — ${error}`);
-      rowsHtml.push(
-        `<tr><td>${row.index}</td><td colspan="${config.resultKeys.length}" style="color:#b00020">FAILED — ${escapeHtml(error)}</td></tr>`,
-      );
-    }
+  if (row?.success) {
+    const values = config.resultKeys.map((key) => {
+      const entry = batch.data[key]?.[0] as Record<string, unknown> | undefined;
+      return [key, formatValue(entry?.[key])] as const;
+    });
+    bodyText = values.map(([key, value]) => `${key}: ${value}`).join('\n');
+    bodyHtml = `
+      <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
+        <tbody>${values.map(([key, value]) => `<tr><th align="left">${escapeHtml(key)}</th><td>${escapeHtml(value)}</td></tr>`).join('')}</tbody>
+      </table>
+    `.trim();
+  } else {
+    const error = row?.error ?? 'unknown error';
+    bodyText = `FAILED — ${error}`;
+    bodyHtml = `<p style="color:#b00020">FAILED — ${escapeHtml(error)}</p>`;
   }
-
-  const stoppedEarly = batch.rows.length < config.repeatCount;
-  const noteText = stoppedEarly
-    ? `\n\n(Stopped early after a failed run — ${batch.rows.length}/${config.repeatCount} repeats ran.)`
-    : '';
-  const noteHtml = stoppedEarly
-    ? `<p style="color:#b00020">Stopped early after a failed run — ${batch.rows.length}/${config.repeatCount} repeats ran.</p>`
-    : '';
 
   const introText = config.content ? `${config.content}\n\n` : '';
   const introHtml = config.content
     ? `<p>${escapeHtml(config.content).replace(/\n/g, '<br>')}</p>`
     : '';
 
-  const text = `${introText}Browser Agent scheduled report: ${config.name}\n\n${rowsText.join('\n')}${noteText}`;
+  const text = `${introText}${config.name} — ${dateLabel}\n\n${bodyText}`;
   const html = `
     ${introHtml}
     <h2>${escapeHtml(config.name)}</h2>
-    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">
-      <thead><tr><th>Run</th>${config.resultKeys.map((key) => `<th>${escapeHtml(key)}</th>`).join('')}</tr></thead>
-      <tbody>${rowsHtml.join('')}</tbody>
-    </table>
-    ${noteHtml}
+    ${bodyHtml}
   `.trim();
 
   const attachments = config.attachment
@@ -109,5 +94,12 @@ export function buildReportEmail(config: ScheduleConfig, batch: ReportBatchResul
         .map((key) => ({ filename: basename(batch.files[key]), path: batch.files[key] }))
     : undefined;
 
-  return { to: config.email.to, from: config.email.from, subject, text, html, attachments };
+  // Resolved here, once, rather than left for the mailer to fall back on —
+  // otherwise the Review tab's preview (which never touches the mailer)
+  // would show a blank From whenever only the account, not a separate From
+  // address, was set in Settings, while the real send used the account
+  // anyway. One resolved value keeps both paths honest.
+  const from = config.email.from || config.email.user;
+
+  return { to: config.email.to, from, subject, text, html, attachments };
 }
