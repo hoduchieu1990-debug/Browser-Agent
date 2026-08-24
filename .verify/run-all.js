@@ -60,6 +60,17 @@ const CHECKS = [
   'schedule-list-check.js',
   'schedule-export-check.js',
   'report-real-preview-check.js',
+  'badge-coverage-check.js',
+  'badge-track-check.js',
+  'search-enter-record-check.js',
+  'slow-result-timeout-check.js',
+  'tiered-timeout-check.js',
+  'input-button-record-check.js',
+  'search-button-no-blur-record-check.js',
+  'stale-value-refresh-check.js',
+  'control-types-check.js',
+  'ctrl-rightclick-check.js',
+  'frame-no-transition-check.js',
 ];
 
 (async () => {

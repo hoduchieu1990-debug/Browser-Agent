@@ -65,9 +65,25 @@ export function resolveOne(doc: Document, selector: string): Element | null {
   return doc.querySelector(selector);
 }
 
+const BARE_TAG = /^[a-z][a-z0-9-]*$/i;
+
 function matchesOnly(selector: string, el: Element): boolean {
   try {
     if (NTH_MATCH.test(selector)) return resolveOne(el.ownerDocument, selector) === el;
+
+    // The bare tag name is the last, cheapest-looking candidate every element
+    // falls through to once nothing more specific matched — cheap to write,
+    // but on a real page with thousands of <div>/<span>/<a>, querySelectorAll
+    // has to build that whole match list just to report its length, and this
+    // runs on every hover during a fast mouse sweep. getElementsByTagName is
+    // a live index the browser already maintains; its .length answers the
+    // same "is there more than one" question without the scan, for the
+    // overwhelmingly common case where the tag is not unique.
+    if (BARE_TAG.test(selector)) {
+      const byTag = el.ownerDocument.getElementsByTagName(selector);
+      return byTag.length === 1 && byTag[0] === el;
+    }
+
     const found = el.ownerDocument.querySelectorAll(selector);
     return found.length === 1 && found[0] === el;
   } catch {

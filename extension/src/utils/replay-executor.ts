@@ -3,9 +3,15 @@ import { readTableRecords } from '@browser-agent/shared/dist/table-reader';
 import { resolveOne } from './selector-utils';
 import { isNexacroSelector, nexacroComponentId, runNexacroAction } from './nexacro';
 
-// Client-rendered pages finish well after load, and a background window is
-// timer-throttled on top of that.
-const ELEMENT_TIMEOUT_MS = 12000;
+// Two tiers, not one timeout for every step: click/input/select act on a
+// control that should already be on the page, so a wrong selector fails fast
+// here. extractText/Table/Json, batchExtract, and screenshot read something
+// that may still be loading or may only exist after a search — those get the
+// longer allowance. Matches the 30s already used elsewhere for the same
+// "page might genuinely take a while" reason (background.ts's
+// NAVIGATION_TIMEOUT_MS, the Search node's own default wait).
+const INTERACT_TIMEOUT_MS = 10000;
+const WAIT_TIMEOUT_MS = 30000;
 const POLL_INTERVAL_MS = 100;
 
 export interface StepOutput {
@@ -50,7 +56,7 @@ function query(selector: string): HTMLElement | null {
 function waitForElement(
   selector: string,
   fallbacks: string[] = [],
-  timeout = ELEMENT_TIMEOUT_MS,
+  timeout = INTERACT_TIMEOUT_MS,
 ): Promise<HTMLElement> {
   const all = [selector, ...fallbacks];
 
@@ -77,8 +83,11 @@ function waitForElement(
   });
 }
 
-function locateFor(action: { selector: string; selectorFallbacks?: string[] }): Promise<HTMLElement> {
-  return waitForElement(action.selector, action.selectorFallbacks ?? []);
+function locateFor(
+  action: { selector: string; selectorFallbacks?: string[] },
+  timeout = INTERACT_TIMEOUT_MS,
+): Promise<HTMLElement> {
+  return waitForElement(action.selector, action.selectorFallbacks ?? [], timeout);
 }
 
 async function runNexacroOrThrow(
@@ -138,22 +147,22 @@ export async function executeStep(action: WorkflowAction & { resolvedValue?: str
       return {};
 
     case 'waitForSelector':
-      await waitForElement(action.selector, action.selectorFallbacks ?? [], action.timeout ?? ELEMENT_TIMEOUT_MS);
+      await waitForElement(action.selector, action.selectorFallbacks ?? [], action.timeout ?? WAIT_TIMEOUT_MS);
       return {};
 
     case 'extractText': {
-      const el = await locateFor(action);
+      const el = await locateFor(action, WAIT_TIMEOUT_MS);
       return { output: { key: action.output, value: el.textContent?.trim() ?? '' } };
     }
 
     case 'extractTable': {
-      const el = await locateFor(action);
+      const el = await locateFor(action, WAIT_TIMEOUT_MS);
       return { output: { key: action.output, value: readTableRecords(el, action.headers) } };
     }
 
     case 'extractJson': {
       const el = action.selector
-        ? await locateFor({ selector: action.selector, selectorFallbacks: action.selectorFallbacks })
+        ? await locateFor({ selector: action.selector, selectorFallbacks: action.selectorFallbacks }, WAIT_TIMEOUT_MS)
         : document.body;
       return { output: { key: action.output, value: JSON.parse(el.textContent ?? 'null') } };
     }
@@ -208,7 +217,7 @@ export async function executeStep(action: WorkflowAction & { resolvedValue?: str
     }
 
     case 'batchExtract': {
-      const el = await locateFor(action);
+      const el = await locateFor(action, WAIT_TIMEOUT_MS);
       const value =
         action.extractType === 'attribute'
           ? (el.getAttribute(action.attribute ?? '') ?? '')
@@ -223,7 +232,10 @@ export async function executeStep(action: WorkflowAction & { resolvedValue?: str
         return { skipped: 'full-page screenshots are only saved when running through the CLI' };
       }
 
-      const el = await locateFor({ selector: action.selector, selectorFallbacks: action.selectorFallbacks });
+      const el = await locateFor(
+        { selector: action.selector, selectorFallbacks: action.selectorFallbacks },
+        WAIT_TIMEOUT_MS,
+      );
       el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
       await new Promise((resolve) => setTimeout(resolve, 150)); // let the scroll settle before the capture
 

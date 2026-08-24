@@ -4,13 +4,22 @@ import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 import { findNexacroComponent } from './nexacro';
 
 const BADGE_ID = '__browser_agent_add_badge__';
-const MAX_TEXT_LENGTH = 300;
+// A short price/status/cell fits well under the old 300, but a product
+// description, a review, or a multi-line detail card routinely runs longer —
+// those were silently un-capturable (findTextTarget returned null, no "Text
+// value" option at all) purely because of this cap, not because the element
+// wasn't a reasonable thing to capture.
+const MAX_TEXT_LENGTH = 800;
 const HIDE_DELAY_MS = 4000;
 const CURSOR_OFFSET_PX = 18;
-// The badge only needs to hold still over the short hop from the element to
-// itself; freezing over a wider radius would also swallow moves to a
-// neighbouring element, silently capturing the wrong thing.
-const APPROACH_MARGIN_PX = 34;
+// The badge appears offset diagonally by CURSOR_OFFSET_PX in both axes, so
+// the row sits ~25px (hypot(18,18)) from the cursor the instant it shows up.
+// This margin used to be 34 — bigger than that starting gap — so the "don't
+// re-aim while reaching for the badge" guard below was true from the very
+// first frame and stayed true through anything short of a large move,
+// reading as the frame refusing to track the cursor at all. It only needs to
+// cover the last short hop onto the row itself, which is well under 25px.
+const APPROACH_MARGIN_PX = 12;
 // Clearing out to roughly this far from the open menu reads as "I'm done
 // with this, let me look elsewhere" rather than just a wobble mid-choice.
 const MENU_DISMISS_DISTANCE_PX = 120;
@@ -75,21 +84,47 @@ function findTextTarget(el: Element | null): HTMLElement | null {
 // Batch Input/Click/Search target form controls and buttons, most of which
 // have no text of their own and so never match findTextTarget above.
 const BATCH_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA']);
-const BATCH_ROLES = new Set(['button', 'link', 'checkbox', 'radio']);
+// Beyond the four obvious ones: modern component libraries build their
+// controls out of divs and lean entirely on the role to say what they are,
+// so limiting this to button/link/checkbox/radio left most of a real app's
+// interactive surface unrecognized by the badge.
+const BATCH_ROLES = new Set([
+  'button', 'link', 'checkbox', 'radio', 'menuitem', 'menuitemcheckbox', 'menuitemradio',
+  'tab', 'switch', 'option', 'combobox', 'listbox', 'searchbox', 'textbox', 'spinbutton',
+  'slider', 'treeitem',
+]);
+
+// A div that a framework wired up by hand still behaves like a control to the
+// user, and is exactly what they will point the badge at. These are the marks
+// of that, cheapest test first — getComputedStyle is last because it forces
+// style resolution, and this runs on every mousemove. checkCursor is false
+// for every ancestor above the original hover target: a cursor:pointer rule
+// belongs to the element the mouse is actually over, not something worth
+// paying a style recalculation for at every one of up to 6 climbed levels.
+function isInteractiveElement(el: HTMLElement, checkCursor: boolean): boolean {
+  if (BATCH_TAGS.has(el.tagName)) return true;
+
+  const role = el.getAttribute('role');
+  if (role && BATCH_ROLES.has(role)) return true;
+
+  if (el.hasAttribute('onclick')) return true;
+  if (el.isContentEditable) return true;
+  if (el.tabIndex >= 0 && el !== document.body) return true;
+
+  return checkCursor && window.getComputedStyle(el).cursor === 'pointer';
+}
 
 function findBatchTarget(el: Element | null): HTMLElement | null {
-  // Nexacro's own DOM element for a component rarely has a matching tag/role
-  // (BATCH_TAGS/BATCH_ROLES below), so it needs its own check up front.
+  // Nexacro's own DOM element for a component rarely has a matching tag/role,
+  // so it needs its own check up front.
   const nexacro = findNexacroComponent(el);
   if (nexacro) return nexacro.element;
 
   let current = el;
 
   for (let depth = 0; current && depth < 6; depth++) {
-    if (current instanceof HTMLElement && !isExtensionUi(current)) {
-      if (BATCH_TAGS.has(current.tagName)) return current;
-      const role = current.getAttribute('role');
-      if (role && BATCH_ROLES.has(role)) return current;
+    if (current instanceof HTMLElement && !isExtensionUi(current) && isInteractiveElement(current, depth === 0)) {
+      return current;
     }
     current = current.parentElement;
   }
@@ -99,15 +134,22 @@ function findBatchTarget(el: Element | null): HTMLElement | null {
 
 // "Type text" only makes sense for a field the user can actually type into —
 // not every button/link findBatchTarget also matches.
+const TYPEABLE_ROLES = new Set(['textbox', 'searchbox', 'combobox', 'spinbutton']);
+
 function isTypeable(el: Element | null): boolean {
   const nexacro = findNexacroComponent(el);
   if (nexacro) return !/button/i.test(nexacro.type);
 
-  if (!(el instanceof HTMLTextAreaElement)) {
-    if (!(el instanceof HTMLInputElement)) return false;
-    if (['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'image', 'hidden'].includes(el.type)) return false;
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (el instanceof HTMLInputElement) {
+    return !['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'image', 'hidden'].includes(el.type);
   }
-  return true;
+  // Rich-text editors and framework inputs are contenteditable divs or
+  // role="textbox" — they take typed text exactly like a real field, and
+  // findBatchTarget now offers them, so "Type text" has to recognize them too.
+  if (el instanceof HTMLElement && el.isContentEditable) return true;
+  const role = el?.getAttribute('role');
+  return !!role && TYPEABLE_ROLES.has(role);
 }
 
 const BATCH_LABELS: Record<BatchKind, string> = {
@@ -178,6 +220,12 @@ function createTargetFrame(): TargetFrame {
   box.style.borderRadius = '3px';
   box.style.zIndex = '2147483646';
   box.style.display = 'none';
+  // Without this, a page with its own `* { transition: ... }` rule (common
+  // in CSS resets/frameworks) makes this box slide to its new position
+  // instead of jumping there — the position update in JS is instant, but
+  // what the user sees animates over the page's own transition duration,
+  // reading as the frame lagging behind a fast-moving cursor.
+  box.style.transition = 'none';
 
   const tag = document.createElement('span');
   tag.style.position = 'absolute';
@@ -238,6 +286,9 @@ function createBadge(): BadgeElements {
   root.style.alignItems = 'flex-start';
   root.style.gap = '4px';
   root.style.pointerEvents = 'auto';
+  // Same reasoning as the target frame — a page's own transition rule must
+  // not animate this badge's position as it follows the cursor.
+  root.style.transition = 'none';
 
   const trigger = document.createElement('button');
   trigger.type = 'button';
@@ -375,9 +426,11 @@ export function attachExtractBadge({
 
   const defaultTarget = () => currentText ?? currentTable ?? currentBatch;
 
+  // The label teaches the Ctrl+Right-click shortcut rather than restating
+  // "this will be added" — the outline itself already says that.
   const frameDefault = () => {
     const el = defaultTarget();
-    if (el) frame.show(el, currentTable && !currentText ? 'table' : 'this will be added');
+    if (el) frame.show(el, 'Ctrl+Right-click to add');
   };
 
   const closeMenu = () => {
@@ -406,6 +459,35 @@ export function attachExtractBadge({
   const scheduleHide = () => {
     if (menuOpen) return; // an open menu waits for a choice, however long that takes
     if (hideTimer === null) hideTimer = window.setTimeout(hide, HIDE_DELAY_MS);
+  };
+
+  // Computed once per call and reused for both the "did anything change"
+  // comparison and the actual state update — the earlier version of this
+  // function (handleMove) called these three finders once to compare against
+  // the current target and, on a mismatch, called them again to know what to
+  // switch to. That doubled the exact per-event cost the whole synchronous,
+  // un-batched design (see the comment below) exists to keep low.
+  const computeTargets = (target: Element | null) => ({
+    table: findTableAncestor(target),
+    text: findTextTarget(target),
+    batch: findBatchTarget(target),
+  });
+
+  // Shared by continuous hover tracking (handleMove) and the one-shot
+  // Ctrl+Right-click trigger (handleContextMenu below) — both need the same
+  // "aim the badge at this, right here" state update once a target is known.
+  const applyTargets = (
+    event: MouseEvent,
+    { table, text, batch }: { table: HTMLElement | null; text: HTMLElement | null; batch: HTMLElement | null },
+  ): void => {
+    cancelHide();
+    currentTable = table;
+    currentText = text;
+    currentBatch = batch;
+    root.style.display = 'flex';
+    moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
+    frameDefault();
+    onTargetChange?.(true);
   };
 
   // Deferring this to a requestAnimationFrame callback was tried, on the
@@ -438,19 +520,15 @@ export function attachExtractBadge({
       closeMenu();
     }
 
-    const table = findTableAncestor(target);
-    const text = findTextTarget(target);
-    const batch = findBatchTarget(target);
-
-    if (!table && !text && !batch) {
+    const targets = computeTargets(target);
+    if (!targets.table && !targets.text && !targets.batch) {
       scheduleHide();
       return;
     }
 
-    cancelHide();
-
     const visible = root.style.display !== 'none';
-    const sameTarget = visible && table === currentTable && text === currentText && batch === currentBatch;
+    const sameTarget =
+      visible && targets.table === currentTable && targets.text === currentText && targets.batch === currentBatch;
 
     // Moving around inside the element you are already aiming at must not drag
     // the badge along, or it would flee from every attempt to click it.
@@ -460,13 +538,22 @@ export function attachExtractBadge({
     // reaching for it crosses that element, which must not re-aim the capture.
     if (visible && distanceToBadge(event.clientX, event.clientY) < APPROACH_MARGIN_PX) return;
 
-    currentTable = table;
-    currentText = text;
-    currentBatch = batch;
-    root.style.display = 'flex';
-    moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
-    frameDefault();
-    onTargetChange?.(true);
+    applyTargets(event, targets);
+  };
+
+  // A right-click held with Ctrl opens the Add menu directly at the pointer,
+  // no travel to the badge required — for anyone who would rather keep both
+  // hands near the keyboard/mouse buttons than chase a floating button.
+  const handleContextMenu = (event: MouseEvent) => {
+    const target = event.target as Element | null;
+    if (!event.ctrlKey || isExtensionUi(target)) return;
+
+    stop(event); // suppress the browser's own context menu
+    const targets = computeTargets(target);
+    if (!targets.table && !targets.text && !targets.batch) return;
+
+    applyTargets(event, targets);
+    openMenu();
   };
 
   const handleScroll = () => {
@@ -480,16 +567,26 @@ export function attachExtractBadge({
     event.stopImmediatePropagation();
   };
 
-  const handleTriggerClick = (event: MouseEvent) => {
-    stop(event);
+  // Shared by the trigger button and the Ctrl+Right-click shortcut — both
+  // land here once a target is already aimed at.
+  const openMenu = () => {
     cancelHide();
-    menuOpen = !menuOpen;
+    menuOpen = true;
     tableItem.style.display = currentTable ? 'flex' : 'none';
     textItem.style.display = currentText ? 'flex' : 'none';
     inputItem.style.display = isTypeable(currentBatch) ? 'flex' : 'none';
     // Batch nodes can be recorded on anything the badge is currently aimed
     // at — table, text, or a plain control — so they're never hidden.
-    menu.style.display = menuOpen ? 'flex' : 'none';
+    menu.style.display = 'flex';
+  };
+
+  const handleTriggerClick = (event: MouseEvent) => {
+    stop(event);
+    if (menuOpen) {
+      closeMenu();
+      return;
+    }
+    openMenu();
   };
 
   const choose = (event: MouseEvent, run: () => void) => {
@@ -560,6 +657,7 @@ export function attachExtractBadge({
   imageItem.addEventListener('click', handleImage, true);
   inputItem.addEventListener('click', handleInput, true);
   document.addEventListener('mousemove', handleMove, true);
+  document.addEventListener('contextmenu', handleContextMenu, true);
   document.addEventListener('keydown', handleKeydown, true);
   document.addEventListener('click', handleOutsideClick, true);
   window.addEventListener('scroll', handleScroll, true);
@@ -568,6 +666,7 @@ export function attachExtractBadge({
     cancelHide();
     frame.remove();
     document.removeEventListener('mousemove', handleMove, true);
+    document.removeEventListener('contextmenu', handleContextMenu, true);
     document.removeEventListener('keydown', handleKeydown, true);
     document.removeEventListener('click', handleOutsideClick, true);
     window.removeEventListener('scroll', handleScroll, true);

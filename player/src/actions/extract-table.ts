@@ -1,13 +1,13 @@
 import type { Page } from 'playwright';
 import type { ExtractTableAction } from '@browser-agent/shared';
 import { readTable } from '@browser-agent/shared';
-import { resolve } from '../utils/selector-engine';
+import { resolve, WAIT_TIMEOUT_MS } from '../utils/selector-engine';
 
 export async function extractTable(
   page: Page,
   action: ExtractTableAction,
 ): Promise<Record<string, string>[]> {
-  const el = await resolve(page, action.selector, action.selectorFallbacks);
+  const el = await resolve(page, action.selector, action.selectorFallbacks, WAIT_TIMEOUT_MS);
 
   // readTable is self-contained precisely so Playwright can serialise it into
   // the page; the column mapping needs no DOM, so it happens back here.

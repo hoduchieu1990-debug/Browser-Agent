@@ -26,6 +26,13 @@ export class PageContext {
     });
     this.context = await this.browser.newContext();
     this.page = await this.context.newPage();
+    // This is Playwright's own auto-wait timeout — the safety net for a
+    // resolved locator's own actionability wait (visible/stable/enabled),
+    // which runs after selector-engine's resolve() has already confirmed the
+    // element exists. The slow part (waiting for something to exist at all)
+    // is resolve()'s own explicit timeout, chosen per action type
+    // (INTERACT_TIMEOUT_MS vs WAIT_TIMEOUT_MS in selector-engine.ts) — this
+    // default only needs to match the shorter of the two.
     this.page.setDefaultTimeout(this.options.timeout ?? 10000);
     return this.page;
   }

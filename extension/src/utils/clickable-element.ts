@@ -19,7 +19,11 @@ export function findClickableAncestor(el: Element | null): HTMLElement | null {
 
       if (current.hasAttribute('onclick')) return current;
       if (current.tabIndex >= 0 && current !== document.body) return current;
-      if (window.getComputedStyle(current).cursor === 'pointer') return current;
+      // Only at the exact hover target: a cursor:pointer rule belongs to the
+      // element the pointer is actually over, and getComputedStyle forces a
+      // style recalculation — worth paying once per event, not up to
+      // MAX_DEPTH times while climbing ancestors that will not match it.
+      if (depth === 0 && window.getComputedStyle(current).cursor === 'pointer') return current;
     }
     current = current.parentElement;
   }

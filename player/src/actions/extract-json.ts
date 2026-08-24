@@ -1,9 +1,10 @@
 import type { Page } from 'playwright';
 import type { ExtractJsonAction } from '@browser-agent/shared';
+import { resolve, WAIT_TIMEOUT_MS } from '../utils/selector-engine';
 
 export async function extractJson(page: Page, action: ExtractJsonAction): Promise<any> {
   const raw = action.selector
-    ? await page.locator(action.selector).first().textContent()
+    ? await (await resolve(page, action.selector, action.selectorFallbacks, WAIT_TIMEOUT_MS)).textContent()
     : await page.evaluate(() => document.body.textContent);
 
   if (!raw) throw new Error(`No content found for extractJson at selector "${action.selector}"`);
