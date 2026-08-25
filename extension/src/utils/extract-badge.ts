@@ -81,17 +81,20 @@ function findTextTarget(el: Element | null): HTMLElement | null {
   return preferLocatable(el);
 }
 
-const IMAGE_TAGS = new Set(['IMG', 'PICTURE', 'CANVAS', 'VIDEO']);
+const IMAGE_TAGS = new Set(['IMG', 'PICTURE', 'CANVAS', 'VIDEO', 'AUDIO']);
 
 // A plain product photo, avatar, or banner has no text and is not a batch
 // control either, so without its own check it matched none of the finders
 // in this file and the badge never appeared over it at all — "Image of this
 // area" was reachable only when the same spot happened to also be a
-// text/table/batch target.
+// text/table/batch target. role="img" covers the same gap for anything that
+// isn't a native media tag at all — an icon font glyph or a CSS
+// background-image div marked accessible that way.
 function findImageTarget(el: Element | null): HTMLElement | null {
   if (!(el instanceof HTMLElement)) return null;
   if (isExtensionUi(el)) return null;
-  return IMAGE_TAGS.has(el.tagName) ? el : null;
+  if (IMAGE_TAGS.has(el.tagName)) return el;
+  return el.getAttribute('role') === 'img' ? el : null;
 }
 
 // Batch Input/Click/Search target form controls and buttons, most of which
@@ -102,8 +105,11 @@ function findImageTarget(el: Element | null): HTMLElement | null {
 // not a descendant, so the input is never reachable by climbing parents from
 // it, and the span itself usually carries none of onclick/role/tabindex.
 // Recognizing the label directly is what makes hovering the visible part of
-// that pattern land on something.
-const BATCH_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']);
+// that pattern land on something. SUMMARY is the native expand/collapse
+// trigger for a <details> element — clickable-element.ts's general hover
+// highlighter already recognized it, this file's own badge detection had
+// fallen out of sync with that.
+const BATCH_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL', 'SUMMARY']);
 // Beyond the four obvious ones: modern component libraries build their
 // controls out of divs and lean entirely on the role to say what they are,
 // so limiting this to button/link/checkbox/radio left most of a real app's
@@ -162,7 +168,14 @@ function isTypeable(el: Element | null): boolean {
 
   if (el instanceof HTMLTextAreaElement) return true;
   if (el instanceof HTMLInputElement) {
-    return !['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'image', 'hidden'].includes(el.type);
+    // range and color are Pick-style controls (drag a slider, open a color
+    // well) — batchInput's inferBatchInputType and the one-shot Add → Type
+    // text step both assume a typed string is a meaningful thing to set,
+    // which isn't true for these two the way it still is for date/time
+    // (those do accept a typed ISO-ish string in every real browser).
+    return ![
+      'checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'image', 'hidden', 'range', 'color',
+    ].includes(el.type);
   }
   // Rich-text editors and framework inputs are contenteditable divs or
   // role="textbox" — they take typed text exactly like a real field, and

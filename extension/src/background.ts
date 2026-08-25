@@ -575,6 +575,17 @@ async function runReplay(
       await delay(STEP_SETTLE_MS);
     } catch (error) {
       const message = (error as Error).message;
+
+      // A step marked onError: 'skip'/'ignore' (e.g. dismissing a popup that
+      // doesn't always appear) is expected to sometimes fail — that must not
+      // abort a run that would otherwise have completed fine without it.
+      if (action.onError === 'skip' || action.onError === 'ignore') {
+        settle({ status: 'skipped', message });
+        await publish(state);
+        await delay(STEP_SETTLE_MS);
+        continue;
+      }
+
       settle({ status: 'failed', message });
       await closeHiddenWindow();
       await finish(`Step ${i + 1} (${action.type}): ${message}`);
@@ -664,7 +675,14 @@ async function runBatchReplay(rows: DataRow[], stopOnError: boolean): Promise<vo
       for (let a = 0; a < actions.length; a++) {
         if (batchCancelled) break;
         const stepResult = await runBatchStep(tabId, actions[a], a, row);
-        if (stepResult.error) throw new Error(`${actions[a].type}: ${stepResult.error}`);
+        if (stepResult.error) {
+          // Same onError:'skip'/'ignore' contract as the plain replay loop
+          // above — a step expected to sometimes not be there (a popup that
+          // doesn't always appear) must not fail the whole row.
+          const onError = actions[a].onError;
+          if (onError === 'skip' || onError === 'ignore') continue;
+          throw new Error(`${actions[a].type}: ${stepResult.error}`);
+        }
         if (stepResult.output) outputs[stepResult.output.key] = String(stepResult.output.value);
       }
       rowResult = { ...rowResult, output: outputs, status: 'success' };

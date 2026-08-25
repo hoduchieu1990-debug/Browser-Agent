@@ -74,6 +74,9 @@ const CHECKS = [
   'hover-same-target-check.js',
   'image-and-custom-checkbox-check.js',
   'shadow-dom-target-check.js',
+  'optional-click-popup-check.js',
+  'optional-click-cli-check.js',
+  'ui-object-coverage-check.js',
 ];
 
 (async () => {

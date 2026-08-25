@@ -12,8 +12,13 @@ function isBatchAction(action: WorkflowAction): boolean {
 
 // Plain `input` steps (via Add → Type text, or typed on the page) get the
 // same expandable panel batch nodes do, just to edit the one field they have.
+// `click` gets one too, for the "optional" toggle below.
 function isConfigurable(action: WorkflowAction): boolean {
-  return isBatchAction(action) || action.type === 'input';
+  return isBatchAction(action) || action.type === 'input' || action.type === 'click';
+}
+
+function isOptional(action: WorkflowAction): boolean {
+  return action.onError === 'skip' || action.onError === 'ignore';
 }
 
 // Uncontrolled against the parent's state so a keystroke doesn't wait on the
@@ -158,6 +163,11 @@ export function RecordTab({
                       <div className="action-type" data-type={action.type}>
                         {batch ? batchNodeLabel(actions, index) : action.type}
                       </div>
+                      {isOptional(action) && (
+                        <span className="action-optional-badge" title="Skipped if not found on the page">
+                          optional
+                        </span>
+                      )}
                     </div>
                     <div className="action-selector">{actionSelectorText(action)}</div>
                     {actionValueText(action) && <div className="action-value">{actionValueText(action)}</div>}
@@ -188,6 +198,18 @@ export function RecordTab({
                         value={action.value}
                         onChange={(e) => onUpdateAction(index, { value: e.target.value })}
                       />
+                    </label>
+                  </div>
+                )}
+                {expanded && action.type === 'click' && (
+                  <div className="action-batch-config">
+                    <label className="action-optional-toggle">
+                      <input
+                        type="checkbox"
+                        checked={isOptional(action)}
+                        onChange={(e) => onUpdateAction(index, { onError: e.target.checked ? 'skip' : undefined })}
+                      />
+                      Optional — click if present, skip if not (e.g. a popup that doesn't always appear)
                     </label>
                   </div>
                 )}

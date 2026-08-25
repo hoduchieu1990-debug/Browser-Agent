@@ -26,6 +26,8 @@ extension/public/icons/
 .verify/hover-same-target-profile/
 .verify/image-checkbox-profile/
 .verify/shadow-dom-profile/
+.verify/optional-click-profile/
+.verify/ui-object-coverage-profile/
 .verify/*.png
 .verify/*.json
 .verify/*.csv
