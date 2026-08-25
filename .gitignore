@@ -23,6 +23,8 @@ extension/public/icons/
 .verify/control-types-profile/
 .verify/ctrl-rightclick-profile/
 .verify/frame-no-transition-profile/
+.verify/hover-same-target-profile/
+.verify/image-checkbox-profile/
 .verify/*.png
 .verify/*.json
 .verify/*.csv

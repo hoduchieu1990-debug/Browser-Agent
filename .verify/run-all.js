@@ -71,6 +71,8 @@ const CHECKS = [
   'control-types-check.js',
   'ctrl-rightclick-check.js',
   'frame-no-transition-check.js',
+  'hover-same-target-check.js',
+  'image-and-custom-checkbox-check.js',
 ];
 
 (async () => {

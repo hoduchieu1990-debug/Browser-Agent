@@ -81,9 +81,29 @@ function findTextTarget(el: Element | null): HTMLElement | null {
   return preferLocatable(el);
 }
 
+const IMAGE_TAGS = new Set(['IMG', 'PICTURE', 'CANVAS', 'VIDEO']);
+
+// A plain product photo, avatar, or banner has no text and is not a batch
+// control either, so without its own check it matched none of the finders
+// in this file and the badge never appeared over it at all — "Image of this
+// area" was reachable only when the same spot happened to also be a
+// text/table/batch target.
+function findImageTarget(el: Element | null): HTMLElement | null {
+  if (!(el instanceof HTMLElement)) return null;
+  if (isExtensionUi(el)) return null;
+  return IMAGE_TAGS.has(el.tagName) ? el : null;
+}
+
 // Batch Input/Click/Search target form controls and buttons, most of which
 // have no text of their own and so never match findTextTarget above.
-const BATCH_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA']);
+// LABEL matters on its own, not just as a fallback ancestor: the common
+// custom-checkbox/radio markup hides the real <input> and shows a styled
+// <span> next to it inside a <label> — that span is a sibling of the input,
+// not a descendant, so the input is never reachable by climbing parents from
+// it, and the span itself usually carries none of onclick/role/tabindex.
+// Recognizing the label directly is what makes hovering the visible part of
+// that pattern land on something.
+const BATCH_TAGS = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']);
 // Beyond the four obvious ones: modern component libraries build their
 // controls out of divs and lean entirely on the role to say what they are,
 // so limiting this to button/link/checkbox/radio left most of a real app's
@@ -393,10 +413,21 @@ export function attachExtractBadge({
   let currentTable: HTMLElement | null = null;
   let currentText: HTMLElement | null = null;
   let currentBatch: HTMLElement | null = null;
+  let currentImage: HTMLElement | null = null;
   let hideTimer: number | null = null;
   let menuOpen = false;
   let anchorX = 0;
   let anchorY = 0;
+  // The raw element a mousemove last landed on, independent of what it
+  // resolved to. A real mouse fires many move events without ever leaving
+  // the element under the pointer (sub-pixel jitter, a slow drag) — as long
+  // as that element hasn't changed, computeTargets cannot have anything new
+  // to report, so re-walking three ancestor chains and re-running selector
+  // uniqueness checks on every one of those events is pure waste. That waste
+  // was still enough, at real mouse event rates, to read as stutter even
+  // though each individual computeTargets call was already cheap in
+  // isolation.
+  let lastRawTarget: Element | null = null;
 
   const moveTo = (x: number, y: number) => {
     const width = row.offsetWidth || 110;
@@ -424,7 +455,7 @@ export function attachExtractBadge({
     return Math.hypot(dx, dy);
   };
 
-  const defaultTarget = () => currentText ?? currentTable ?? currentBatch;
+  const defaultTarget = () => currentText ?? currentTable ?? currentBatch ?? currentImage;
 
   // The label teaches the Ctrl+Right-click shortcut rather than restating
   // "this will be added" — the outline itself already says that.
@@ -446,6 +477,14 @@ export function attachExtractBadge({
     currentTable = null;
     currentText = null;
     currentBatch = null;
+    currentImage = null;
+    // Without this, re-hovering the exact same element right after it was
+    // captured (a very common flow: pick "Text value", the mouse hasn't
+    // moved yet) would still match lastRawTarget from before hide() ran and
+    // the steady-hover skip above would bail before ever recomputing —
+    // leaving the badge permanently gone until the pointer visits a
+    // different element first.
+    lastRawTarget = null;
     onTargetChange?.(false);
   };
 
@@ -471,6 +510,7 @@ export function attachExtractBadge({
     table: findTableAncestor(target),
     text: findTextTarget(target),
     batch: findBatchTarget(target),
+    image: findImageTarget(target),
   });
 
   // Shared by continuous hover tracking (handleMove) and the one-shot
@@ -478,12 +518,18 @@ export function attachExtractBadge({
   // "aim the badge at this, right here" state update once a target is known.
   const applyTargets = (
     event: MouseEvent,
-    { table, text, batch }: { table: HTMLElement | null; text: HTMLElement | null; batch: HTMLElement | null },
+    {
+      table,
+      text,
+      batch,
+      image,
+    }: { table: HTMLElement | null; text: HTMLElement | null; batch: HTMLElement | null; image: HTMLElement | null },
   ): void => {
     cancelHide();
     currentTable = table;
     currentText = text;
     currentBatch = batch;
+    currentImage = image;
     root.style.display = 'flex';
     moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
     frameDefault();
@@ -520,15 +566,22 @@ export function attachExtractBadge({
       closeMenu();
     }
 
+    if (target === lastRawTarget) return;
+    lastRawTarget = target;
+
     const targets = computeTargets(target);
-    if (!targets.table && !targets.text && !targets.batch) {
+    if (!targets.table && !targets.text && !targets.batch && !targets.image) {
       scheduleHide();
       return;
     }
 
     const visible = root.style.display !== 'none';
     const sameTarget =
-      visible && targets.table === currentTable && targets.text === currentText && targets.batch === currentBatch;
+      visible &&
+      targets.table === currentTable &&
+      targets.text === currentText &&
+      targets.batch === currentBatch &&
+      targets.image === currentImage;
 
     // Moving around inside the element you are already aiming at must not drag
     // the badge along, or it would flee from every attempt to click it.
@@ -550,7 +603,7 @@ export function attachExtractBadge({
 
     stop(event); // suppress the browser's own context menu
     const targets = computeTargets(target);
-    if (!targets.table && !targets.text && !targets.batch) return;
+    if (!targets.table && !targets.text && !targets.batch && !targets.image) return;
 
     applyTargets(event, targets);
     openMenu();
