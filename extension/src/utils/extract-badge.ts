@@ -396,6 +396,21 @@ function createBadge(): BadgeElements {
   return { root, row, trigger, stopBtn, menu, tableItem, textItem, imageItem, inputItem, batchItems };
 }
 
+// Composed events (mousemove, click, contextmenu) are retargeted for any
+// listener sitting outside a shadow tree the real hit element lives inside —
+// per the DOM spec, event.target collapses to that tree's host instead of
+// the actual innermost element. On a page that puts a shadow boundary
+// somewhere between the document and the pointer's true target,
+// event.target can end up being some unrelated host element even while the
+// pointer is squarely over our own badge, making every root.contains(target)
+// check below silently and permanently fail. composedPath()[0] reports the
+// true innermost element regardless of any shadow boundaries in the way, so
+// use that instead of event.target everywhere a real hit-test is needed.
+function realTarget(event: Event): Element | null {
+  const path = event.composedPath();
+  return (path[0] as Element | undefined) ?? (event.target as Element | null);
+}
+
 // Rides along with the pointer during recording and offers to capture whatever
 // is under it, so extracting data never requires leaving the page.
 export function attachExtractBadge({
@@ -549,7 +564,7 @@ export function attachExtractBadge({
   // solve by batching — handling every event immediately, synchronously, is
   // both simpler and actually lower latency.
   const handleMove = (event: MouseEvent) => {
-    const target = event.target as Element | null;
+    const target = realTarget(event);
 
     if (target && root.contains(target)) {
       cancelHide(); // the pointer is on the badge: it stays until used
@@ -598,7 +613,7 @@ export function attachExtractBadge({
   // no travel to the badge required — for anyone who would rather keep both
   // hands near the keyboard/mouse buttons than chase a floating button.
   const handleContextMenu = (event: MouseEvent) => {
-    const target = event.target as Element | null;
+    const target = realTarget(event);
     if (!event.ctrlKey || isExtensionUi(target)) return;
 
     stop(event); // suppress the browser's own context menu
@@ -689,7 +704,8 @@ export function attachExtractBadge({
   };
 
   const handleOutsideClick = (event: MouseEvent) => {
-    if (menuOpen && !root.contains(event.target as Node)) hide();
+    const target = realTarget(event);
+    if (menuOpen && (!target || !root.contains(target))) hide();
   };
 
   // The frame no longer changes per menu item on hover — it used to preview

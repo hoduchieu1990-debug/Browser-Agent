@@ -73,6 +73,7 @@ const CHECKS = [
   'frame-no-transition-check.js',
   'hover-same-target-check.js',
   'image-and-custom-checkbox-check.js',
+  'shadow-dom-target-check.js',
 ];
 
 (async () => {

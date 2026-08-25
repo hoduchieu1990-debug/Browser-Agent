@@ -25,6 +25,7 @@ extension/public/icons/
 .verify/frame-no-transition-profile/
 .verify/hover-same-target-profile/
 .verify/image-checkbox-profile/
+.verify/shadow-dom-profile/
 .verify/*.png
 .verify/*.json
 .verify/*.csv

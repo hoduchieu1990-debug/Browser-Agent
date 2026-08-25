@@ -59,17 +59,34 @@ function isStableId(id: string): boolean {
 // resolveOne teaches the in-browser replay the same trick.
 const NTH_MATCH = /^:nth-match\((.+),\s*(\d+)\)$/;
 
-export function resolveOne(doc: Document, selector: string): Element | null {
+export function resolveOne(doc: Document | ShadowRoot, selector: string): Element | null {
   const nth = NTH_MATCH.exec(selector);
   if (nth) return doc.querySelectorAll(nth[1])[Number(nth[2]) - 1] ?? null;
   return doc.querySelector(selector);
+}
+
+// el.ownerDocument is always the top-level Document, even for an element
+// rendered inside a shadow tree — shadow DOM is encapsulated, so querying
+// the document can never find it, and every uniqueness check below would
+// silently and permanently report "0 matches" for anything in there.
+// getRootNode() returns the nearest ShadowRoot instead when there is one;
+// unlike Document, ShadowRoot only implements querySelectorAll (no
+// getElementsByTagName/getElementsByClassName — those never made it into the
+// DocumentFragment/ShadowRoot side of the DOM), so the two fast paths below
+// still branch on which kind of root they got.
+type QueryRoot = Document | ShadowRoot;
+
+function queryRoot(el: Element): QueryRoot {
+  const root = el.getRootNode();
+  return root instanceof ShadowRoot ? root : el.ownerDocument;
 }
 
 const BARE_TAG = /^[a-z][a-z0-9-]*$/i;
 
 function matchesOnly(selector: string, el: Element): boolean {
   try {
-    if (NTH_MATCH.test(selector)) return resolveOne(el.ownerDocument, selector) === el;
+    const root = queryRoot(el);
+    if (NTH_MATCH.test(selector)) return resolveOne(root, selector) === el;
 
     // The bare tag name is the last, cheapest-looking candidate every element
     // falls through to once nothing more specific matched — cheap to write,
@@ -78,13 +95,14 @@ function matchesOnly(selector: string, el: Element): boolean {
     // runs on every hover during a fast mouse sweep. getElementsByTagName is
     // a live index the browser already maintains; its .length answers the
     // same "is there more than one" question without the scan, for the
-    // overwhelmingly common case where the tag is not unique.
+    // overwhelmingly common case where the tag is not unique — only
+    // available on Document, so shadow content pays for the real scan.
     if (BARE_TAG.test(selector)) {
-      const byTag = el.ownerDocument.getElementsByTagName(selector);
+      const byTag = root instanceof Document ? root.getElementsByTagName(selector) : root.querySelectorAll(selector);
       return byTag.length === 1 && byTag[0] === el;
     }
 
-    const found = el.ownerDocument.querySelectorAll(selector);
+    const found = root.querySelectorAll(selector);
     return found.length === 1 && found[0] === el;
   } catch {
     return false; // malformed selector (odd characters in an attribute value)
@@ -104,7 +122,12 @@ const SHARED_CLASS_LIMIT = 4;
 function isIdentifyingClass(el: Element, className: string): boolean {
   if (!isStableToken(className) || STATE_CLASS.test(className) || UTILITY_CLASS.test(className)) return false;
   if (VARIANT_CLASS.test(className)) return false;
-  return el.ownerDocument.getElementsByClassName(className).length <= SHARED_CLASS_LIMIT;
+  const root = queryRoot(el);
+  const count =
+    root instanceof Document
+      ? root.getElementsByClassName(className).length
+      : root.querySelectorAll(`.${CSS.escape(className)}`).length;
+  return count <= SHARED_CLASS_LIMIT;
 }
 
 function stableClassSelector(el: Element): string | null {
@@ -224,7 +247,7 @@ function nthMatchSelector(el: Element): string | null {
   }
 
   const base = scope ? `${scope} ${tag}` : tag;
-  const matches = Array.from(el.ownerDocument.querySelectorAll(base));
+  const matches = Array.from(queryRoot(el).querySelectorAll(base));
   const index = matches.indexOf(el);
   return index === -1 ? null : `:nth-match(${base}, ${index + 1})`;
 }
