@@ -77,6 +77,7 @@ const CHECKS = [
   'optional-click-popup-check.js',
   'optional-click-cli-check.js',
   'ui-object-coverage-check.js',
+  'plain-click-across-navigation-check.js',
 ];
 
 (async () => {
