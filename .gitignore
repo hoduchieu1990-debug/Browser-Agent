@@ -28,6 +28,7 @@ extension/public/icons/
 .verify/shadow-dom-profile/
 .verify/optional-click-profile/
 .verify/ui-object-coverage-profile/
+.verify/plain-click-nav-profile/
 .verify/*.png
 .verify/*.json
 .verify/*.csv
