@@ -29,6 +29,9 @@ extension/public/icons/
 .verify/optional-click-profile/
 .verify/ui-object-coverage-profile/
 .verify/plain-click-nav-profile/
+.verify/profile-cdp-click/
+.verify/profile-framework-tag/
+.verify/profile-nexacro-grid-target/
 .verify/*.png
 .verify/*.json
 .verify/*.csv

@@ -2,11 +2,15 @@ import type { Page } from 'playwright';
 import type { ExtractTableAction } from '@browser-agent/shared';
 import { readTable } from '@browser-agent/shared';
 import { resolve, WAIT_TIMEOUT_MS } from '../utils/selector-engine';
+import { isNexacroSelector, nexacroComponentId, nexacroExtractGrid } from '../utils/nexacro';
 
 export async function extractTable(
   page: Page,
   action: ExtractTableAction,
 ): Promise<Record<string, string>[]> {
+  if (isNexacroSelector(action.selector)) {
+    return nexacroExtractGrid(page, nexacroComponentId(action.selector));
+  }
   const el = await resolve(page, action.selector, action.selectorFallbacks, WAIT_TIMEOUT_MS);
 
   // readTable is self-contained precisely so Playwright can serialise it into

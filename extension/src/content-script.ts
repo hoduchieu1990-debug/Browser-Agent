@@ -8,7 +8,8 @@ import { generateSelectorCandidates } from './utils/selector-utils';
 import { showToast, clearToasts } from './utils/toast';
 import { describeAction } from './utils/action-display';
 import { executeStep } from './utils/replay-executor';
-import { findNexacroComponent, nexacroSelector } from './utils/nexacro';
+import { findNexacroComponent, findNexacroGrid, nexacroSelector } from './utils/nexacro';
+import { detectFramework } from './utils/framework';
 
 declare global {
   interface Window {
@@ -30,6 +31,15 @@ function locate(el: Element): { selector: string; selectorFallbacks?: string[] }
 
   const [selector, ...rest] = generateSelectorCandidates(el);
   return rest.length ? { selector, selectorFallbacks: rest } : { selector };
+}
+
+// A Nexacro Grid is read through its bound dataset, never off the DOM, so a
+// table step has to name the Grid component itself even when the user
+// pointed at a cell inside it — the one place resolving up into the grid is
+// what's wanted, rather than the exact node under the cursor.
+function locateTable(el: Element): { selector: string; selectorFallbacks?: string[] } {
+  const grid = findNexacroGrid(el);
+  return grid ? { selector: nexacroSelector(grid.id) } : locate(el);
 }
 
 // Clicking something to aim at it and then pressing Add is one intention, not
@@ -60,6 +70,13 @@ function rectOf(el: Element): ThumbnailRect {
   return { x: r.x, y: r.y, width: r.width, height: r.height };
 }
 
+// Left off entirely for ordinary HTML: every step on a normal page carrying
+// framework:'html' would be noise in the exported workflow.
+function tagFramework(action: RecordedActionPayload, el: Element): RecordedActionPayload {
+  const framework = detectFramework(el);
+  return framework ? { ...action, framework } : action;
+}
+
 function capture(action: RecordedActionPayload, el: Element): void {
   // screenshot steps already capture their own full image as the step's
   // actual output — a second, smaller copy of the same thing would be noise.
@@ -67,7 +84,7 @@ function capture(action: RecordedActionPayload, el: Element): void {
 
   chrome.runtime.sendMessage({
     type: 'RECORDED_ACTION',
-    action,
+    action: tagFramework(action, el),
     replacesLastClick: takeSupersededClick(el),
     ...thumbnail,
   } satisfies RuntimeMessage);
@@ -77,7 +94,7 @@ function recordTable(table: HTMLElement): void {
   capture(
     {
       type: 'extractTable',
-      ...locate(table),
+      ...locateTable(table),
       headers: extractTableHeaders(table),
       output: `table${++tableCount}`,
     },
@@ -134,7 +151,7 @@ function setRecording(value: boolean, highlightElements: boolean): void {
     recorder = attachListeners((action, el) => {
       chrome.runtime.sendMessage({
         type: 'RECORDED_ACTION',
-        action,
+        action: tagFramework(action, el),
         rect: rectOf(el),
         dpr: window.devicePixelRatio || 1,
       } satisfies RuntimeMessage);

@@ -26,6 +26,17 @@ export function nexacroComponentId(selector: string): string {
 // on the wrong component. window.nexacro.getActiveFrame(), used here
 // previously, does not exist on real Nexacro N.
 //
+// The one other recoverable miss: a dynamic work window's frame id carries
+// an instance suffix assigned the moment it opens ("winFFM0371_0_744") that
+// changes the next time the same screen opens, even within the same
+// session — a real MES/ERP-style multi-screen Nexacro app, as opposed to the
+// single-frame demo above was verified against. Recognise that shape (the
+// "win" prefix is Nexacro Studio's own default naming convention for a work
+// window's root form, confirmed against a live production Nexacro
+// automation tool's own resolver) and ask the containing frameset for
+// whichever frame currently serves that same stable prefix ("winFFM0371")
+// instead of failing.
+//
 // Each function below repeats this walk inline (rather than sharing one
 // helper) because page.evaluate() serializes only the function it's given —
 // it can't close over another module-level function.
@@ -35,8 +46,25 @@ function resolveInPage(id: string): unknown {
   const parts = id.replace(/:[^:.]*$/, '').split('.');
   let obj: any = app;
   for (let i = 0; i < parts.length; i++) {
-    const next = obj?.[parts[i]];
-    if (next === undefined) return i === parts.length - 1 ? obj : null;
+    let next = obj?.[parts[i]];
+    if (next === undefined) {
+      const dynamicMatch = /^(win[A-Za-z0-9]+)_\d+_\d+$/.exec(parts[i]);
+      if (dynamicMatch) {
+        const formId = dynamicMatch[1];
+        const active = typeof obj?.getActiveFrame === 'function' ? obj.getActiveFrame() : null;
+        if (active?.id && String(active.id).indexOf(formId) === 0) next = active;
+        else if (obj?.all && typeof obj.all.length === 'number') {
+          for (let j = 0; j < obj.all.length; j++) {
+            const frame = obj.all[j];
+            if (frame?.id && String(frame.id).indexOf(formId) === 0) {
+              next = frame;
+              break;
+            }
+          }
+        }
+      }
+      if (next == null) return i === parts.length - 1 ? obj : null;
+    }
     obj = next;
   }
   return obj;
@@ -46,6 +74,8 @@ function resolveInPage(id: string): unknown {
 // getApplication()'s component tree is fully populated (observed ~8s on a
 // real, heavy Nexacro N app) — long enough that the previous 10s default cut
 // it close.
+const IDLE_WAIT_MS = 8000;
+
 async function waitForComponent(page: Page, componentId: string, timeout = 15000): Promise<void> {
   const deadline = Date.now() + timeout;
 
@@ -66,10 +96,27 @@ export async function nexacroClick(page: Page, componentId: string): Promise<voi
     let obj: any = app;
     let comp: any = null;
     for (let i = 0; i < parts.length; i++) {
-      const next = obj?.[parts[i]];
+      let next = obj?.[parts[i]];
       if (next === undefined) {
-        comp = i === parts.length - 1 ? obj : null;
-        break;
+        const dynamicMatch = /^(win[A-Za-z0-9]+)_\d+_\d+$/.exec(parts[i]);
+        if (dynamicMatch) {
+          const formId = dynamicMatch[1];
+          const active = typeof obj?.getActiveFrame === 'function' ? obj.getActiveFrame() : null;
+          if (active?.id && String(active.id).indexOf(formId) === 0) next = active;
+          else if (obj?.all && typeof obj.all.length === 'number') {
+            for (let j = 0; j < obj.all.length; j++) {
+              const frame = obj.all[j];
+              if (frame?.id && String(frame.id).indexOf(formId) === 0) {
+                next = frame;
+                break;
+              }
+            }
+          }
+        }
+        if (next == null) {
+          comp = i === parts.length - 1 ? obj : null;
+          break;
+        }
       }
       obj = next;
       comp = obj;
@@ -81,6 +128,35 @@ export async function nexacroClick(page: Page, componentId: string): Promise<voi
     // already runs the component's own click handling.
     if (typeof comp.onclick === 'function') comp.onclick();
   }, { id: componentId });
+
+  // Nexacro shows its own loading affordance (busy cursor, or a
+  // "waitwindow"-id overlay) while a click's server round-trip is in
+  // flight — Playwright's own load-state signals settle immediately, well
+  // before the app is actually done. Bounded and best-effort: most clicks
+  // don't trigger server work, so this returns right away; a timeout here
+  // is a warning; the next step's own resolve/wait catches anything real.
+  await page
+    .waitForFunction(
+      () => {
+        const bodyCursor = getComputedStyle(document.body).cursor;
+        const htmlCursor = getComputedStyle(document.documentElement).cursor;
+        if (bodyCursor === 'wait' || bodyCursor === 'progress' || htmlCursor === 'wait' || htmlCursor === 'progress') {
+          return false;
+        }
+        const nodes = document.querySelectorAll('[id*="waitwindow"]');
+        for (const el of Array.from(nodes)) {
+          const rect = el.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) continue;
+          const style = getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
+          return false;
+        }
+        return true;
+      },
+      null,
+      { timeout: IDLE_WAIT_MS },
+    )
+    .catch(() => {});
 }
 
 export async function nexacroSetValue(page: Page, componentId: string, value: string): Promise<void> {
@@ -92,10 +168,27 @@ export async function nexacroSetValue(page: Page, componentId: string, value: st
       let obj: any = app;
       let comp: any = null;
       for (let i = 0; i < parts.length; i++) {
-        const next = obj?.[parts[i]];
+        let next = obj?.[parts[i]];
         if (next === undefined) {
-          comp = i === parts.length - 1 ? obj : null;
-          break;
+          const dynamicMatch = /^(win[A-Za-z0-9]+)_\d+_\d+$/.exec(parts[i]);
+          if (dynamicMatch) {
+            const formId = dynamicMatch[1];
+            const active = typeof obj?.getActiveFrame === 'function' ? obj.getActiveFrame() : null;
+            if (active?.id && String(active.id).indexOf(formId) === 0) next = active;
+            else if (obj?.all && typeof obj.all.length === 'number') {
+              for (let j = 0; j < obj.all.length; j++) {
+                const frame = obj.all[j];
+                if (frame?.id && String(frame.id).indexOf(formId) === 0) {
+                  next = frame;
+                  break;
+                }
+              }
+            }
+          }
+          if (next == null) {
+            comp = i === parts.length - 1 ? obj : null;
+            break;
+          }
         }
         obj = next;
         comp = obj;
@@ -117,14 +210,172 @@ export async function nexacroGetValue(page: Page, componentId: string): Promise<
     let obj: any = app;
     let comp: any = null;
     for (let i = 0; i < parts.length; i++) {
-      const next = obj?.[parts[i]];
+      let next = obj?.[parts[i]];
       if (next === undefined) {
-        comp = i === parts.length - 1 ? obj : null;
-        break;
+        const dynamicMatch = /^(win[A-Za-z0-9]+)_\d+_\d+$/.exec(parts[i]);
+        if (dynamicMatch) {
+          const formId = dynamicMatch[1];
+          const active = typeof obj?.getActiveFrame === 'function' ? obj.getActiveFrame() : null;
+          if (active?.id && String(active.id).indexOf(formId) === 0) next = active;
+          else if (obj?.all && typeof obj.all.length === 'number') {
+            for (let j = 0; j < obj.all.length; j++) {
+              const frame = obj.all[j];
+              if (frame?.id && String(frame.id).indexOf(formId) === 0) {
+                next = frame;
+                break;
+              }
+            }
+          }
+        }
+        if (next == null) {
+          comp = i === parts.length - 1 ? obj : null;
+          break;
+        }
       }
       obj = next;
       comp = obj;
     }
     return String(comp?.value ?? comp?.get_value?.() ?? '');
   }, componentId);
+}
+
+interface NexacroGridExtractResult {
+  error?: string;
+  rows: Record<string, unknown>[];
+}
+
+// Never read a Nexacro Grid off the DOM: it virtualizes both rows and
+// columns outside the rendered viewport (a far cell can have no DOM node at
+// all while its data still exists), and a combo-mapped column's DOM text is
+// the underlying code, not the label the grid paints. The bound dataset
+// (rowcount/colcount/getColumn) holds every row regardless of scroll;
+// getCellText(row, cell) is what the grid actually paints.
+//
+// Header names come from the Format metadata's own 'col'/'colspan' on each
+// head/body cell, not from matching head and body cells at the same
+// rendered position — a merged group header or a hidden captioned column
+// makes the head band's index space diverge from the body band's, so
+// position-matching silently reads the wrong column for some cells.
+async function extractGridInPage(page: Page, componentId: string): Promise<NexacroGridExtractResult> {
+  return page.evaluate((id) => {
+    const app = (window as any).nexacro?.getApplication?.();
+    const parts = id.replace(/:[^:.]*$/, '').split('.');
+    let obj: any = app;
+    let grid: any = null;
+    for (let i = 0; i < parts.length; i++) {
+      let next = obj?.[parts[i]];
+      if (next === undefined) {
+        const dynamicMatch = /^(win[A-Za-z0-9]+)_\d+_\d+$/.exec(parts[i]);
+        if (dynamicMatch) {
+          const formId = dynamicMatch[1];
+          const active = typeof obj?.getActiveFrame === 'function' ? obj.getActiveFrame() : null;
+          if (active?.id && String(active.id).indexOf(formId) === 0) next = active;
+          else if (obj?.all && typeof obj.all.length === 'number') {
+            for (let j = 0; j < obj.all.length; j++) {
+              const frame = obj.all[j];
+              if (frame?.id && String(frame.id).indexOf(formId) === 0) {
+                next = frame;
+                break;
+              }
+            }
+          }
+        }
+        if (next == null) {
+          grid = i === parts.length - 1 ? obj : null;
+          break;
+        }
+      }
+      obj = next;
+      grid = obj;
+    }
+    if (!grid) return { error: `Nexacro component not found: ${id}`, rows: [] };
+
+    const dataset = typeof grid.getBindDataset === 'function' ? grid.getBindDataset() : null;
+    if (!dataset) return { error: 'Nexacro grid has no bound dataset', rows: [] };
+
+    const columns: string[] = [];
+    for (let c = 0; c < dataset.colcount; c++) columns.push(dataset.getColID(c));
+    const rawRows: Record<string, unknown>[] = [];
+    for (let r = 0; r < dataset.rowcount; r++) {
+      const row: Record<string, unknown> = {};
+      for (const col of columns) row[col] = dataset.getColumn(r, col);
+      rawRows.push(row);
+    }
+
+    let mappedRows: Record<string, unknown>[] = [];
+    try {
+      if (typeof grid.getCellCount === 'function' && typeof grid.getCellProperty === 'function') {
+        const headCount = grid.getCellCount('head');
+        const heads: { text: string; col: number; row: number; colspan: number }[] = [];
+        for (let hi = 0; hi < headCount; hi++) {
+          const text = String(grid.getCellProperty('head', hi, 'text') || '').trim();
+          if (!text) continue;
+          heads.push({
+            text,
+            col: Number(grid.getCellProperty('head', hi, 'col')) || 0,
+            row: Number(grid.getCellProperty('head', hi, 'row')) || 0,
+            colspan: Number(grid.getCellProperty('head', hi, 'colspan')) || 1,
+          });
+        }
+
+        // bodyCellIndex -> resolved header text. Index 0 is the grid's own
+        // checkbox/state column, excluded like every other rendering-only cell.
+        const bodyCount = grid.getCellCount('body');
+        const bodyColumns: { cellIndex: number; header: string }[] = [];
+        for (let bi = 1; bi < bodyCount; bi++) {
+          const bodyCol = Number(grid.getCellProperty('body', bi, 'col'));
+          if (Number.isNaN(bodyCol)) continue;
+          const matched = heads.filter((h) => bodyCol >= h.col && bodyCol < h.col + h.colspan);
+          // Deepest header row first, narrowest span second — a specific
+          // sub-header wins over the wide group header it sits under.
+          matched.sort((x, y) => y.row - x.row || x.colspan - y.colspan);
+          if (matched[0]) bodyColumns.push({ cellIndex: bi, header: matched[0].text });
+        }
+
+        if (bodyColumns.length > 0) {
+          for (let mr = 0; mr < dataset.rowcount; mr++) {
+            const mapped: Record<string, unknown> = {};
+            for (const { cellIndex, header } of bodyColumns) {
+              const cellText = grid.getCellText(mr, cellIndex);
+              mapped[header] = cellText === undefined ? null : cellText;
+            }
+            mappedRows.push(mapped);
+          }
+        }
+      }
+    } catch {
+      mappedRows = [];
+    }
+
+    // Prefer what the screen actually shows; only the raw code/id data is
+    // available when the grid exposes no head captions to map with.
+    return { rows: mappedRows.length > 0 ? mappedRows : rawRows };
+  }, componentId);
+}
+
+const GRID_DATA_WAIT_MS = 8000;
+
+export async function nexacroExtractGrid(page: Page, componentId: string): Promise<Record<string, string>[]> {
+  await waitForComponent(page, componentId);
+
+  let result = await extractGridInPage(page, componentId);
+  if (result.error) throw new Error(result.error);
+
+  // Grid data can arrive slightly after the component itself resolves — the
+  // loading overlay clears before the dataset actually binds — so poll for a
+  // first row rather than reporting a false empty result from a search
+  // that's still running. rows: [] after this wait is a real empty result.
+  const deadline = Date.now() + GRID_DATA_WAIT_MS;
+  while (result.rows.length === 0 && Date.now() < deadline) {
+    await page.waitForTimeout(250);
+    const retry = await extractGridInPage(page, componentId);
+    if (retry.error) break;
+    result = retry;
+  }
+
+  return result.rows.map((row) => {
+    const record: Record<string, string> = {};
+    for (const key of Object.keys(row)) record[key] = String(row[key] ?? '');
+    return record;
+  });
 }

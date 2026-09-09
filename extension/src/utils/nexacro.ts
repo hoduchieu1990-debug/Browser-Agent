@@ -25,6 +25,7 @@ export interface NexacroActionResult {
   ok: boolean;
   error?: string;
   value?: string;
+  grid?: { rows: Record<string, unknown>[] };
 }
 
 // A <script src> tag loads and executes asynchronously — dispatching a
@@ -64,7 +65,7 @@ export function setNexacroMarking(enabled: boolean): void {
   });
 }
 
-export function findNexacroComponent(el: Element | null): NexacroComponentRef | null {
+function markedAncestor(el: Element | null): NexacroComponentRef | null {
   const marked = el?.closest?.(`[${MARK_ATTR}]`) as HTMLElement | null;
   if (!marked) return null;
   const id = marked.getAttribute(MARK_ATTR);
@@ -72,11 +73,39 @@ export function findNexacroComponent(el: Element | null): NexacroComponentRef | 
   return { id, type: marked.getAttribute(TYPE_ATTR) ?? '', element: marked };
 }
 
+/**
+ * What a click or a typed value should target.
+ *
+ * A Grid is addressable as a whole — that's how its dataset gets read, see
+ * findNexacroGrid — but everything drawn inside one (rows, cells, and the
+ * tree items and checkboxes rendered in them) is an artifact of the grid's
+ * rendering rather than a component in its own right. Resolving those up to
+ * the Grid would record "click the whole grid" for what the user did to a
+ * single row, so they fall through to a CSS selector aimed at that exact
+ * node instead. That matches how a production Nexacro automation tool drives
+ * them: by DOM click, never through the component API.
+ */
+export function findNexacroComponent(el: Element | null): NexacroComponentRef | null {
+  const hit = markedAncestor(el);
+  if (!hit) return null;
+  if (hit.type === 'Grid' && hit.element !== el) return null;
+  return hit;
+}
+
+/**
+ * Table extraction only: a cell resolves up to the Grid that owns it, since
+ * the rows come from the Grid's bound dataset rather than the DOM.
+ */
+export function findNexacroGrid(el: Element | null): NexacroComponentRef | null {
+  const hit = markedAncestor(el);
+  return hit?.type === 'Grid' ? hit : null;
+}
+
 let requestCounter = 0;
 
 export async function runNexacroAction(
   componentId: string,
-  action: 'click' | 'set_value' | 'get_value',
+  action: 'click' | 'set_value' | 'get_value' | 'extract_grid',
   value?: string,
 ): Promise<NexacroActionResult> {
   await ensureBridgeInjected();

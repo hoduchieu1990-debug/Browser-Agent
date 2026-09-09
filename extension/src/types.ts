@@ -88,7 +88,7 @@ export type RuntimeMessage =
   | { type: 'RECORDING_UPDATED'; recording: boolean }
   | { type: 'SHOW_TOAST'; step: number; action: WorkflowAction }
   | { type: 'REPLAY_START'; background: boolean }
-  | { type: 'REPLAY_STEP'; action: WorkflowAction & { resolvedValue?: string } }
+  | { type: 'REPLAY_STEP'; action: WorkflowAction & { resolvedValue?: string; cdpPointOnly?: boolean } }
   | { type: 'REPLAY_UPDATED'; state: ReplayState }
   | { type: 'GET_REPLAY_STATE' }
   // A Report compose window's own preview run — always in a hidden window,

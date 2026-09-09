@@ -97,6 +97,9 @@ export type ActionType =
   | 'batchSearch'
   | 'batchExtract';
 
+/** Enterprise UI frameworks that render their own widgets instead of plain HTML controls. */
+export type ActionFramework = 'nexacro' | 'websquare';
+
 export interface BaseAction {
   id: string;
   type: ActionType;
@@ -108,6 +111,12 @@ export interface BaseAction {
   selectorFallbacks?: string[];
   /** A label the user gave this step — display only, never read during replay. */
   note?: string;
+  /**
+   * Which framework rendered the element, when it wasn't plain HTML. Recorded
+   * as a hint for whoever reads the workflow later; never read during replay,
+   * which decides how to drive a step from the selector alone.
+   */
+  framework?: ActionFramework;
 }
 
 export interface RetryConfig {

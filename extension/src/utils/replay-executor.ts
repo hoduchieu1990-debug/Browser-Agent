@@ -45,6 +45,7 @@ export interface StepResult {
   output?: StepOutput;
   skipped?: string;
   capture?: CaptureRequest; // only the background can take a screenshot
+  point?: { x: number; y: number }; // only the background can dispatch a CDP click
 }
 
 function query(selector: string): HTMLElement | null {
@@ -116,7 +117,9 @@ function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectE
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-export async function executeStep(action: WorkflowAction & { resolvedValue?: string }): Promise<StepResult> {
+export async function executeStep(
+  action: WorkflowAction & { resolvedValue?: string; cdpPointOnly?: boolean },
+): Promise<StepResult> {
   switch (action.type) {
     case 'click': {
       if (isNexacroSelector(action.selector)) {
@@ -132,6 +135,18 @@ export async function executeStep(action: WorkflowAction & { resolvedValue?: str
       const el = optional
         ? await locateFor({ selector: action.selector }, OPTIONAL_TIMEOUT_MS)
         : await locateFor(action);
+
+      // The background asks for the click point only, then dispatches the
+      // click itself through the debugger (a trusted event some frameworks
+      // require) — see cdp-click.ts. Same scrollIntoView-then-measure shape
+      // as the 'screenshot' case below.
+      if (action.cdpPointOnly) {
+        el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+        await new Promise((resolve) => setTimeout(resolve, 150)); // let the scroll settle before measuring
+        const rect = el.getBoundingClientRect();
+        return { point: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } };
+      }
+
       el.click();
       return {};
     }
@@ -170,6 +185,18 @@ export async function executeStep(action: WorkflowAction & { resolvedValue?: str
     }
 
     case 'extractTable': {
+      if (isNexacroSelector(action.selector)) {
+        const result = await runNexacroAction(nexacroComponentId(action.selector), 'extract_grid');
+        if (!result.ok || !result.grid) {
+          throw new Error(result.error ?? `Nexacro grid extraction failed: ${action.selector}`);
+        }
+        const records = result.grid.rows.map((row) => {
+          const record: Record<string, string> = {};
+          for (const key of Object.keys(row)) record[key] = String(row[key] ?? '');
+          return record;
+        });
+        return { output: { key: action.output, value: records } };
+      }
       const el = await locateFor(action, WAIT_TIMEOUT_MS);
       return { output: { key: action.output, value: readTableRecords(el, action.headers) } };
     }

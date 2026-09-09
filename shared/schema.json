@@ -142,6 +142,10 @@
           },
           "onError": { "enum": ["fail", "skip", "ignore"], "default": "fail" },
           "note": { "type": "string", "description": "User-facing label for this step, display only" },
+          "framework": {
+            "enum": ["nexacro", "websquare"],
+            "description": "Framework that rendered the element when recorded, absent for plain HTML. Metadata only, never read during replay"
+          },
           "inputType": { "enum": ["text", "fileUpload", "select"], "description": "Batch Input element kind" },
           "column": { "type": "string", "description": "Dataset column a Batch Input reads its value from" },
           "replaceMode": {

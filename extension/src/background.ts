@@ -1,5 +1,6 @@
 import type {
   WorkflowAction,
+  ClickAction,
   RuntimeMessage,
   RecorderSettings,
   EmailSettings,
@@ -40,6 +41,8 @@ import {
 } from './utils/storage-manager';
 import { captureElement, captureElementViaDebugger, captureThumbnail, type CaptureRect } from './utils/capture';
 import { setFileInputFilesViaDebugger } from './utils/file-input';
+import { cdpClick } from './utils/cdp-click';
+import { isNexacroSelector } from './utils/nexacro';
 
 const STEP_SETTLE_MS = 300;
 const NAVIGATION_TIMEOUT_MS = 30000;
@@ -317,10 +320,40 @@ function navigateAndWait(tabId: number, url: string): Promise<void> {
   });
 }
 
+// A trusted click (event.isTrusted === true) some frameworks require but a
+// synthetic DOM MouseEvent can't produce. The content script only resolves
+// the target and reports its point; the actual dispatch has to happen from
+// here, since chrome.debugger is background/service-worker only. Returns
+// null to tell the caller to fall back to a plain content-script click —
+// either because there was no debugger session available (already owned by
+// real DevTools, most commonly) or the dispatch itself failed — and the
+// element's own StepResult (usually just an error) when point resolution
+// itself is what failed, so the caller doesn't redundantly wait for the
+// same missing element a second time.
+async function tryCdpClick(tabId: number, action: ClickAction): Promise<any | null> {
+  const pointResult = await chrome.tabs
+    .sendMessage(tabId, { type: 'REPLAY_STEP', action: { ...action, cdpPointOnly: true } } satisfies RuntimeMessage)
+    .catch(() => null);
+  if (!pointResult) return null;
+  if (pointResult.error) return pointResult;
+  if (!pointResult.point) return null;
+  const clicked = await cdpClick(tabId, pointResult.point);
+  return clicked ? {} : null;
+}
+
 // A replayed click can navigate the page, which tears down the content script;
 // re-injecting before every step keeps the next one from talking to a dead frame.
 async function sendStep(tabId: number, action: WorkflowAction): Promise<any> {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content-script.js'] });
+
+  // Nexacro clicks already go through the component's own click() API (see
+  // replay-executor.ts) — that's more reliable than a coordinate click for
+  // them, so this only applies to everything else.
+  if (action.type === 'click' && !isNexacroSelector(action.selector)) {
+    const cdpResult = await tryCdpClick(tabId, action);
+    if (cdpResult) return cdpResult;
+  }
+
   return chrome.tabs.sendMessage(tabId, { type: 'REPLAY_STEP', action } satisfies RuntimeMessage);
 }
 
