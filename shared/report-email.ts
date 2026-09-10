@@ -44,7 +44,7 @@ function escapeHtml(value: string): string {
 }
 
 // The extension's own preview run (ReportComposer.tsx's Review tab) captures
-// extractImage steps as data: URLs — the same representation the popup's
+// screenshot steps as data: URLs — the same representation the popup's
 // Preview tab already shows. Rendering it as text would dump the whole
 // base64 blob into the table instead of an actual picture.
 function isImageValue(value: unknown): value is string {
@@ -67,42 +67,21 @@ const THEME = {
   errorText: '#b91c1c',
 };
 
-// Shared by the CLI daemon (real sends, cli/src/schedule/runner.ts) and the
-// extension's Report window Review tab (a placeholder ReportBatchResult) —
-// one function means the preview is exactly what actually gets sent, given
-// the same inputs.
-//
-// Each configured time-of-day is its own independent trigger, so `batch`
-// always has exactly one row (see runner.ts's tick()) — this is "did this
-// one run succeed" rendering, not a table of repeats.
-function renderResultsBlock(config: ScheduleConfig, batch: ReportBatchResult): { text: string; html: string } {
-  const row = batch.rows[0];
-  if (row?.success) {
-    const entries = config.resultKeys.map((key) => {
-      const record = batch.data[key]?.[0] as Record<string, unknown> | undefined;
-      return [key, record?.[key]] as const;
-    });
-    const text = entries
-      .map(([key, value]) => `${key}: ${isImageValue(value) ? '[image]' : formatValue(value)}`)
-      .join('\n');
-    const rows = entries
-      .map(([key, value], i) => {
-        const cell = isImageValue(value)
-          ? `<img src="${value}" alt="${escapeHtml(key)}" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid ${THEME.border};display:block" />`
-          : `<span style="font-size:13px;color:${THEME.text}">${escapeHtml(formatValue(value)) || '<span style="color:#94a3b8">(empty)</span>'}</span>`;
-        return `
-          <tr style="background:${i % 2 === 0 ? THEME.panelAlt : '#ffffff'}">
-            <th align="left" valign="top" style="padding:10px 14px;font-size:12px;font-weight:600;color:${THEME.muted};border:1px solid ${THEME.border};width:32%;white-space:nowrap">${escapeHtml(key)}</th>
-            <td style="padding:10px 14px;border:1px solid ${THEME.border}">${cell}</td>
-          </tr>`;
-      })
-      .join('');
-    const html = entries.length
-      ? `<table role="presentation" style="width:100%;border-collapse:collapse;margin:4px 0" cellpadding="0" cellspacing="0"><tbody>${rows}</tbody></table>`
-      : `<p style="font-size:13px;color:${THEME.muted};margin:4px 0">No results selected.</p>`;
-    return { text, html };
-  }
-  const error = row?.error ?? 'unknown error';
+type ResultKind = 'text' | 'table' | 'image';
+
+// The recorded action that produced this output name is the one source of
+// truth for what shape its value is — extractTable's is an array of rows,
+// screenshot's is a data: URL, everything else is a single scalar. Looking
+// it up here (rather than stamping a redundant kind onto the ReportBlock)
+// means a block never has to be kept in sync if the recording changes.
+function outputKind(config: ScheduleConfig, key: string): ResultKind {
+  const action = config.workflow.actions.find((a) => 'output' in a && a.output === key);
+  if (action?.type === 'extractTable') return 'table';
+  if (action?.type === 'screenshot') return 'image';
+  return 'text';
+}
+
+function runFailureBlock(error: string): { text: string; html: string } {
   return {
     text: `FAILED — ${error}`,
     html: `
@@ -111,6 +90,80 @@ function renderResultsBlock(config: ScheduleConfig, batch: ReportBatchResult): {
         <div style="color:${THEME.errorText};font-size:13px;margin-top:4px">${escapeHtml(error)}</div>
       </div>`,
   };
+}
+
+// A table result's rows arrive flattened directly into batch.data[key] (one
+// entry per row, column names as its own keys — see player/batch.ts's
+// accumulate) rather than nested under a `key` property the way a scalar
+// result is, so it needs its own render path: an actual table, one row per
+// entry, columns read off whichever keys the first row happens to have.
+function renderTableBlock(key: string, rows: unknown[]): { text: string; html: string } {
+  if (rows.length === 0) {
+    return {
+      text: `${key}: (no rows)`,
+      html: `<p style="font-size:13px;color:${THEME.muted};margin:4px 0">${escapeHtml(key)}: no rows.</p>`,
+    };
+  }
+  const columns = Object.keys(rows[0] as object);
+  const cell = (row: unknown, col: string) => formatValue((row as Record<string, unknown>)[col]);
+
+  const text = [columns.join(' | '), ...rows.map((r) => columns.map((c) => cell(r, c)).join(' | '))].join('\n');
+
+  const head = columns
+    .map(
+      (c) =>
+        `<th align="left" style="padding:8px 10px;font-size:11px;font-weight:600;color:${THEME.muted};border:1px solid ${THEME.border};background:${THEME.panelAlt}">${escapeHtml(c)}</th>`,
+    )
+    .join('');
+  const body = rows
+    .map(
+      (r, i) => `
+        <tr style="background:${i % 2 === 0 ? '#ffffff' : THEME.panelAlt}">
+          ${columns.map((c) => `<td style="padding:8px 10px;font-size:12px;color:${THEME.text};border:1px solid ${THEME.border}">${escapeHtml(cell(r, c)) || '&nbsp;'}</td>`).join('')}
+        </tr>`,
+    )
+    .join('');
+  const html = `<table role="presentation" style="width:100%;border-collapse:collapse;margin:4px 0" cellpadding="0" cellspacing="0"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+
+  return { text, html };
+}
+
+function renderScalarBlock(key: string, value: unknown, kind: ResultKind): { text: string; html: string } {
+  const isImage = kind === 'image' || isImageValue(value);
+  const text = `${key}: ${isImage ? '[image]' : formatValue(value)}`;
+  const cell = isImage
+    ? `<img src="${value}" alt="${escapeHtml(key)}" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid ${THEME.border};display:block" />`
+    : `<span style="font-size:13px;color:${THEME.text}">${escapeHtml(formatValue(value)) || '<span style="color:#94a3b8">(empty)</span>'}</span>`;
+  const html = `
+    <table role="presentation" style="width:100%;border-collapse:collapse;margin:4px 0" cellpadding="0" cellspacing="0">
+      <tbody>
+        <tr style="background:${THEME.panelAlt}">
+          <th align="left" valign="top" style="padding:10px 14px;font-size:12px;font-weight:600;color:${THEME.muted};border:1px solid ${THEME.border};width:32%;white-space:nowrap">${escapeHtml(key)}</th>
+          <td style="padding:10px 14px;border:1px solid ${THEME.border}">${cell}</td>
+        </tr>
+      </tbody>
+    </table>`;
+  return { text, html };
+}
+
+// Shared by the CLI daemon (real sends, cli/src/schedule/runner.ts) and the
+// extension's Report window Review tab (a placeholder ReportBatchResult) —
+// one function means the preview is exactly what actually gets sent, given
+// the same inputs.
+//
+// Each configured time-of-day is its own independent trigger, so `batch`
+// always has exactly one row (see runner.ts's tick()) — this renders "did
+// this one run succeed", not a table of repeats.
+function renderResultBlock(config: ScheduleConfig, batch: ReportBatchResult, key: string): { text: string; html: string } {
+  const row = batch.rows[0];
+  if (!row?.success) return runFailureBlock(row?.error ?? 'unknown error');
+
+  const kind = outputKind(config, key);
+  const entries = batch.data[key] ?? [];
+  if (kind === 'table') return renderTableBlock(key, entries);
+
+  const value = (entries[0] as Record<string, unknown> | undefined)?.[key];
+  return renderScalarBlock(key, value, kind);
 }
 
 function renderBlockHtml(type: string, value: string): string {
@@ -124,7 +177,7 @@ export function buildReportEmail(config: ScheduleConfig, batch: ReportBatchResul
   const dateLabel = new Date().toLocaleString();
   const subject = config.email.subject || `[Browser Agent] ${config.name} — ${dateLabel}`;
 
-  const blocks = config.contentBlocks?.length ? config.contentBlocks : defaultReportBlocks();
+  const blocks = config.contentBlocks?.length ? config.contentBlocks : defaultReportBlocks(config.resultKeys);
   const textParts: string[] = [];
   const htmlParts: string[] = [];
 
@@ -137,10 +190,10 @@ export function buildReportEmail(config: ScheduleConfig, batch: ReportBatchResul
     } else if (block.type === 'divider') {
       textParts.push('----------');
       htmlParts.push(`<hr style="border:none;border-top:1px solid ${THEME.border};margin:20px 0" />`);
-    } else if (block.type === 'results') {
-      const results = renderResultsBlock(config, batch);
-      textParts.push(results.text);
-      htmlParts.push(results.html);
+    } else if (block.type === 'result' && block.resultKey) {
+      const result = renderResultBlock(config, batch, block.resultKey);
+      textParts.push(result.text);
+      htmlParts.push(result.html);
     }
   }
 

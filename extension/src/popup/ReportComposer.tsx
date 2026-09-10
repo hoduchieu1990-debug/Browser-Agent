@@ -20,14 +20,16 @@ import type {
   RuntimeMessage,
 } from '../types';
 import { buildWorkflow } from '../utils/workflow-builder';
-import { extractableOutputs } from '../utils/result-keys';
+import { extractableOutputs, type ReportResultKind, type ReportResultSource } from '../utils/result-keys';
 
-const BLOCK_LABELS: Record<ReportBlockType, string> = {
+const BLOCK_LABELS: Record<Exclude<ReportBlockType, 'result'>, string> = {
   heading: '📌 Heading',
   paragraph: '📝 Paragraph',
-  results: '📊 Results table (auto-filled)',
   divider: '➖ Divider',
 };
+
+const KIND_ICON: Record<ReportResultKind, string> = { text: '🎯', table: '📊', image: '🖼️' };
+const KIND_LABEL: Record<ReportResultKind, string> = { text: 'Text', table: 'Table', image: 'Image' };
 
 interface Props {
   recording: SavedRecording;
@@ -45,11 +47,11 @@ function newBlockId(): string {
 // Reshapes a finished real run into the batch shape buildReportEmail expects —
 // null while nothing has actually run yet, so the caller knows to fall back
 // to sample data instead of an empty/failed-looking preview.
-function toReportBatch(state: ReplayState | null, keys: string[]): ReportBatchResult | null {
+function toReportBatch(state: ReplayState | null, outputs: ReportResultSource[]): ReportBatchResult | null {
   if (!state || state.running) return null;
   if (state.error) return { rows: [{ index: 1, success: false, error: state.error }], data: {}, files: {} };
   const data: Record<string, unknown[]> = {};
-  for (const key of keys) data[key] = [{ [key]: state.variables[key] }];
+  for (const { key } of outputs) data[key] = [{ [key]: state.variables[key] }];
   return { rows: [{ index: 1, success: true }], data, files: {} };
 }
 
@@ -75,8 +77,29 @@ function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
   return next;
 }
 
+// A block dragged from the palette — before it has an id, since that's only
+// assigned once it actually lands on the canvas.
+type PaletteItem =
+  | { kind: 'heading' | 'paragraph' | 'divider' }
+  | { kind: 'result'; resultKey: string };
+
+function blockFromPalette(item: PaletteItem): Omit<ReportBlock, 'id'> {
+  if (item.kind === 'result') return { type: 'result', resultKey: item.resultKey };
+  if (item.kind === 'divider') return { type: 'divider' };
+  return { type: item.kind, text: '' };
+}
+
+// What the browser puts on the wire for both a palette drag (a block not on
+// the canvas yet) and a canvas drag (reordering one already there) — one MIME
+// type, discriminated by `kind`, so a single drop handler covers both.
+type DragPayload = { kind: 'new'; item: PaletteItem } | { kind: 'move'; id: string };
+const DRAG_MIME = 'application/x-ba-report-block';
+
 export function ReportComposer({ recording, settings, emailSettings, onAddRecipient }: Props) {
   const outputs = extractableOutputs(recording.actions);
+  const kindByKey = new Map(outputs.map((o) => [o.key, o.kind]));
+
+  const [activeTab, setActiveTab] = useState<'edit' | 'review'>('edit');
 
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
   const [newRecipient, setNewRecipient] = useState('');
@@ -92,11 +115,22 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
   const [times, setTimes] = useState<string[]>(['09:00']);
   const [newTime, setNewTime] = useState('09:00');
 
-  // The email body as a small canvas: an ordered list of blocks the user
-  // adds, edits, removes, and reorders — not a single free-text field.
-  const [blocks, setBlocks] = useState<ReportBlock[]>(defaultReportBlocks());
+  // The email body as a small drag-and-drop canvas: an ordered list of
+  // blocks the user drags in from the palette, edits, removes, and
+  // reorders — not a single free-text field. Each result the job produced
+  // (text/table/image) is its own draggable palette item, so it can be
+  // placed anywhere among the headings/paragraphs rather than dumped as one
+  // combined block.
+  const [blocks, setBlocks] = useState<ReportBlock[]>(defaultReportBlocks(outputs.map((o) => o.key)));
+  // Which drop target (a block's id, or 'end' for after the last block) is
+  // currently under the dragged item — purely a highlight, cleared on every
+  // drop/dragleave.
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
 
-  const [resultKeys, setResultKeys] = useState<Set<string>>(new Set(outputs));
+  // Attachment is a separate concern from the canvas: which results get
+  // bundled into a downloadable CSV/Excel file, independent of which ones
+  // (if any) the user chose to show inline in the email body.
+  const [resultKeys, setResultKeys] = useState<Set<string>>(new Set(outputs.map((o) => o.key)));
   const [attachEnabled, setAttachEnabled] = useState(false);
   const [attachFormat, setAttachFormat] = useState<'csv' | 'excel'>('csv');
 
@@ -184,8 +218,32 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
     setTimes(times.filter((t) => t !== time));
   };
 
-  const addBlock = (type: ReportBlockType) => {
-    setBlocks([...blocks, { id: newBlockId(), type, text: type === 'heading' || type === 'paragraph' ? '' : undefined }]);
+  const insertBlockAt = (index: number, block: ReportBlock) => {
+    setBlocks((cur) => {
+      const next = [...cur];
+      next.splice(index, 0, block);
+      return next;
+    });
+  };
+
+  const moveBlockTo = (id: string, index: number) => {
+    setBlocks((cur) => {
+      const fromIndex = cur.findIndex((b) => b.id === id);
+      if (fromIndex === -1) return cur;
+      const moving = cur[fromIndex];
+      const without = cur.filter((b) => b.id !== id);
+      const adjusted = fromIndex < index ? index - 1 : index;
+      const next = [...without];
+      next.splice(adjusted, 0, moving);
+      return next;
+    });
+  };
+
+  // The click fallback appends to the end — dragging is how you choose
+  // where, but a small popup window makes drag-precision fiddly, so a click
+  // always has to work too.
+  const addFromPalette = (item: PaletteItem) => {
+    setBlocks((cur) => [...cur, { id: newBlockId(), ...blockFromPalette(item) }]);
   };
 
   const removeBlock = (id: string) => {
@@ -196,12 +254,40 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
     setBlocks(blocks.map((b) => (b.id === id ? { ...b, text } : b)));
   };
 
-  const moveBlock = (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= blocks.length) return;
-    const next = [...blocks];
-    [next[index], next[target]] = [next[target], next[index]];
-    setBlocks(next);
+  const onPaletteDragStart = (e: React.DragEvent, item: PaletteItem) => {
+    e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'new', item } satisfies DragPayload));
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const onBlockDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'move', id } satisfies DragPayload));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const onDropTargetOver = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = e.dataTransfer.effectAllowed === 'copy' ? 'copy' : 'move';
+    setDragOverTarget(targetId);
+  };
+
+  const onDropTargetLeave = (targetId: string) => {
+    setDragOverTarget((cur) => (cur === targetId ? null : cur));
+  };
+
+  // `index` is where the dropped block should land, i.e. "insert before the
+  // block currently at this position" — dropping past the last block passes
+  // blocks.length.
+  const onDrop = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverTarget(null);
+    const raw = e.dataTransfer.getData(DRAG_MIME);
+    if (!raw) return;
+    const payload = JSON.parse(raw) as DragPayload;
+    if (payload.kind === 'new') {
+      insertBlockAt(index, { id: newBlockId(), ...blockFromPalette(payload.item) });
+    } else {
+      moveBlockTo(payload.id, index);
+    }
   };
 
   const hasEmailAccount = emailSettings.user.trim() !== '';
@@ -279,10 +365,12 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
   const previewConfig = buildConfig();
   const placeholderBatch: ReportBatchResult = {
     rows: [{ index: 1, success: true }],
-    data: Object.fromEntries([...resultKeys].map((key) => [key, [{ [key]: '(sample value)' }]])),
+    data: Object.fromEntries(
+      outputs.map(({ key, kind }) => [key, kind === 'table' ? [{ value: '(sample value)' }] : [{ [key]: '(sample value)' }]]),
+    ),
     files: {},
   };
-  const realBatch = toReportBatch(previewState, [...resultKeys]);
+  const realBatch = toReportBatch(previewState, outputs);
   const usingRealData = realBatch !== null;
   const preview = buildReportEmail(previewConfig, realBatch ?? placeholderBatch);
 
@@ -300,12 +388,22 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
               Object.keys(previewState.variables).join(', ') || '(nothing)'
             }`;
 
+  const endZoneClass =
+    dragOverTarget === 'end' ? 'report-canvas-end-zone report-canvas-end-zone-over' : 'report-canvas-end-zone';
+
   return (
     <div className="report-composer">
       <div className="report-header">
         <div className="form-group">
           <label className="form-label">Report name</label>
           <input className="form-input" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">From</label>
+          <p className="form-hint report-sender-line">
+            {emailSettings.from || emailSettings.user || '(set up an email account in Settings)'}
+          </p>
         </div>
 
         <div className="form-group">
@@ -356,229 +454,318 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
         </p>
       )}
 
+      <div className="report-tabs">
+        <button
+          className={activeTab === 'edit' ? 'report-tab selected' : 'report-tab'}
+          onClick={() => setActiveTab('edit')}
+        >
+          ✏️ Edit
+        </button>
+        <button
+          className={activeTab === 'review' ? 'report-tab selected' : 'report-tab'}
+          onClick={() => setActiveTab('review')}
+        >
+          👁️ Review
+        </button>
+      </div>
+
       <div className="report-body">
-        <section className="report-section">
-          <h3 className="report-section-title">
-            <span className="report-section-number">1</span> Schedule
-          </h3>
-          <p className="form-hint">
-            This snapshots the job as it is right now — editing the saved recording later won't change reports
-            already created from it.
-          </p>
+        {activeTab === 'edit' ? (
+          <>
+            <section className="report-section">
+              <h3 className="report-section-title">
+                <span className="report-section-number">1</span> Schedule
+              </h3>
+              <p className="form-hint">
+                This snapshots the job as it is right now — editing the saved recording later won't change reports
+                already created from it.
+              </p>
 
-          <div className="form-group">
-            <label className="form-label">Recurrence</label>
-            <div className="recurrence-type-picker">
-              <button
-                className={recurrenceType === 'weekly' ? 'recurrence-type-btn selected' : 'recurrence-type-btn'}
-                onClick={() => setRecurrenceType('weekly')}
-              >
-                Weekly
-              </button>
-              <button
-                className={recurrenceType === 'once' ? 'recurrence-type-btn selected' : 'recurrence-type-btn'}
-                onClick={() => setRecurrenceType('once')}
-              >
-                Once on a date
-              </button>
-            </div>
-          </div>
-
-          {recurrenceType === 'weekly' ? (
-            <div className="form-group">
-              <label className="form-label">Days</label>
-              <div className="weekday-picker">
-                {WEEKDAYS.map((day) => (
+              <div className="form-group">
+                <label className="form-label">Recurrence</label>
+                <div className="recurrence-type-picker">
                   <button
-                    key={day.value}
-                    className={weekdays.has(day.value) ? 'weekday-chip selected' : 'weekday-chip'}
-                    onClick={() => setWeekdays(toggleInSet(weekdays, day.value))}
+                    className={recurrenceType === 'weekly' ? 'recurrence-type-btn selected' : 'recurrence-type-btn'}
+                    onClick={() => setRecurrenceType('weekly')}
                   >
-                    {day.label}
+                    Weekly
                   </button>
-                ))}
+                  <button
+                    className={recurrenceType === 'once' ? 'recurrence-type-btn selected' : 'recurrence-type-btn'}
+                    onClick={() => setRecurrenceType('once')}
+                  >
+                    Once on a date
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="form-group">
-              <label className="form-label">Date</label>
-              <input className="form-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-          )}
 
-          <div className="form-group">
-            <label className="form-label">Times of day (each one runs and emails independently)</label>
-            {times.length > 0 && (
-              <div className="weekday-picker">
-                {times.map((t) => (
-                  <span key={t} className="report-attachment-chip">
-                    {t}
-                    <button className="time-remove-btn" onClick={() => removeTime(t)}>
-                      ✕
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="recipient-add-row">
-              <input className="form-input" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
-              <button className="saved-load" onClick={addTime}>
-                + Add time
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section className="report-section">
-          <h3 className="report-section-title">
-            <span className="report-section-number">2</span> Content canvas
-          </h3>
-          <p className="form-hint">
-            Add, edit, remove, and reorder blocks. The 📊 Results block is filled in automatically from a real run.
-          </p>
-          <div className="report-canvas">
-            {blocks.map((block, index) => (
-              <div className="report-block" key={block.id}>
-                <div className="report-block-header">
-                  <span className="report-block-type">{BLOCK_LABELS[block.type]}</span>
-                  <div className="report-block-controls">
-                    <button
-                      className="report-block-btn"
-                      disabled={index === 0}
-                      onClick={() => moveBlock(index, -1)}
-                      title="Move up"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      className="report-block-btn"
-                      disabled={index === blocks.length - 1}
-                      onClick={() => moveBlock(index, 1)}
-                      title="Move down"
-                    >
-                      ↓
-                    </button>
-                    <button className="report-block-btn" onClick={() => removeBlock(block.id)} title="Remove">
-                      ✕
-                    </button>
+              {recurrenceType === 'weekly' ? (
+                <div className="form-group">
+                  <label className="form-label">Days</label>
+                  <div className="weekday-picker">
+                    {WEEKDAYS.map((day) => (
+                      <button
+                        key={day.value}
+                        className={weekdays.has(day.value) ? 'weekday-chip selected' : 'weekday-chip'}
+                        onClick={() => setWeekdays(toggleInSet(weekdays, day.value))}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                {block.type === 'heading' && (
-                  <input
-                    className="form-input"
-                    type="text"
-                    placeholder="Heading text…"
-                    value={block.text ?? ''}
-                    onChange={(e) => updateBlockText(block.id, e.target.value)}
-                  />
+              ) : (
+                <div className="form-group">
+                  <label className="form-label">Date</label>
+                  <input className="form-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label className="form-label">Times of day (each one runs and emails independently)</label>
+                {times.length > 0 && (
+                  <div className="weekday-picker">
+                    {times.map((t) => (
+                      <span key={t} className="report-attachment-chip">
+                        {t}
+                        <button className="time-remove-btn" onClick={() => removeTime(t)}>
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
                 )}
-                {block.type === 'paragraph' && (
-                  <textarea
-                    className="form-input report-content-textarea"
-                    placeholder="A note, instructions, or context for the reader…"
-                    value={block.text ?? ''}
-                    onChange={(e) => updateBlockText(block.id, e.target.value)}
-                    rows={3}
-                  />
+                <div className="recipient-add-row">
+                  <input className="form-input" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+                  <button className="saved-load" onClick={addTime}>
+                    + Add time
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section className="report-section">
+              <h3 className="report-section-title">
+                <span className="report-section-number">2</span> Content canvas
+              </h3>
+              <p className="form-hint">
+                Drag a block from the palette onto the canvas — or click one to add it to the end. Each result the job
+                produced is its own block, so it can go anywhere you like.
+              </p>
+
+              <div className="report-canvas-layout">
+                <div className="report-palette">
+                  <div className="report-palette-label">Blocks</div>
+                  {(['heading', 'paragraph', 'divider'] as const).map((type) => (
+                    <div
+                      key={type}
+                      className="report-palette-chip"
+                      draggable
+                      onDragStart={(e) => onPaletteDragStart(e, { kind: type })}
+                      onClick={() => addFromPalette({ kind: type })}
+                      title="Drag onto the canvas, or click to add to the end"
+                    >
+                      {BLOCK_LABELS[type]}
+                    </div>
+                  ))}
+
+                  {outputs.length > 0 && (
+                    <>
+                      <div className="report-palette-label report-palette-label-spaced">Results from this job</div>
+                      {outputs.map(({ key, kind }) => (
+                        <div
+                          key={key}
+                          className="report-palette-chip"
+                          draggable
+                          onDragStart={(e) => onPaletteDragStart(e, { kind: 'result', resultKey: key })}
+                          onClick={() => addFromPalette({ kind: 'result', resultKey: key })}
+                          title={`${KIND_LABEL[kind]} result — drag onto the canvas, or click to add to the end`}
+                        >
+                          {KIND_ICON[kind]} {key}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  {outputs.length === 0 && (
+                    <p className="form-hint">
+                      This job has no extractText/extractTable/extractJson/screenshot steps, so there's nothing to
+                      drag in yet.
+                    </p>
+                  )}
+                </div>
+
+                <div className="report-canvas">
+                  {blocks.length === 0 && (
+                    <div
+                      className={dragOverTarget === 'empty' ? 'report-canvas-empty report-canvas-empty-over' : 'report-canvas-empty'}
+                      onDragOver={(e) => onDropTargetOver(e, 'empty')}
+                      onDragLeave={() => onDropTargetLeave('empty')}
+                      onDrop={(e) => onDrop(e, 0)}
+                    >
+                      Drag a block here to start
+                    </div>
+                  )}
+                  {blocks.map((block, index) => (
+                    <div
+                      className={dragOverTarget === block.id ? 'report-block report-block-dragover' : 'report-block'}
+                      key={block.id}
+                      draggable
+                      onDragStart={(e) => onBlockDragStart(e, block.id)}
+                      onDragOver={(e) => onDropTargetOver(e, block.id)}
+                      onDragLeave={() => onDropTargetLeave(block.id)}
+                      onDrop={(e) => onDrop(e, index)}
+                    >
+                      <div className="report-block-header">
+                        <div className="report-block-label-group">
+                          <span className="report-block-drag-handle" title="Drag to reorder">
+                            ⠿
+                          </span>
+                          <span className="report-block-type" data-result-key={block.type === 'result' ? block.resultKey : undefined}>
+                            {block.type === 'result'
+                              ? `${KIND_ICON[kindByKey.get(block.resultKey ?? '') ?? 'text']} ${block.resultKey}`
+                              : BLOCK_LABELS[block.type]}
+                          </span>
+                        </div>
+                        <div className="report-block-controls">
+                          <button className="report-block-btn" onClick={() => removeBlock(block.id)} title="Remove">
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                      {block.type === 'heading' && (
+                        <input
+                          className="form-input"
+                          type="text"
+                          placeholder="Heading text…"
+                          value={block.text ?? ''}
+                          onChange={(e) => updateBlockText(block.id, e.target.value)}
+                        />
+                      )}
+                      {block.type === 'paragraph' && (
+                        <textarea
+                          className="form-input report-content-textarea"
+                          placeholder="A note, instructions, or context for the reader…"
+                          value={block.text ?? ''}
+                          onChange={(e) => updateBlockText(block.id, e.target.value)}
+                          rows={3}
+                        />
+                      )}
+                      {block.type === 'result' && (
+                        <p className="form-hint report-result-block-hint">Filled in automatically from the run.</p>
+                      )}
+                    </div>
+                  ))}
+                  <div
+                    className={endZoneClass}
+                    onDragOver={(e) => onDropTargetOver(e, 'end')}
+                    onDragLeave={() => onDropTargetLeave('end')}
+                    onDrop={(e) => onDrop(e, blocks.length)}
+                  >
+                    Drop here to add to the end
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="report-section">
+              <h3 className="report-section-title">
+                <span className="report-section-number">3</span> Attachment
+              </h3>
+              <div className="form-group">
+                <label className="result-key-item">
+                  <input type="checkbox" checked={attachEnabled} onChange={(e) => setAttachEnabled(e.target.checked)} />
+                  Attach results as a file
+                </label>
+                {attachEnabled && (
+                  <>
+                    <div className="recurrence-type-picker">
+                      <button
+                        className={attachFormat === 'csv' ? 'recurrence-type-btn selected' : 'recurrence-type-btn'}
+                        onClick={() => setAttachFormat('csv')}
+                      >
+                        CSV
+                      </button>
+                      <button
+                        className={attachFormat === 'excel' ? 'recurrence-type-btn selected' : 'recurrence-type-btn'}
+                        onClick={() => setAttachFormat('excel')}
+                      >
+                        Excel
+                      </button>
+                    </div>
+                    {outputs.length === 0 ? (
+                      <p className="form-hint">This job has no results to attach.</p>
+                    ) : (
+                      <div className="result-key-list">
+                        {outputs.map(({ key, kind }) => (
+                          <label className="result-key-item" key={key}>
+                            <input
+                              type="checkbox"
+                              checked={resultKeys.has(key)}
+                              onChange={() => setResultKeys(toggleInSet(resultKeys, key))}
+                            />
+                            {KIND_ICON[kind]} {key}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-            ))}
-          </div>
-          <div className="report-block-add-row">
-            <button className="saved-load" onClick={() => addBlock('heading')}>
-              + Heading
-            </button>
-            <button className="saved-load" onClick={() => addBlock('paragraph')}>
-              + Paragraph
-            </button>
-            <button className="saved-load" onClick={() => addBlock('results')}>
-              + Results table
-            </button>
-            <button className="saved-load" onClick={() => addBlock('divider')}>
-              + Divider
-            </button>
-          </div>
-        </section>
+            </section>
 
-        <section className="report-section">
-          <h3 className="report-section-title">
-            <span className="report-section-number">3</span> Format &amp; attachment
-          </h3>
-          <div className="form-group">
-            <label className="form-label">Results to include</label>
-            {outputs.length === 0 ? (
-              <p className="form-hint">This job has no extractText/extractTable/extractJson steps, so there's nothing to report.</p>
-            ) : (
-              <div className="result-key-list">
-                {outputs.map((key) => (
-                  <label className="result-key-item" key={key}>
-                    <input
-                      type="checkbox"
-                      checked={resultKeys.has(key)}
-                      onChange={() => setResultKeys(toggleInSet(resultKeys, key))}
-                    />
-                    {key}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label className="result-key-item">
-              <input type="checkbox" checked={attachEnabled} onChange={(e) => setAttachEnabled(e.target.checked)} />
-              Attach results as a file
-            </label>
-            {attachEnabled && (
-              <div className="recurrence-type-picker">
-                <button
-                  className={attachFormat === 'csv' ? 'recurrence-type-btn selected' : 'recurrence-type-btn'}
-                  onClick={() => setAttachFormat('csv')}
-                >
-                  CSV
-                </button>
-                <button
-                  className={attachFormat === 'excel' ? 'recurrence-type-btn selected' : 'recurrence-type-btn'}
-                  onClick={() => setAttachFormat('excel')}
-                >
-                  Excel
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="report-section report-section-preview">
-          <h3 className="report-section-title">
-            <span className="report-section-number">4</span> Report preview
-          </h3>
-
-          <div className="report-preview-controls">
-            <button className="saved-load" disabled={previewState?.running} onClick={runRealPreview}>
-              {previewState?.running ? '⏳ Running…' : usingRealData ? '🔄 Run again' : '▶ Run a real preview'}
-            </button>
-            <span className="report-preview-status">Status: {statusLine}</span>
-          </div>
-          {previewState?.error && <p className="form-hint schedule-warning">⚠️ {previewState.error}</p>}
-
-          <div className="report-template">
-            <div className="report-template-headers">
-              <div><strong>From:</strong> {preview.from || '(SMTP account, set in Settings)'}</div>
-              <div><strong>To:</strong> {preview.to || '(no recipient selected)'}</div>
-              <div><strong>Subject:</strong> {preview.subject}</div>
+            <div className="report-edit-footer">
+              <button className="export-btn" onClick={() => setActiveTab('review')}>
+                👁️ Review →
+              </button>
             </div>
-            <iframe className="report-preview-frame" srcDoc={preview.html} sandbox="" title="Report preview" />
-            {preview.attachments && preview.attachments.length > 0 && (
-              <div className="result-key-list report-template-attachments">
-                {preview.attachments.map((a) => (
-                  <span key={a.filename} className="report-attachment-chip">
-                    📎 {a.filename}
-                  </span>
-                ))}
+          </>
+        ) : (
+          <section className="report-section report-section-preview">
+            <h3 className="report-section-title">👁️ Review</h3>
+            <p className="form-hint">This is exactly what gets emailed — the same rendering the real send uses.</p>
+
+            <div className="report-preview-controls">
+              <button className="saved-load" disabled={previewState?.running} onClick={runRealPreview}>
+                {previewState?.running ? '⏳ Running…' : usingRealData ? '🔄 Run again' : '▶ Run a real preview'}
+              </button>
+              <span className="report-preview-status">Status: {statusLine}</span>
+            </div>
+            {previewState?.error && <p className="form-hint schedule-warning">⚠️ {previewState.error}</p>}
+
+            <div className="report-template">
+              <div className="report-template-headers">
+                <div>
+                  <strong>From:</strong> {preview.from || '(SMTP account, set in Settings)'}
+                </div>
+                <div>
+                  <strong>To:</strong> {preview.to || '(no recipient selected)'}
+                </div>
+                <div>
+                  <strong>Subject:</strong> {preview.subject}
+                </div>
               </div>
-            )}
-          </div>
-        </section>
+              <iframe className="report-preview-frame" srcDoc={preview.html} sandbox="" title="Report preview" />
+              {preview.attachments && preview.attachments.length > 0 && (
+                <div className="result-key-list report-template-attachments">
+                  {preview.attachments.map((a) => (
+                    <span key={a.filename} className="report-attachment-chip">
+                      📎 {a.filename}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="report-review-actions">
+              <button className="saved-load" onClick={() => setActiveTab('edit')}>
+                ← Back to edit
+              </button>
+              <button className="export-btn" disabled={!canSubmit} onClick={handleSubmit}>
+                📥 Create report
+              </button>
+            </div>
+          </section>
+        )}
       </div>
 
       <div className="report-footer">
@@ -586,9 +773,6 @@ export function ReportComposer({ recording, settings, emailSettings, onAddRecipi
         <div className="schedule-form-actions">
           <button className="action-delete schedule-cancel-btn" onClick={() => window.close()}>
             Cancel
-          </button>
-          <button className="export-btn" disabled={!canSubmit} onClick={handleSubmit}>
-            📥 Create report
           </button>
         </div>
       </div>

@@ -80,17 +80,23 @@ const PAGE = `<!doctype html>
     await reportPage.waitForLoadState();
     await reportPage.waitForTimeout(300);
 
-    // Everything lives on one page now — result keys default to all-selected,
-    // and the real run fires the moment the window opens (no tab, no click)
-    // once it confirms there is no earlier stored result for this recording.
+    const recs = await reportPage.evaluate(() => chrome.runtime.sendMessage({ type: 'GET_RECORDINGS' }));
+    console.log('[recordings]', JSON.stringify(recs));
+
+    // The real run fires the moment the window opens (no click needed) once
+    // it confirms there is no earlier stored result for this recording — but
+    // seeing it now takes a deliberate switch to the Review tab.
+    await reportPage.locator('.report-tab', { hasText: 'Review' }).click();
     const previewFrame = reportPage.frameLocator('.report-preview-frame');
 
     // Wait for that background run to actually finish rather than a fixed delay.
     await reportPage
       .locator('.report-preview-controls button', { hasText: 'Run again' })
       .waitFor({ timeout: 20000 });
+    await reportPage.waitForTimeout(300); // let the iframe's srcDoc actually finish reloading
 
     const realText = await previewFrame.locator('body').innerText();
+    console.log('[preview text]', JSON.stringify(realText));
     assert(realText.includes('1,284'), 'expected the real captured text value (1,284), not the sample placeholder');
     assert(!realText.includes('(sample value)'), 'sample placeholder should be gone once a real run finished');
     console.log('[ok] Review shows the real extracted text after running the recording for real');

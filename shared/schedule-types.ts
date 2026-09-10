@@ -38,25 +38,38 @@ export interface ScheduleAttachment {
   format: 'csv' | 'excel';
 }
 
-// The email body as a small canvas: an ordered list of blocks the user adds,
-// edits, removes, and reorders in ReportComposer.tsx. 'results' is a
-// placeholder — buildReportEmail (report-email.ts) substitutes the actual
-// results table/failure message there, so its position among the other
-// blocks is the only thing this format needs to record.
-export type ReportBlockType = 'heading' | 'paragraph' | 'results' | 'divider';
+// The email body as a small canvas: an ordered list of blocks the user drags
+// in, edits, removes, and reorders in ReportComposer.tsx. 'result' is a
+// placeholder for ONE named output (resultKey) — buildReportEmail
+// (report-email.ts) substitutes that output's actual value there (as text,
+// an inline image, or a table, depending on what the value turns out to be),
+// so its position among the other blocks is the only thing this format
+// needs to record. One block per result, not one block for all of them, is
+// what lets the user place each result exactly where they want it relative
+// to their own headings/paragraphs.
+export type ReportBlockType = 'heading' | 'paragraph' | 'result' | 'divider';
 
 export interface ReportBlock {
   id: string;
   type: ReportBlockType;
-  /** heading/paragraph only — ignored for 'results' and 'divider'. */
+  /** heading/paragraph only — ignored otherwise. */
   text?: string;
+  /** result only — which action `output` name this block renders. */
+  resultKey?: string;
 }
 
-/** What a new report starts with: an empty intro line above the results table. */
-export function defaultReportBlocks(): ReportBlock[] {
+/**
+ * What a report starts with when nothing was explicitly laid out: an intro
+ * line plus one block per given result key, in that order. Used both for a
+ * brand-new report in ReportComposer.tsx (pre-populated with every result
+ * the job produced, so there's something to rearrange rather than an empty
+ * canvas) and as report-email.ts's fallback for a ScheduleConfig that has no
+ * contentBlocks at all.
+ */
+export function defaultReportBlocks(resultKeys: string[] = []): ReportBlock[] {
   return [
     { id: 'block-intro', type: 'paragraph', text: '' },
-    { id: 'block-results', type: 'results' },
+    ...resultKeys.map((resultKey, i) => ({ id: `block-result-${i}`, type: 'result' as const, resultKey })),
   ];
 }
 
@@ -66,7 +79,7 @@ export interface ScheduleConfig {
   /** Snapshot taken at creation time — editing the original saved recording later does not affect this. */
   workflow: Workflow;
   recurrence: ScheduleRecurrence;
-  /** Which action `output` names to include in the report email. */
+  /** Which action `output` names to attach as a CSV/Excel file — independent of which ones appear as 'result' blocks in the body. */
   resultKeys: string[];
   /** The email body, in block order. Missing/empty falls back to defaultReportBlocks(). */
   contentBlocks?: ReportBlock[];

@@ -1426,10 +1426,157 @@ html.report-window body {
   cursor: default;
 }
 
-.report-block-add-row {
+/* Edit / Review switcher — a deliberate "go look at what this will actually
+   send" step, not a preview that's just always sitting there below a long
+   scroll. */
+.report-tabs {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
+  padding: 0 20px;
+  flex-shrink: 0;
+}
+
+.report-tab {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--surface);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.report-tab.selected {
+  background: var(--surface-raised);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.report-sender-line {
+  margin: 0;
+  font-size: 12px;
+}
+
+.report-edit-footer,
+.report-review-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Palette (draggable source) on the left, canvas (drop target, in send
+   order) on the right — a small popup window is too narrow for these side
+   by side below ~560px, so they stack instead. */
+.report-canvas-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 560px) {
+  .report-canvas-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.report-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+}
+
+.report-palette-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.report-palette-label-spaced {
+  margin-top: 8px;
+}
+
+.report-palette-chip {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-size: 12px;
+  color: var(--foreground);
+  cursor: grab;
+  user-select: none;
+}
+
+.report-palette-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.report-palette-chip:active {
+  cursor: grabbing;
+}
+
+.report-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 60px;
+}
+
+.report-canvas-empty,
+.report-canvas-end-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  text-align: center;
+}
+
+.report-canvas-empty-over,
+.report-canvas-end-zone-over {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--surface-raised);
+}
+
+.report-block-dragover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.report-block-label-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.report-block-drag-handle {
+  cursor: grab;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.report-block[draggable='true']:active .report-block-drag-handle {
+  cursor: grabbing;
+}
+
+.report-result-block-hint {
+  margin: 0;
 }
 
 .report-preview-frame {

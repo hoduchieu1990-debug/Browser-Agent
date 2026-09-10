@@ -52,6 +52,7 @@ const CHECKS = [
   'nexacro-dynamic-window-check.js',
   'nexacro-dynamic-window-bridge-check.js',
   'nexacro-grid-target-check.js',
+  'report-canvas-check.js',
   'cdp-click-check.js',
   'framework-tag-check.js',
   'hover-raf-coalesce-check.js',

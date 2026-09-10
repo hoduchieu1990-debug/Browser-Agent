@@ -95,18 +95,21 @@ const PAGE = `<!doctype html>
     await reportPage.waitForTimeout(150);
 
     // Canvas section — type a custom intro message into the default
-    // paragraph block (defaultReportBlocks() starts every report with one).
+    // paragraph block (defaultReportBlocks() starts every report with one),
+    // and read the output name off the result block the same default
+    // pre-populates the canvas with (one per result the job produced).
     await reportPage.locator('.report-content-textarea').fill('Hi team, here is today\'s report:');
+    const outputName = await reportPage.locator('.report-canvas .report-block-type[data-result-key]').last().getAttribute('data-result-key');
+    console.log('[available result key]', outputName);
+    assert(outputName && outputName.length > 0, 'expected the recorded extractText output name to be on the canvas by default');
 
-    // Format section — result keys + attach as CSV. Scoped to .report-body:
-    // the header's recipient checkboxes reuse the same .result-key-item
-    // class and would otherwise be matched first (DOM order).
-    const outputName = await reportPage.locator('.report-body .result-key-item').first().textContent();
-    console.log('[available result key]', outputName.trim());
-    assert(outputName.trim().length > 0, 'expected the recorded extractText output name to be listed');
+    // Attachment section — attach as CSV. resultKeys defaults to every
+    // output pre-selected, so enabling attachment alone is enough; no need
+    // to also click the (now attach-only) per-output checkbox.
     await reportPage.locator('.report-body .result-key-item', { hasText: 'Attach results as a file' }).click();
 
-    // Report preview section — full email info: From/To/Subject headers plus the body preview.
+    // Review tab — full email info: From/To/Subject headers plus the body preview.
+    await reportPage.locator('.report-tab', { hasText: 'Review' }).click();
     const headerText = await reportPage.locator('.report-template-headers').innerText();
     console.log('[preview headers]', headerText.replace(/\n/g, ' | '));
     assert(headerText.includes('ops@samsung.com'), 'preview headers should show the From account set in Settings');
@@ -149,7 +152,10 @@ const PAGE = `<!doctype html>
       config.contentBlocks.some((b) => b.type === 'paragraph' && b.text === "Hi team, here is today's report:"),
       'expected the typed canvas paragraph block in contentBlocks',
     );
-    assert(config.contentBlocks.some((b) => b.type === 'results'), 'expected the results block to still be present');
+    assert(
+      config.contentBlocks.some((b) => b.type === 'result' && b.resultKey === outputName.trim()),
+      'expected the result block for the recorded output to still be present',
+    );
     assert.deepStrictEqual(config.attachment, { format: 'csv' });
     assert(config.workflow.exportFormats.length === 1 && config.workflow.exportFormats[0].type === 'csv', 'attaching should set the embedded workflow\'s exportFormats');
     console.log('[ok] downloaded .schedule.json has the expected recurrence times/resultKeys/subject/content/attachment/workflow/email');

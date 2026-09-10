@@ -32,6 +32,7 @@ extension/public/icons/
 .verify/profile-cdp-click/
 .verify/profile-framework-tag/
 .verify/profile-nexacro-grid-target/
+.verify/profile-report-canvas/
 .verify/*.png
 .verify/*.json
 .verify/*.csv
