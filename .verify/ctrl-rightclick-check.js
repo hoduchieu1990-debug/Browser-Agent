@@ -45,11 +45,12 @@ const PAGE = `<!doctype html><html><body style="padding:60px;font-family:sans-se
     await popup.click('text=Start');
     await tab.waitForTimeout(400);
 
-    const frameLabel = tab.locator('#__browser_agent_target_frame__ span');
+    // Plain hovering costs the page nothing now: no target frame, no menu,
+    // no ancestor walks — just the cheap outline highlighter.ts draws.
+    const targetFrame = tab.locator('#__browser_agent_target_frame__');
     await tab.hover('#price');
     await tab.waitForTimeout(300);
-    const labelText = await frameLabel.textContent();
-    check('the target frame teaches the shortcut', labelText?.includes('Ctrl+Right-click to add') ?? false, labelText ?? '');
+    check('hovering alone draws no target frame', !(await targetFrame.isVisible()));
 
     const menu = tab.locator('#__browser_agent_add_badge__ [data-ba-role="menu"]');
     const menuVisibleBefore = await menu.evaluate((el) => el.style.display !== 'none').catch(() => false);

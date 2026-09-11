@@ -58,9 +58,8 @@ const PAGE = `<!doctype html>
     await popup.click('text=Start');
     await testPage.waitForTimeout(400);
     await testPage.hover('#total');
+    await testPage.click('#total', { button: 'right', modifiers: ['Control'] });
     await testPage.waitForTimeout(300);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await testPage.waitForTimeout(150);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await testPage.waitForTimeout(250);
     await testPage.bringToFront();

@@ -45,9 +45,8 @@ const PAGE = `<!doctype html>
       if (label === 'second') {
         const badge = testPage.locator('#__browser_agent_add_badge__');
         await testPage.hover('#total');
+        await testPage.click('#total', { button: 'right', modifiers: ['Control'] });
         await testPage.waitForTimeout(300);
-        await badge.locator('button', { hasText: 'Add' }).click(); // open the menu first
-        await testPage.waitForTimeout(150);
         await badge.locator('button', { hasText: 'Text value' }).click();
         await testPage.waitForTimeout(200);
       }

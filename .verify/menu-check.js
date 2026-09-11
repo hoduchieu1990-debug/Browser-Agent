@@ -45,32 +45,27 @@ const PAGE = `<!doctype html>
     await testPage.waitForTimeout(400);
 
     const badge = testPage.locator('#__browser_agent_add_badge__');
-    const trigger = badge.locator('button', { hasText: 'Add' });
+    const openMenuOn = async (selector) => {
+      await testPage.hover(selector);
+      await testPage.click(selector, { button: 'right', modifiers: ['Control'] });
+      await testPage.waitForTimeout(300);
+    };
 
     // ---- text value: menu must hide the table option ----
-    await testPage.hover('#total');
-    await testPage.waitForTimeout(300);
-    await trigger.click();
-    await testPage.waitForTimeout(200);
+    await openMenuOn('#total');
     await testPage.screenshot({ path: path.join(__dirname, 'menu-open.png') });
     console.log('table option visible over plain text:', await badge.locator('button', { hasText: 'Table data' }).isVisible());
     await badge.locator('button', { hasText: 'Text value' }).click();
     await testPage.waitForTimeout(300);
 
     // ---- table: all three options ----
-    await testPage.hover('td >> text=Alice');
-    await testPage.waitForTimeout(300);
-    await trigger.click();
-    await testPage.waitForTimeout(200);
+    await openMenuOn('td >> text=Alice');
     console.log('over a table -> table option visible:', await badge.locator('button', { hasText: 'Table data' }).isVisible());
     await badge.locator('button', { hasText: 'Table data' }).click();
     await testPage.waitForTimeout(300);
 
     // ---- image of the table area ----
-    await testPage.hover('td >> text=Bob');
-    await testPage.waitForTimeout(300);
-    await trigger.click();
-    await testPage.waitForTimeout(200);
+    await openMenuOn('td >> text=Bob');
     await badge.locator('button', { hasText: 'Image' }).click();
     await testPage.waitForTimeout(300);
 

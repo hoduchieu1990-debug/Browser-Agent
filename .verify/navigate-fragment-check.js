@@ -59,21 +59,20 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     await tab.waitForTimeout(600);
 
     const badge = tab.locator('#__browser_agent_add_badge__');
-    const box = await tab.locator('#cellA').boundingBox();
-    await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await tab.waitForTimeout(400);
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(150);
+    await tab.hover('#cellA');
+    await tab.click('#cellA', { button: 'right', modifiers: ['Control'] });
+    await tab.waitForTimeout(300);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await tab.waitForTimeout(400);
 
-    await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await tab.waitForTimeout(300);
-    const [reopened] = await Promise.all([
-      context.waitForEvent('page'),
-      badge.locator('[data-ba-role="stop"]').click(),
-    ]);
-    await reopened.waitForLoadState();
+    // Stop lives only in the popup now, not on the page — reuse the same
+    // popup tab from setup rather than opening a new one: a new tab/window
+    // opened *before* recording is actually turned off gets attached to and
+    // its own navigation to popup.html recorded as a spurious step, since
+    // recording follows whichever tab the user just switched to.
+    const reopened = popup;
+    await reopened.bringToFront();
+    await reopened.click('.record-btn.stop');
     await reopened.waitForTimeout(400);
 
     const navTarget = await reopened.locator('.action-selector').first().textContent();

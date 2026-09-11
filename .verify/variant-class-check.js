@@ -66,11 +66,13 @@ let hasToc = true;
     const token = tab.locator('pre').nth(4).locator('span span').first();
     const box = await token.boundingBox();
     await tab.mouse.move(box.x + 4, box.y + box.height / 2);
-    await tab.waitForTimeout(450);
+    await tab.waitForTimeout(200);
+    await tab.keyboard.down('Control');
+    await tab.mouse.click(box.x + 4, box.y + box.height / 2, { button: 'right' });
+    await tab.keyboard.up('Control');
+    await tab.waitForTimeout(300);
 
     const badge = tab.locator('#__browser_agent_add_badge__');
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(250);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await tab.waitForTimeout(500);
 

@@ -64,9 +64,8 @@ let renamed = false;
 
     const badge = tab.locator('#__browser_agent_add_badge__');
     await tab.hover('pre.result-body');
-    await tab.waitForTimeout(400);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await tab.waitForTimeout(200);
+    await tab.click('pre.result-body', { button: 'right', modifiers: ['Control'] });
+    await tab.waitForTimeout(300);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await tab.waitForTimeout(400);
 

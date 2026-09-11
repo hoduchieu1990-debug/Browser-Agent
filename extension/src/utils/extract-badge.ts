@@ -10,19 +10,11 @@ const BADGE_ID = '__browser_agent_add_badge__';
 // value" option at all) purely because of this cap, not because the element
 // wasn't a reasonable thing to capture.
 const MAX_TEXT_LENGTH = 800;
-const HIDE_DELAY_MS = 4000;
-const CURSOR_OFFSET_PX = 18;
-// The badge appears offset diagonally by CURSOR_OFFSET_PX in both axes, so
-// the row sits ~25px (hypot(18,18)) from the cursor the instant it shows up.
-// This margin used to be 34 — bigger than that starting gap — so the "don't
-// re-aim while reaching for the badge" guard below was true from the very
-// first frame and stayed true through anything short of a large move,
-// reading as the frame refusing to track the cursor at all. It only needs to
-// cover the last short hop onto the row itself, which is well under 25px.
-const APPROACH_MARGIN_PX = 12;
-// Clearing out to roughly this far from the open menu reads as "I'm done
-// with this, let me look elsewhere" rather than just a wobble mid-choice.
-const MENU_DISMISS_DISTANCE_PX = 120;
+// Fallback size for the very first paint, before the menu has ever been
+// measured — matches roughly what it renders at once populated, so the
+// screen-edge clamp below has a sane box to work with immediately.
+const MENU_FALLBACK_WIDTH_PX = 190;
+const MENU_FALLBACK_HEIGHT_PX = 220;
 
 export type BatchKind = 'input' | 'click' | 'search' | 'extract';
 
@@ -32,8 +24,7 @@ export interface BadgeCallbacks {
   onAddImage: (el: HTMLElement) => void;
   onAddInput: (el: HTMLElement) => void;
   onAddBatch: (el: HTMLElement, kind: BatchKind) => void;
-  onStop: () => void;
-  /** Fires when the badge takes over (or releases) showing the outline. */
+  /** Fires while the menu is open (or once it closes) — lets the caller mute the plain hover outline so it doesn't double up with this component's own frame. */
   onTargetChange?: (hasTarget: boolean) => void;
 }
 
@@ -295,9 +286,6 @@ function createTargetFrame(): TargetFrame {
 
 interface BadgeElements {
   root: HTMLDivElement;
-  row: HTMLDivElement;
-  trigger: HTMLButtonElement;
-  stopBtn: HTMLButtonElement;
   menu: HTMLDivElement;
   tableItem: HTMLButtonElement;
   textItem: HTMLButtonElement;
@@ -309,59 +297,18 @@ interface BadgeElements {
 function createBadge(): BadgeElements {
   document.getElementById(BADGE_ID)?.remove();
 
+  // Just a positioned wrapper for the menu now — no floating trigger/stop
+  // row tracking the cursor. Ctrl+Right-click opens the menu right where the
+  // pointer already is, the same way a native context menu would, so there
+  // is nothing left for this element to do but anchor it on screen.
   const root = document.createElement('div');
   root.id = BADGE_ID;
   markAsExtensionUi(root);
   root.style.position = 'fixed';
   root.style.zIndex = '2147483647';
   root.style.display = 'none';
-  root.style.flexDirection = 'column';
-  root.style.alignItems = 'flex-start';
-  root.style.gap = '4px';
   root.style.pointerEvents = 'auto';
-  // Same reasoning as the target frame — a page's own transition rule must
-  // not animate this badge's position as it follows the cursor.
   root.style.transition = 'none';
-
-  const trigger = document.createElement('button');
-  trigger.type = 'button';
-  trigger.dataset.baRole = 'add';
-  trigger.textContent = '＋ Add';
-  trigger.style.border = 'none';
-  trigger.style.borderRadius = '999px';
-  trigger.style.padding = '6px 14px';
-  trigger.style.background = '#4f46e5';
-  trigger.style.color = '#fff';
-  trigger.style.font = '600 11px system-ui, "Segoe UI", sans-serif';
-  trigger.style.cursor = 'pointer';
-  trigger.style.boxShadow = '0 2px 10px rgba(79, 70, 229, 0.45)';
-
-  // Sits right beside Add — the counting bubble that used to float in the
-  // corner is gone, so this is the only on-page way to stop a recording now.
-  const stopBtn = document.createElement('button');
-  stopBtn.type = 'button';
-  stopBtn.dataset.baRole = 'stop';
-  stopBtn.title = 'Stop recording';
-  stopBtn.textContent = '⏹';
-  stopBtn.style.border = 'none';
-  stopBtn.style.borderRadius = '999px';
-  stopBtn.style.width = '28px';
-  stopBtn.style.height = '28px';
-  stopBtn.style.flexShrink = '0';
-  stopBtn.style.display = 'flex';
-  stopBtn.style.alignItems = 'center';
-  stopBtn.style.justifyContent = 'center';
-  stopBtn.style.background = '#dc2626';
-  stopBtn.style.color = '#fff';
-  stopBtn.style.fontSize = '11px';
-  stopBtn.style.cursor = 'pointer';
-  stopBtn.style.boxShadow = '0 2px 10px rgba(220, 38, 38, 0.45)';
-
-  const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.alignItems = 'center';
-  row.style.gap = '6px';
-  row.append(trigger, stopBtn);
 
   const menu = document.createElement('div');
   menu.dataset.baRole = 'menu';
@@ -403,10 +350,10 @@ function createBadge(): BadgeElements {
     styleMenuLabel('Batch'),
     ...batchKinds.map((kind) => batchItems[kind]),
   );
-  root.append(row, menu);
+  root.append(menu);
   document.documentElement.appendChild(root);
 
-  return { root, row, trigger, stopBtn, menu, tableItem, textItem, imageItem, inputItem, batchItems };
+  return { root, menu, tableItem, textItem, imageItem, inputItem, batchItems };
 }
 
 // Composed events (mousemove, click, contextmenu) are retargeted for any
@@ -432,108 +379,27 @@ export function attachExtractBadge({
   onAddImage,
   onAddInput,
   onAddBatch,
-  onStop,
   onTargetChange,
 }: BadgeCallbacks): () => void {
-  const { root, row, trigger, stopBtn, menu, tableItem, textItem, imageItem, inputItem, batchItems } = createBadge();
+  const { root, menu, tableItem, textItem, imageItem, inputItem, batchItems } = createBadge();
   const frame = createTargetFrame();
 
   let currentTable: HTMLElement | null = null;
   let currentText: HTMLElement | null = null;
   let currentBatch: HTMLElement | null = null;
   let currentImage: HTMLElement | null = null;
-  let hideTimer: number | null = null;
   let menuOpen = false;
-  let anchorX = 0;
-  let anchorY = 0;
-  // The raw element a mousemove last landed on, independent of what it
-  // resolved to. A real mouse fires many move events without ever leaving
-  // the element under the pointer (sub-pixel jitter, a slow drag) — as long
-  // as that element hasn't changed, computeTargets cannot have anything new
-  // to report, so re-walking three ancestor chains and re-running selector
-  // uniqueness checks on every one of those events is pure waste. That waste
-  // was still enough, at real mouse event rates, to read as stutter even
-  // though each individual computeTargets call was already cheap in
-  // isolation.
-  let lastRawTarget: Element | null = null;
-
-  const moveTo = (x: number, y: number) => {
-    const width = row.offsetWidth || 110;
-    const height = row.offsetHeight || 28;
-    anchorX = Math.max(4, Math.min(x, window.innerWidth - width - 4));
-    anchorY = Math.max(4, Math.min(y, window.innerHeight - height - 4));
-    root.style.left = `${anchorX}px`;
-    root.style.top = `${anchorY}px`;
-  };
-
-  // distance to the Add+Stop row, zero when the pointer is inside it
-  const distanceToBadge = (x: number, y: number) => {
-    const rect = row.getBoundingClientRect();
-    const dx = Math.max(rect.left - x, 0, x - rect.right);
-    const dy = Math.max(rect.top - y, 0, y - rect.bottom);
-    return Math.hypot(dx, dy);
-  };
-
-  // distance to the whole badge+menu footprint — used to notice the user has
-  // clearly moved on, as opposed to just not being exactly over it
-  const distanceToRoot = (x: number, y: number) => {
-    const rect = root.getBoundingClientRect();
-    const dx = Math.max(rect.left - x, 0, x - rect.right);
-    const dy = Math.max(rect.top - y, 0, y - rect.bottom);
-    return Math.hypot(dx, dy);
-  };
 
   const defaultTarget = () => currentText ?? currentTable ?? currentBatch ?? currentImage;
 
-  // The label teaches the Ctrl+Right-click shortcut rather than restating
-  // "this will be added" — the outline itself already says that.
-  const frameDefault = () => {
-    const el = defaultTarget();
-    if (el) frame.show(el, 'Ctrl+Right-click to add');
-  };
-
-  const closeMenu = () => {
-    menuOpen = false;
-    menu.style.display = 'none';
-    frameDefault();
-  };
-
-  const hide = () => {
-    closeMenu();
-    root.style.display = 'none';
-    frame.hide();
-    currentTable = null;
-    currentText = null;
-    currentBatch = null;
-    currentImage = null;
-    // Without this, re-hovering the exact same element right after it was
-    // captured (a very common flow: pick "Text value", the mouse hasn't
-    // moved yet) would still match lastRawTarget from before hide() ran and
-    // the steady-hover skip above would bail before ever recomputing —
-    // leaving the badge permanently gone until the pointer visits a
-    // different element first.
-    lastRawTarget = null;
-    onTargetChange?.(false);
-  };
-
-  const cancelHide = () => {
-    if (hideTimer !== null) {
-      clearTimeout(hideTimer);
-      hideTimer = null;
-    }
-  };
-
-  const scheduleHide = () => {
-    if (menuOpen) return; // an open menu waits for a choice, however long that takes
-    if (hideTimer === null) hideTimer = window.setTimeout(hide, HIDE_DELAY_MS);
-  };
-
-  // Computed once per call and reused for both the "did anything change"
-  // comparison and the actual state update — the earlier version of this
-  // function (handleMove) called these three finders once to compare against
-  // the current target and, on a mismatch, called them again to know what to
-  // switch to. That doubled the exact per-event cost the whole synchronous,
-  // un-batched design (see the comment below) exists to keep low.
+  // Only ever called once per Ctrl+Right-click, not on every mousemove —
+  // this used to also run continuously while the pointer crossed the page
+  // (walking up to three ancestor chains per element) chasing a floating
+  // trigger button that followed the cursor. That was measured cheap in
+  // isolation, but at real mouse event rates it was still enough extra main-
+  // thread work to read as stutter. The page now gets a plain, effectively
+  // free CSS outline on hover (highlighter.ts, mouseover-driven) instead,
+  // and this only does any work at all when the menu is actually opening.
   const computeTargets = (target: Element | null) => ({
     table: findTableAncestor(target),
     text: findTextTarget(target),
@@ -541,105 +407,22 @@ export function attachExtractBadge({
     image: findImageTarget(target),
   });
 
-  // Shared by continuous hover tracking (handleMove) and the one-shot
-  // Ctrl+Right-click trigger (handleContextMenu below) — both need the same
-  // "aim the badge at this, right here" state update once a target is known.
-  const applyTargets = (
-    event: MouseEvent,
-    {
-      table,
-      text,
-      batch,
-      image,
-    }: { table: HTMLElement | null; text: HTMLElement | null; batch: HTMLElement | null; image: HTMLElement | null },
-  ): void => {
-    cancelHide();
-    currentTable = table;
-    currentText = text;
-    currentBatch = batch;
-    currentImage = image;
-    root.style.display = 'flex';
-    moveTo(event.clientX + CURSOR_OFFSET_PX, event.clientY + CURSOR_OFFSET_PX);
-    frameDefault();
-    onTargetChange?.(true);
+  const positionAt = (x: number, y: number) => {
+    const width = root.offsetWidth || MENU_FALLBACK_WIDTH_PX;
+    const height = root.offsetHeight || MENU_FALLBACK_HEIGHT_PX;
+    root.style.left = `${Math.max(4, Math.min(x, window.innerWidth - width - 4))}px`;
+    root.style.top = `${Math.max(4, Math.min(y, window.innerHeight - height - 4))}px`;
   };
 
-  // Deferring this to a requestAnimationFrame callback was tried, on the
-  // theory that a real mouse fires far more mousemove events than the screen
-  // repaints — but rAF scheduled from inside a mousemove handler runs on the
-  // *next* frame, not the current one, adding a real ~16ms of latency on top
-  // of whatever the browser's own event dispatch already costs. That is
-  // invisible while crawling the pointer slowly but reads as a visible gap
-  // between the cursor and the frame during a fast sweep, which is exactly
-  // backwards from the goal. The per-call cost here (ancestor walks, selector
-  // checks) was separately measured at low single-digit milliseconds even on
-  // a pathological page, so there was never a processing-time problem to
-  // solve by batching — handling every event immediately, synchronously, is
-  // both simpler and actually lower latency.
-  const handleMove = (event: MouseEvent) => {
-    const target = realTarget(event);
-
-    if (target && root.contains(target)) {
-      cancelHide(); // the pointer is on the badge: it stays until used
-      return;
-    }
-
-    // Locked the instant Add is clicked, not just once a choice is made — the
-    // whole point is that nothing underneath can change while you're picking.
-    // Moving well clear of the menu without clicking anything backs out of
-    // that lock too, so exploring the page freely doesn't require a click
-    // first.
-    if (menuOpen) {
-      if (distanceToRoot(event.clientX, event.clientY) < MENU_DISMISS_DISTANCE_PX) return;
-      closeMenu();
-    }
-
-    if (target === lastRawTarget) return;
-    lastRawTarget = target;
-
-    const targets = computeTargets(target);
-    if (!targets.table && !targets.text && !targets.batch && !targets.image) {
-      scheduleHide();
-      return;
-    }
-
-    const visible = root.style.display !== 'none';
-    const sameTarget =
-      visible &&
-      targets.table === currentTable &&
-      targets.text === currentText &&
-      targets.batch === currentBatch &&
-      targets.image === currentImage;
-
-    // Moving around inside the element you are already aiming at must not drag
-    // the badge along, or it would flee from every attempt to click it.
-    if (sameTarget) return;
-
-    // The badge is offset from the cursor and may sit over a different element;
-    // reaching for it crosses that element, which must not re-aim the capture.
-    if (visible && distanceToBadge(event.clientX, event.clientY) < APPROACH_MARGIN_PX) return;
-
-    applyTargets(event, targets);
-  };
-
-  // A right-click held with Ctrl opens the Add menu directly at the pointer,
-  // no travel to the badge required — for anyone who would rather keep both
-  // hands near the keyboard/mouse buttons than chase a floating button.
-  const handleContextMenu = (event: MouseEvent) => {
-    const target = realTarget(event);
-    if (!event.ctrlKey || isExtensionUi(target)) return;
-
-    stop(event); // suppress the browser's own context menu
-    const targets = computeTargets(target);
-    if (!targets.table && !targets.text && !targets.batch && !targets.image) return;
-
-    applyTargets(event, targets);
-    openMenu();
-  };
-
-  const handleScroll = () => {
-    // the page moved under a badge pinned to viewport coordinates
-    if (root.style.display !== 'none') hide();
+  const hide = () => {
+    menuOpen = false;
+    root.style.display = 'none';
+    frame.hide();
+    currentTable = null;
+    currentText = null;
+    currentBatch = null;
+    currentImage = null;
+    onTargetChange?.(false);
   };
 
   const stop = (event: Event) => {
@@ -648,26 +431,38 @@ export function attachExtractBadge({
     event.stopImmediatePropagation();
   };
 
-  // Shared by the trigger button and the Ctrl+Right-click shortcut — both
-  // land here once a target is already aimed at.
-  const openMenu = () => {
-    cancelHide();
+  // The only way the menu opens: a real context menu, not a button that has
+  // to be hunted down first. Nothing tracks the cursor between clicks.
+  const handleContextMenu = (event: MouseEvent) => {
+    const target = realTarget(event);
+    if (!event.ctrlKey || isExtensionUi(target)) return;
+
+    stop(event); // suppress the browser's own context menu
+    const targets = computeTargets(target);
+    if (!targets.table && !targets.text && !targets.batch && !targets.image) return;
+
+    currentTable = targets.table;
+    currentText = targets.text;
+    currentBatch = targets.batch;
+    currentImage = targets.image;
     menuOpen = true;
+
     tableItem.style.display = currentTable ? 'flex' : 'none';
     textItem.style.display = currentText ? 'flex' : 'none';
     inputItem.style.display = isTypeable(currentBatch) ? 'flex' : 'none';
-    // Batch nodes can be recorded on anything the badge is currently aimed
-    // at — table, text, or a plain control — so they're never hidden.
+    // Batch nodes can be recorded on anything the menu is aimed at — table,
+    // text, or a plain control — so they're never hidden.
     menu.style.display = 'flex';
+    root.style.display = 'block';
+    positionAt(event.clientX, event.clientY);
+
+    const el = defaultTarget();
+    if (el) frame.show(el, 'Selected');
+    onTargetChange?.(true);
   };
 
-  const handleTriggerClick = (event: MouseEvent) => {
-    stop(event);
-    if (menuOpen) {
-      closeMenu();
-      return;
-    }
-    openMenu();
+  const handleScroll = () => {
+    if (menuOpen) hide(); // the page moved under a menu pinned to viewport coordinates
   };
 
   const choose = (event: MouseEvent, run: () => void) => {
@@ -706,12 +501,6 @@ export function attachExtractBadge({
     choose(event, () => el && onAddBatch(el, kind));
   };
 
-  const handleStop = (event: MouseEvent) => {
-    stop(event);
-    onStop();
-    hide(); // instant feedback — the real teardown lands shortly after via SET_RECORDING
-  };
-
   const handleKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') hide();
   };
@@ -721,33 +510,22 @@ export function attachExtractBadge({
     if (menuOpen && (!target || !root.contains(target))) hide();
   };
 
-  // The frame no longer changes per menu item on hover — it used to preview
-  // each option's own target (the whole table for "Table data" vs. just a
-  // cell for "Text value"), but with several options meaning several
-  // possibly-different elements, that made the outline flip around while you
-  // were still choosing. One fixed frame for the whole time the menu is open
-  // is what "locked" actually means here.
   const batchKinds: BatchKind[] = ['input', 'click', 'search', 'extract'];
   batchKinds.forEach((kind) => {
     batchItems[kind].addEventListener('click', (event) => handleBatch(event, kind), true);
   });
 
-  trigger.addEventListener('click', handleTriggerClick, true);
-  stopBtn.addEventListener('click', handleStop, true);
   tableItem.addEventListener('click', handleTable, true);
   textItem.addEventListener('click', handleText, true);
   imageItem.addEventListener('click', handleImage, true);
   inputItem.addEventListener('click', handleInput, true);
-  document.addEventListener('mousemove', handleMove, true);
   document.addEventListener('contextmenu', handleContextMenu, true);
   document.addEventListener('keydown', handleKeydown, true);
   document.addEventListener('click', handleOutsideClick, true);
   window.addEventListener('scroll', handleScroll, true);
 
   return () => {
-    cancelHide();
     frame.remove();
-    document.removeEventListener('mousemove', handleMove, true);
     document.removeEventListener('contextmenu', handleContextMenu, true);
     document.removeEventListener('keydown', handleKeydown, true);
     document.removeEventListener('click', handleOutsideClick, true);

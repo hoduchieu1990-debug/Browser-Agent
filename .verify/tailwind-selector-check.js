@@ -64,9 +64,11 @@ let shifted = false;
     const badge = tab.locator('#__browser_agent_add_badge__');
     const preBox = await tab.locator('pre').boundingBox();
     await tab.mouse.move(preBox.x + 60, preBox.y + preBox.height / 2);
-    await tab.waitForTimeout(400);
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(250);
+    await tab.waitForTimeout(200);
+    await tab.keyboard.down('Control');
+    await tab.mouse.click(preBox.x + 60, preBox.y + preBox.height / 2, { button: 'right' });
+    await tab.keyboard.up('Control');
+    await tab.waitForTimeout(300);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await tab.waitForTimeout(400);
 

@@ -45,11 +45,9 @@ const PAGE = `<!doctype html><html><body style="padding:20px;font-family:sans-se
 
     const badge = tab.locator('#__browser_agent_add_badge__');
     const noticesAfterAdd = async (selector) => {
-      const box = await tab.locator(selector).boundingBox();
-      await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await tab.waitForTimeout(400);
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(150);
+      await tab.hover(selector);
+      await tab.click(selector, { button: 'right', modifiers: ['Control'] });
+      await tab.waitForTimeout(300);
       await badge.locator('button', { hasText: 'Text value' }).click();
       await tab.waitForTimeout(250); // still well inside the notice's lifetime
       return tab.evaluate(() => {

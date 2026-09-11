@@ -57,19 +57,17 @@ let serveBrokenPage = false;
     await testPage.waitForTimeout(200);
 
     const badge = testPage.locator('#__browser_agent_add_badge__');
-    const trigger = badge.locator('button', { hasText: 'Add' });
+    const openMenuOn = async (selector) => {
+      await testPage.hover(selector);
+      await testPage.click(selector, { button: 'right', modifiers: ['Control'] });
+      await testPage.waitForTimeout(300);
+    };
 
-    await testPage.hover('#total');
-    await testPage.waitForTimeout(300);
-    await trigger.click(); // open the menu first
-    await testPage.waitForTimeout(150);
+    await openMenuOn('#total');
     await badge.locator('button', { hasText: 'Text value' }).click();
     await testPage.waitForTimeout(200);
 
-    await testPage.hover('td >> text=Alice');
-    await testPage.waitForTimeout(300);
-    await trigger.click();
-    await testPage.waitForTimeout(150);
+    await openMenuOn('td >> text=Alice');
     await badge.locator('button', { hasText: 'Table data' }).click();
     await testPage.waitForTimeout(200);
 

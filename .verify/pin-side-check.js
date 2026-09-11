@@ -79,24 +79,22 @@ const PAGE = `<!doctype html><html><body style="padding:24px;font-family:sans-se
     const afterToggle = await contextTypes();
     check('turning it on docks the panel immediately', afterToggle.includes('SIDE_PANEL'), afterToggle.join(', '));
 
-    // ---- Stop from the page opens the panel rather than a popup window ----
+    // ---- Stopping while pinned stays in the panel, not a popup window ----
+    // Stop no longer lives on the page itself (Ctrl+Right-click replaced the
+    // on-page Add/Stop row) — the docked panel is what stays open beside the
+    // tab, so stop from there directly.
     await popup.click('text=Record');
     await popup.waitForTimeout(200);
     await tab.bringToFront();
     await popup.click('.record-btn.start');
     await tab.waitForTimeout(700);
 
-    const badge = tab.locator('#__browser_agent_add_badge__');
-    const box = await tab.locator('#cellA').boundingBox();
-    await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await tab.waitForTimeout(400);
-
     const windowsBefore = await worker.evaluate(() => chrome.windows.getAll().then((w) => w.length));
-    await badge.locator('[data-ba-role="stop"]').click();
+    await popup.click('.record-btn.stop');
     await tab.waitForTimeout(1500);
 
     const after = await contextTypes();
-    check('Stop opened the side panel', after.includes('SIDE_PANEL'), after.join(', '));
+    check('the panel is still docked, not replaced by a popup', after.includes('SIDE_PANEL'), after.join(', '));
 
     const windowsAfter = await worker.evaluate(() => chrome.windows.getAll().then((w) => w.length));
     check('and did not spawn a separate popup window', windowsAfter === windowsBefore, `${windowsBefore} → ${windowsAfter}`);

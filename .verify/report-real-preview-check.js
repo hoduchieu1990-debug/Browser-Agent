@@ -48,21 +48,17 @@ const PAGE = `<!doctype html>
     await popup.click('text=Start');
     await testPage.waitForTimeout(400);
 
-    const totalBox = await testPage.locator('#total').boundingBox();
-    await testPage.mouse.move(totalBox.x + totalBox.width / 2, totalBox.y + totalBox.height / 2);
-    await testPage.waitForTimeout(400);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await testPage.waitForTimeout(150);
+    await testPage.hover('#total');
+    await testPage.click('#total', { button: 'right', modifiers: ['Control'] });
+    await testPage.waitForTimeout(300);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await testPage.waitForTimeout(400);
     await testPage.mouse.move(5, 5); // clear the hover state before targeting the next element
     await testPage.waitForTimeout(300);
 
-    const imgBox = await testPage.locator('#box').boundingBox();
-    await testPage.mouse.move(imgBox.x + imgBox.width / 2, imgBox.y + imgBox.height / 2);
-    await testPage.waitForTimeout(400);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await testPage.waitForTimeout(150);
+    await testPage.hover('#box');
+    await testPage.click('#box', { button: 'right', modifiers: ['Control'] });
+    await testPage.waitForTimeout(300);
     await badge.locator('button', { hasText: 'Image of this area' }).click();
     await testPage.waitForTimeout(400);
 

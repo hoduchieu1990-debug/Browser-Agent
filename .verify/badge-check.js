@@ -50,18 +50,20 @@ const TEST_HTML = `<!doctype html>
     await testPage.waitForTimeout(300);
 
     const badge = testPage.locator('#__browser_agent_add_badge__');
-    const tableBtn = badge.locator('button', { hasText: 'Table' });
-    const textBtn = badge.locator('button', { hasText: 'Text' });
+    const tableBtn = badge.locator('button', { hasText: 'Table data' });
+    const textBtn = badge.locator('button', { hasText: 'Text value' });
 
-    // --- hover a plain text value -> only "Text" offered ---
+    // --- Ctrl+Right-click a plain text value -> only "Text" offered ---
     await testPage.hover('#price');
+    await testPage.click('#price', { button: 'right', modifiers: ['Control'] });
     await testPage.waitForTimeout(250);
     console.log('over #price  | badge:', await badge.isVisible(), '| table btn:', await tableBtn.isVisible(), '| text btn:', await textBtn.isVisible());
     await textBtn.click();
     await testPage.waitForTimeout(300);
 
-    // --- hover a table cell -> both offered ---
+    // --- Ctrl+Right-click a table cell -> both offered ---
     await testPage.hover('td >> text=Alice');
+    await testPage.click('td >> text=Alice', { button: 'right', modifiers: ['Control'] });
     await testPage.waitForTimeout(250);
     console.log('over table   | badge:', await badge.isVisible(), '| table btn:', await tableBtn.isVisible(), '| text btn:', await textBtn.isVisible());
     await testPage.screenshot({ path: path.join(__dirname, 'badge-both.png') });

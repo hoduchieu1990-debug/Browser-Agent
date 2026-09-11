@@ -397,6 +397,15 @@ async function publishReportPreviewState(recordingId: string, state: ReplayState
 // than an inactive tab, because captureVisibleTab only ever photographs the
 // active tab of a window — from an inactive tab it fails outright, while a
 // minimized window still renders and returns a real frame.
+//
+// An off-screen (not minimized) window was tried here to kill the brief
+// visible flash chrome.windows.create({ state: 'minimized' }) causes — but
+// testing turned up chrome.windows.create() sometimes never resolving at all
+// with off-screen coordinates once enough other browser windows are already
+// open (confirmed: the call hung past every timeout, with no error, no
+// window, nothing — not just slow). A silent hang is a worse failure mode
+// than a cosmetic flash, so this reverts to the proven-reliable minimized
+// form until the flash can be fixed without that risk.
 async function openHiddenWindow(): Promise<chrome.windows.Window> {
   return chrome.windows.create({ url: 'about:blank', focused: false, state: 'minimized' });
 }
@@ -759,20 +768,6 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       detachFromActiveTab();
       archiveCurrentRecording();
       sendResponse({ recording, actions });
-      // Only when Stop came from the on-page badge (sender.tab is set) is
-      // there no popup on screen to show the result in. Reopening one
-      // regardless would also steal lastFocusedWindow, which is what
-      // attachToActiveTab reads — the next Start would then try to record
-      // the popup itself.
-      // (chrome.action.openPopup() looks like the fit, but it only honours a
-      // gesture made directly on the action button; a click relayed from a
-      // content script doesn't qualify and it fails silently.)
-      if (sender.tab) {
-        // The badge that sent this is proof of which window holds the site,
-        // so the popup we are about to focus cannot muddle it.
-        if (sender.tab.windowId !== undefined) rememberBrowsingWindow(sender.tab.windowId);
-        openPopupWindow(sender.tab.windowId);
-      }
       return;
 
     case 'GET_RECORDINGS':

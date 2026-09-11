@@ -57,15 +57,13 @@ const PAGE = (withPopup) => `<!doctype html><html><body style="padding:20px;font
     await tab.click('#next');
     await tab.waitForTimeout(200);
 
-    // capture #done via the Add badge, the way a user actually would
+    // capture #done the way a user actually would: Ctrl+Right-click on it
     const badge = tab.locator('#__browser_agent_add_badge__');
     await tab.mouse.move(5, 5);
     await tab.waitForTimeout(150);
-    const doneBox = await tab.locator('#done').boundingBox();
-    await tab.mouse.move(doneBox.x + doneBox.width / 2, doneBox.y + doneBox.height / 2);
+    await tab.hover('#done');
+    await tab.click('#done', { button: 'right', modifiers: ['Control'] });
     await tab.waitForTimeout(300);
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(150);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await tab.waitForTimeout(200);
 

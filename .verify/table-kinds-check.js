@@ -83,13 +83,11 @@ const PAGE = `<!doctype html><html><body style="font-family:Segoe UI,sans-serif;
     const badge = tab.locator('#__browser_agent_add_badge__');
     const addTable = async (cellText, label) => {
       const cell = tab.locator(`text=${cellText}`).first();
-      const box = await cell.boundingBox();
-      await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await tab.waitForTimeout(400);
+      await cell.hover();
+      await cell.click({ button: 'right', modifiers: ['Control'] });
+      await tab.waitForTimeout(300);
 
       const tableOption = badge.locator('button', { hasText: 'Table data' });
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(250);
       const offered = await tableOption.isVisible();
       check(`${label}: "Table data" offered`, offered);
       if (!offered) {

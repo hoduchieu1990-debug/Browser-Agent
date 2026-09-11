@@ -53,23 +53,26 @@ const PAGE = `<!doctype html><html><head>
     };
 
     const a = await centerOf('#a');
-    await tab.mouse.move(a.x, a.y);
+    await tab.hover('#a');
+    await tab.click('#a', { button: 'right', modifiers: ['Control'] });
     await tab.waitForTimeout(700); // let any transition settle before the real check
 
     const b = await centerOf('#b');
-    await tab.mouse.move(b.x, b.y);
+    await tab.keyboard.press('Escape');
+    await tab.hover('#b');
+    await tab.click('#b', { button: 'right', modifiers: ['Control'] });
     // Deliberately short — the page's own transition is 600ms, so if the
     // frame is animating instead of jumping, it will still be far from B's
-    // position this soon after the move.
+    // position this soon after it is re-aimed.
     await tab.waitForTimeout(80);
 
     const frameBox = await frame.boundingBox();
     const withinB = frameBox && Math.abs(frameBox.x - b.box.x) < 6 && Math.abs(frameBox.width - b.box.width) < 6;
-    console.log('[frame box 80ms after moving to b]', frameBox);
+    console.log('[frame box 80ms after re-aiming at b]', frameBox);
     console.log('[b box]', b.box);
     assert(
       withinB,
-      `expected the frame to already match "b" 80ms after the move (no animation), got ${JSON.stringify(frameBox)} vs ${JSON.stringify(b.box)}`,
+      `expected the frame to already match "b" 80ms after re-aiming (no animation), got ${JSON.stringify(frameBox)} vs ${JSON.stringify(b.box)}`,
     );
     console.log('[ok] the frame jumps to the new position instantly even on a page with its own global transition rule');
   } finally {

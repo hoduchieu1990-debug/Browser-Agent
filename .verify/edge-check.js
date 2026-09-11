@@ -66,30 +66,26 @@ const check = (name, passed, detail = '') => {
     await testPage.waitForTimeout(250);
 
     const badge = testPage.locator('#__browser_agent_add_badge__');
-    const trigger = badge.locator('button', { hasText: 'Add' });
+    // Ctrl+Right-click is the only opener now — nothing shows on plain hover
+    // but the cheap outline highlighter.ts draws.
+    const openMenuOn = async (selector) => {
+      await testPage.hover(selector);
+      await testPage.click(selector, { button: 'right', modifiers: ['Control'] });
+      await testPage.waitForTimeout(300);
+    };
 
-    await testPage.hover('#total');
-    await testPage.waitForTimeout(350);
-    check('Add badge appears on hover', await badge.isVisible());
-
-    await trigger.click();
-    await testPage.waitForTimeout(200);
+    await openMenuOn('#total');
+    check('menu opens on hover target', await badge.isVisible());
     check('menu hides Table option over plain text', !(await badge.locator('button', { hasText: 'Table data' }).isVisible()));
     await badge.locator('button', { hasText: 'Text value' }).click();
     await testPage.waitForTimeout(300);
 
-    await testPage.hover('td >> text=Alice');
-    await testPage.waitForTimeout(350);
-    await trigger.click();
-    await testPage.waitForTimeout(200);
+    await openMenuOn('td >> text=Alice');
     check('menu shows Table option over a table', await badge.locator('button', { hasText: 'Table data' }).isVisible());
     await badge.locator('button', { hasText: 'Table data' }).click();
     await testPage.waitForTimeout(300);
 
-    await testPage.hover('td >> text=Bob');
-    await testPage.waitForTimeout(350);
-    await trigger.click();
-    await testPage.waitForTimeout(200);
+    await openMenuOn('td >> text=Bob');
     await badge.locator('button', { hasText: 'Image' }).click();
     await testPage.waitForTimeout(300);
 

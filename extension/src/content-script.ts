@@ -162,8 +162,7 @@ function setRecording(value: boolean, highlightElements: boolean): void {
       onAddImage: recordImage,
       onAddInput: recordInput,
       onAddBatch: recordBatch,
-      onStop: () => chrome.runtime.sendMessage({ type: 'STOP_RECORDING' } satisfies RuntimeMessage),
-      // two outlines on screen at once is noise; the badge's is the precise one
+      // two outlines on screen at once is noise; the menu's is the precise one
       onTargetChange: (hasTarget) => highlighter?.setPaused(hasTarget),
     });
   } else if (!value && recorder) {

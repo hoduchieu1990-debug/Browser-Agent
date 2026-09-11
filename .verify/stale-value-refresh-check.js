@@ -47,9 +47,8 @@ const server = http.createServer((_req, res) => {
 
     const badge = tab.locator('#__browser_agent_add_badge__');
     await tab.hover('#price');
+    await tab.click('#price', { button: 'right', modifiers: ['Control'] });
     await tab.waitForTimeout(300);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await tab.waitForTimeout(150);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await tab.waitForTimeout(300);
 

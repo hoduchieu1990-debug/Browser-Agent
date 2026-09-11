@@ -47,11 +47,9 @@ const PAGE = (label) => `<!doctype html><html><body style="padding:24px;font-fam
 
     const badge = tab.locator('#__browser_agent_add_badge__');
     const addText = async (selector) => {
-      const box = await tab.locator(selector).boundingBox();
-      await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await tab.waitForTimeout(350);
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(150);
+      await tab.hover(selector);
+      await tab.click(selector, { button: 'right', modifiers: ['Control'] });
+      await tab.waitForTimeout(300);
       await badge.locator('button', { hasText: 'Text value' }).click();
       await tab.waitForTimeout(350);
     };

@@ -20,6 +20,15 @@ const sameBox = (a, b, tol = 3) =>
   a && b && Math.abs(a.x - b.x) < tol && Math.abs(a.y - b.y) < tol &&
   Math.abs(a.width - b.width) < tol && Math.abs(a.height - b.height) < tol;
 
+// Ctrl+Right-click is the only way the menu opens now — no floating trigger
+// to hover for and click. Note this has to go through the selector-based
+// click API: page.mouse.click() takes no `modifiers` option, so the ctrlKey
+// the handler checks for never gets set that way.
+async function ctrlRightClick(page, selector) {
+  await page.hover(selector);
+  await page.click(selector, { button: 'right', modifiers: ['Control'] });
+}
+
 (async () => {
   const server = http.createServer((_req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -53,18 +62,17 @@ const sameBox = (a, b, tol = 3) =>
     await page.waitForTimeout(600);
 
     const badge = page.locator('#__browser_agent_add_badge__');
-    const trigger = badge.locator('[data-ba-role="add"]');
     const frame = page.locator('#__browser_agent_target_frame__');
 
-    check('no frame before hovering', !(await frame.isVisible()));
+    check('no frame before Ctrl+Right-clicking', !(await frame.isVisible()));
 
-    // ---------- hovering a value frames that value ----------
+    // ---------- Ctrl+Right-clicking a value frames that value and opens the menu ----------
     const priceBox = await page.locator('#price').boundingBox();
-    await page.mouse.move(priceBox.x + 40, priceBox.y + priceBox.height / 2);
-    await page.waitForTimeout(350);
+    await ctrlRightClick(page, '#price');
+    await page.waitForTimeout(300);
 
-    check('frame appears with the badge', await frame.isVisible());
-    check('frame outlines the hovered value', sameBox(await frame.boundingBox(), priceBox),
+    check('frame appears with the menu', await frame.isVisible());
+    check('frame outlines the right-clicked value', sameBox(await frame.boundingBox(), priceBox),
       JSON.stringify(await frame.boundingBox()));
     console.log('  label:', (await frame.locator('span').textContent()).trim());
 
@@ -72,13 +80,13 @@ const sameBox = (a, b, tol = 3) =>
       !(await page.locator('#__browser_agent_highlight__').isVisible()));
 
     await page.screenshot({ path: path.join(__dirname, 'frame-text.png') });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
 
     // ---------- the frame stays locked while the menu is open, regardless
     // of which option is hovered ----------
     const cellBox = await page.locator('#cell').boundingBox();
-    await page.mouse.move(cellBox.x + cellBox.width / 2, cellBox.y + cellBox.height / 2);
-    await page.waitForTimeout(350);
-    await trigger.click();
+    await ctrlRightClick(page, '#cell');
     await page.waitForTimeout(300);
 
     const boxAtOpen = await frame.boundingBox();

@@ -2,7 +2,11 @@ import { findClickableAncestor } from './clickable-element';
 import { markAsExtensionUi, isExtensionUi } from './ui-marker';
 
 const OVERLAY_ID = '__browser_agent_highlight__';
-const DEFAULT_COLOR = '#18181b';
+// The same indigo the capture frame uses (extract-badge.ts's createTargetFrame)
+// — one hover colour for the whole recording experience, rather than a
+// near-black outline that reads as "something is broken/selected" rather than
+// "this is what the extension is pointing at".
+const DEFAULT_COLOR = '#4f46e5';
 
 // Draws an independent overlay box instead of mutating the target's own
 // inline style — SPA frameworks (React/Vue/Angular) reconcile the DOM on

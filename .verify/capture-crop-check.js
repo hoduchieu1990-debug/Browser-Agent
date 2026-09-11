@@ -53,11 +53,9 @@ const PAGE = `<!doctype html><html><body style="margin:0;background:#ffffff">
     const captureImageOf = async (selector) => {
       await tab.evaluate((sel) => document.querySelector(sel).scrollIntoView({ block: 'center' }), selector);
       await tab.waitForTimeout(400);
-      const box = await tab.locator(selector).boundingBox();
-      await tab.mouse.move(box.x + box.width / 2, Math.max(20, box.y + Math.min(60, box.height / 2)));
-      await tab.waitForTimeout(450);
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(200);
+      await tab.hover(selector);
+      await tab.click(selector, { button: 'right', modifiers: ['Control'] });
+      await tab.waitForTimeout(300);
       await badge.locator('button', { hasText: 'Image of this area' }).click();
       await tab.waitForTimeout(450);
     };

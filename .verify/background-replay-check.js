@@ -48,24 +48,21 @@ const OTHER = `<!doctype html><html><body style="padding:40px"><h1>Unrelated pag
 
     const badge = testPage.locator('#__browser_agent_add_badge__');
     await testPage.hover('#total');
+    await testPage.click('#total', { button: 'right', modifiers: ['Control'] });
     await testPage.waitForTimeout(300);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await testPage.waitForTimeout(150);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await testPage.waitForTimeout(250);
 
     await testPage.hover('td >> text=Alice');
+    await testPage.click('td >> text=Alice', { button: 'right', modifiers: ['Control'] });
     await testPage.waitForTimeout(300);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await testPage.waitForTimeout(150);
     await badge.locator('button', { hasText: 'Table data' }).click();
     await testPage.waitForTimeout(250);
 
     // the whole point of this run: an image must come back from background mode too
     await testPage.hover('td >> text=Bob');
+    await testPage.click('td >> text=Bob', { button: 'right', modifiers: ['Control'] });
     await testPage.waitForTimeout(300);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await testPage.waitForTimeout(150);
     await badge.locator('button', { hasText: 'Image' }).click();
     await testPage.waitForTimeout(250);
 

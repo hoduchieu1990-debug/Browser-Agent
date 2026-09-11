@@ -104,8 +104,8 @@ export function RecordTab({
 
       {recording && (
         <div className="extract-hint">
-          💡 Hover anything on the page, then click <strong>＋ Add</strong> to capture it as table data, a text
-          value, an image, or text to type in.
+          💡 <strong>Ctrl+Right-click</strong> anything on the page to capture it as table data, a text value, an
+          image, or text to type in.
         </div>
       )}
 

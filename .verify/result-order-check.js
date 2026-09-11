@@ -40,11 +40,9 @@ const PAGE = `<!doctype html><html><body style="padding:20px;font-family:sans-se
   await tab.waitForTimeout(700);
   const badge = tab.locator('#__browser_agent_add_badge__');
   const add = async (sel, menu) => {
-    const box = await tab.locator(sel).boundingBox();
-    await tab.mouse.move(box.x + Math.min(30, box.width/2), box.y + box.height/2);
-    await tab.waitForTimeout(400);
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(180);
+    await tab.hover(sel);
+    await tab.click(sel, { button: 'right', modifiers: ['Control'] });
+    await tab.waitForTimeout(300);
     await badge.locator('button', { hasText: menu }).click();
     await tab.waitForTimeout(400);
   };

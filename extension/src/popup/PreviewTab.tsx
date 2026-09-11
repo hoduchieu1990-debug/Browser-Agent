@@ -236,7 +236,7 @@ export function PreviewTab({ actions, state, background, thumbnails, onBackgroun
         <div className="empty-state">
           <div className="empty-state-icon">📋</div>
           <strong>Replay finished — no data captured</strong>
-          <p>Hover a table or value while recording and press ＋ Add.</p>
+          <p>Ctrl+Right-click a table or value while recording to capture it.</p>
         </div>
       )}
 

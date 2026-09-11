@@ -62,6 +62,7 @@ function heavyPage(n) {
 
     // --- Correctness: id'd element is captured directly, not its ancestor ---
     await tab.hover('#price');
+    await tab.click('#price', { button: 'right', modifiers: ['Control'] });
     await tab.waitForFunction(
       () => {
         const f = document.getElementById('__browser_agent_target_frame__');
@@ -85,6 +86,7 @@ function heavyPage(n) {
     const rowTarget = tab.locator('.row').nth(500);
     await rowTarget.locator('.label').scrollIntoViewIfNeeded();
     await rowTarget.locator('.label').hover();
+    await rowTarget.locator('.label').click({ button: 'right', modifiers: ['Control'] });
     await tab.waitForFunction(
       () => {
         const f = document.getElementById('__browser_agent_target_frame__');
@@ -108,10 +110,21 @@ function heavyPage(n) {
 
     const hops = [];
     for (let i = 0; i < 5; i++) {
+      // Close whatever the previous iteration opened, so each measurement
+      // times a real open rather than passing instantly on a stale frame.
+      await tab.keyboard.press('Escape');
+      await tab.waitForFunction(
+        () => {
+          const f = document.getElementById('__browser_agent_target_frame__');
+          return !f || f.style.display === 'none';
+        },
+        undefined,
+        { timeout: 5000 },
+      );
       await tab.mouse.move(5, 5);
       await tab.waitForTimeout(30);
       const t0 = Date.now();
-      await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await target.click({ button: 'right', modifiers: ['Control'] });
       await tab.waitForFunction(
         () => {
           const f = document.getElementById('__browser_agent_target_frame__');
@@ -123,8 +136,8 @@ function heavyPage(n) {
       hops.push(Date.now() - t0);
     }
     const avg = hops.reduce((a, b) => a + b, 0) / hops.length;
-    console.log(`[perf] heavy-page hover latency: ${hops.join(',')}ms avg=${avg.toFixed(1)}ms`);
-    assert(Math.max(...hops) < 2000, `hover latency spiked to ${Math.max(...hops)}ms on the heavy shared-class page`);
+    console.log(`[perf] heavy-page capture-open latency: ${hops.join(',')}ms avg=${avg.toFixed(1)}ms`);
+    assert(Math.max(...hops) < 2000, `capture-open latency spiked to ${Math.max(...hops)}ms on the heavy shared-class page`);
     console.log('[ok] heavy shared-class page stays responsive (max hop < 2000ms)');
 
     await popup.click('.record-btn.stop').catch(() => {});

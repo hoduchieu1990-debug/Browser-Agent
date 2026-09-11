@@ -42,10 +42,12 @@ const PAGE = (label) => `<!doctype html><html><body style="padding:24px;font-fam
 
     const badgeVisibleOn = async (page) => {
       await page.bringToFront();
-      const box = await page.locator('#cellA').boundingBox();
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.hover('#cellA');
+      await page.click('#cellA', { button: 'right', modifiers: ['Control'] });
       await page.waitForTimeout(500);
-      return page.locator('#__browser_agent_add_badge__').isVisible().catch(() => false);
+      const visible = await page.locator('#__browser_agent_add_badge__').isVisible().catch(() => false);
+      await page.keyboard.press('Escape').catch(() => {});
+      return visible;
     };
 
     // The user is working in the SECOND window. Starting from a popup window
@@ -82,15 +84,12 @@ const PAGE = (label) => `<!doctype html><html><body style="padding:24px;font-fam
     check('and not to the other browser window', !(await badgeVisibleOn(first)));
 
     // stop cleanly so the archived-session state doesn't leak into other runs
-    await second.bringToFront();
-    const box = await second.locator('#cellA').boundingBox();
-    await second.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await second.waitForTimeout(400);
-    await second
-      .locator('#__browser_agent_add_badge__ [data-ba-role="stop"]')
-      .click()
-      .catch(() => {});
-    await second.waitForTimeout(400);
+    // — Stop lives only in the popup now, not on a badge row on the page.
+    const stopWin = await context.newPage();
+    await stopWin.goto(`chrome-extension://${extensionId}/popup.html`);
+    await stopWin.click('.record-btn.stop').catch(() => {});
+    await stopWin.waitForTimeout(300);
+    await stopWin.close();
   } finally {
     await context.close();
     server.close();

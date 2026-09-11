@@ -41,17 +41,18 @@ const PAGE = `<!doctype html>
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
 
     const badge = testPage.locator('#__browser_agent_add_badge__');
-    const addBtn = badge.locator('button', { hasText: 'Add' });
+    const openMenuOn = async (selector) => {
+      await testPage.hover(selector);
+      await testPage.click(selector, { button: 'right', modifiers: ['Control'] });
+      await testPage.waitForTimeout(300);
+    };
 
     // ---- JOB 1: capture only the text value ----
     await testPage.bringToFront();
     await popup.click('text=Record');
     await popup.click('text=Start');
     await testPage.waitForTimeout(400);
-    await testPage.hover('#total');
-    await testPage.waitForTimeout(300);
-    await addBtn.click();
-    await testPage.waitForTimeout(150);
+    await openMenuOn('#total');
     await badge.locator('button', { hasText: 'Text value' }).click();
     await testPage.waitForTimeout(250);
     await testPage.bringToFront();
@@ -62,10 +63,7 @@ const PAGE = `<!doctype html>
     await testPage.bringToFront();
     await popup.click('text=Start');
     await testPage.waitForTimeout(400);
-    await testPage.hover('td >> text=Alice');
-    await testPage.waitForTimeout(300);
-    await addBtn.click();
-    await testPage.waitForTimeout(150);
+    await openMenuOn('td >> text=Alice');
     await badge.locator('button', { hasText: 'Table data' }).click();
     await testPage.waitForTimeout(250);
     await testPage.bringToFront();

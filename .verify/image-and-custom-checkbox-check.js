@@ -66,40 +66,38 @@ const PAGE = `<!doctype html><html><body style="padding:20px;font-family:sans-se
     const badge = tab.locator('#__browser_agent_add_badge__');
     const frame = tab.locator('#__browser_agent_target_frame__');
 
-    const hover = async (selector) => {
+    // Ctrl+Right-click is the only opener now: nothing appears on plain
+    // hover but the cheap outline highlighter.ts draws.
+    const aim = async (selector) => {
       await tab.mouse.move(5, 5);
       await tab.waitForTimeout(120);
-      const box = await tab.locator(selector).boundingBox();
-      await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await tab.hover(selector);
+      await tab.click(selector, { button: 'right', modifiers: ['Control'] });
       await tab.waitForTimeout(300);
     };
 
     // ---------- 1. plain <img>, no wrapper ----------
-    await hover('#photo');
+    await aim('#photo');
     const frameVisibleForImg = await frame.evaluate((el) => el.style.display !== 'none').catch(() => false);
     check('the target frame appears over a plain <img>', frameVisibleForImg);
 
     const badgeVisibleForImg = await badge.evaluate((el) => el.style.display !== 'none').catch(() => false);
-    check('the Add badge appears over a plain <img>', badgeVisibleForImg);
+    check('the menu opens over a plain <img>', badgeVisibleForImg);
 
     if (badgeVisibleForImg) {
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(150);
       await badge.locator('button', { hasText: 'Image of this area' }).click();
       await tab.waitForTimeout(200);
     }
 
     // ---------- 2. custom checkbox (hidden input + styled sibling span) ----------
-    await hover('#fakebox');
+    await aim('#fakebox');
     const frameVisibleForCheckbox = await frame.evaluate((el) => el.style.display !== 'none').catch(() => false);
     check('the target frame appears over the styled span of a custom checkbox', frameVisibleForCheckbox);
 
     const badgeVisibleForCheckbox = await badge.evaluate((el) => el.style.display !== 'none').catch(() => false);
-    check('the Add badge appears over the styled span of a custom checkbox', badgeVisibleForCheckbox);
+    check('the menu opens over the styled span of a custom checkbox', badgeVisibleForCheckbox);
 
     if (badgeVisibleForCheckbox) {
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(150);
       const clickOptionVisible = await badge
         .locator('button', { hasText: 'Click' })
         .evaluate((el) => el.style.display !== 'none')

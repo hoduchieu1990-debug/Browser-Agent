@@ -91,11 +91,9 @@ async function buildDataset(filePath) {
 
     const badge = tab.locator('#__browser_agent_add_badge__');
     const addBatch = async (targetSelector, menuText) => {
-      const box = await tab.locator(targetSelector).boundingBox();
-      await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await tab.hover(targetSelector);
+      await tab.click(targetSelector, { button: 'right', modifiers: ['Control'] });
       await tab.waitForTimeout(300);
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(150);
       await badge.locator('button', { hasText: menuText }).click();
       await tab.waitForTimeout(250);
     };

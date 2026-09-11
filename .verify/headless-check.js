@@ -51,16 +51,14 @@ const PAGE = `<!doctype html>
 
     const badge = testPage.locator('#__browser_agent_add_badge__');
     await testPage.hover('#total');
+    await testPage.click('#total', { button: 'right', modifiers: ['Control'] });
     await testPage.waitForTimeout(300);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await testPage.waitForTimeout(150);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await testPage.waitForTimeout(300);
 
     await testPage.hover('td >> text=Alice');
+    await testPage.click('td >> text=Alice', { button: 'right', modifiers: ['Control'] });
     await testPage.waitForTimeout(300);
-    await badge.locator('button', { hasText: 'Add' }).click();
-    await testPage.waitForTimeout(150);
     await badge.locator('button', { hasText: 'Table data' }).click();
     await testPage.waitForTimeout(300);
 

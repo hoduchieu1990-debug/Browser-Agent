@@ -59,21 +59,23 @@ const PAGE = `<!doctype html><html><body style="padding:20px;font-family:sans-se
         await tab.waitForTimeout(400);
       }
       await tab.mouse.move(x, y);
-      await tab.waitForTimeout(400);
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(150);
+      await tab.waitForTimeout(200);
+      // Ctrl+Right-click opens the menu right where the pointer is — the
+      // selector-based API, since page.mouse takes no `modifiers`.
+      await tab.click(selector, { button: 'right', modifiers: ['Control'] });
+      await tab.waitForTimeout(300);
       await badge.locator('button', { hasText: menu }).click();
       await tab.waitForTimeout(450);
     };
 
-    // aiming by hovering only — one step, as always
+    // capturing straight away — one step, as always
     await addVia('#a', 'Text value');
-    check('hover then Add records one step', (await steps()).join() === 'navigate,extractText', (await steps()).join(', '));
+    check('capture alone records one step', (await steps()).join() === 'navigate,extractText', (await steps()).join(', '));
 
     // aiming by clicking first — the click is part of the same intention
     await addVia('#t', 'Table data', { clickFirst: true });
     check(
-      'click then Add still records one step',
+      'click then capture still records one step',
       (await steps()).join() === 'navigate,extractText,extractTable',
       (await steps()).join(', '),
     );

@@ -65,11 +65,12 @@ const PAGE = `<!doctype html><html><body style="padding:40px;font-family:sans-se
     // real shadow-internal span the same way a user's eyes would.
     const priceBox = await tab.locator('#price').boundingBox();
     const hostBox = await tab.locator('#host').boundingBox();
-    await tab.mouse.move(priceBox.x + priceBox.width / 2, priceBox.y + priceBox.height / 2);
+    await tab.hover('#price');
+    await tab.click('#price', { button: 'right', modifiers: ['Control'] });
     await tab.waitForTimeout(350);
 
     const badgeVisible = await badge.evaluate((el) => el.style.display !== 'none').catch(() => false);
-    check('the Add badge appears when hovering a value inside an open shadow root', badgeVisible);
+    check('the menu opens on a value inside an open shadow root', badgeVisible);
 
     const frameBox = await frame.boundingBox().catch(() => null);
     check('the target frame appears at all', !!frameBox, JSON.stringify(frameBox));
@@ -84,8 +85,6 @@ const PAGE = `<!doctype html><html><body style="padding:40px;font-family:sans-se
     }
 
     if (badgeVisible) {
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(150);
       const textOptionVisible = await badge
         .locator('button', { hasText: 'Text value' })
         .evaluate((el) => el.style.display !== 'none')

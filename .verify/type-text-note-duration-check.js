@@ -40,11 +40,9 @@ const PAGE = `<!doctype html><html><body style="padding:20px;font-family:sans-se
     const badge = tab.locator('#__browser_agent_add_badge__');
 
     // ---- (1) Type text menu item + config panel ----
-    const box = await tab.locator('#code').boundingBox();
-    await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await tab.waitForTimeout(400);
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(200);
+    await tab.hover('#code');
+    await tab.click('#code', { button: 'right', modifiers: ['Control'] });
+    await tab.waitForTimeout(300);
     const typeTextOffered = await badge.locator('button', { hasText: 'Type text' }).isVisible();
     check('"Type text" is offered over an input field', typeTextOffered);
 
@@ -52,11 +50,9 @@ const PAGE = `<!doctype html><html><body style="padding:20px;font-family:sans-se
     await tab.waitForTimeout(400);
 
     // and it must not be offered over something that isn't typeable
-    const divBox = await tab.locator('#a').boundingBox();
-    await tab.mouse.move(divBox.x + divBox.width / 2, divBox.y + divBox.height / 2);
-    await tab.waitForTimeout(400);
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(200);
+    await tab.hover('#a');
+    await tab.click('#a', { button: 'right', modifiers: ['Control'] });
+    await tab.waitForTimeout(300);
     const typeTextOverDiv = await badge.locator('button', { hasText: 'Type text' }).isVisible();
     check('"Type text" is not offered over a plain div', !typeTextOverDiv);
     await tab.keyboard.press('Escape');
@@ -98,10 +94,9 @@ const PAGE = `<!doctype html><html><body style="padding:20px;font-family:sans-se
     // ---- (5) durations in Preview ----
     // add one more simple capture so there's something to extract too
     await tab.bringToFront();
-    await tab.mouse.move((await tab.locator('#a').boundingBox()).x + 30, (await tab.locator('#a').boundingBox()).y + 15);
-    await tab.waitForTimeout(400);
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(200);
+    await tab.hover('#a');
+    await tab.click('#a', { button: 'right', modifiers: ['Control'] });
+    await tab.waitForTimeout(300);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await tab.waitForTimeout(400);
 

@@ -62,8 +62,9 @@ const PAGE = `<!doctype html><html><body style="margin:0;padding:20px;background
 
     // aim at one cell
     const cellBox = await tab.locator('#cell').boundingBox();
-    await tab.mouse.move(cellBox.x + cellBox.width / 2, cellBox.y + cellBox.height / 2);
-    await tab.waitForTimeout(450);
+    await tab.hover('#cell');
+    await tab.click('#cell', { button: 'right', modifiers: ['Control'] });
+    await tab.waitForTimeout(300);
 
     const framed = await frame.boundingBox();
     const near = (a, b) => Math.abs(a - b) < 4;
@@ -73,8 +74,6 @@ const PAGE = `<!doctype html><html><body style="margin:0;padding:20px;background
       `outline ${JSON.stringify(framed)} vs cell ${JSON.stringify(cellBox)}`,
     );
 
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(200);
     await badge.locator('button', { hasText: 'Image of this area' }).click();
     await tab.waitForTimeout(500);
 

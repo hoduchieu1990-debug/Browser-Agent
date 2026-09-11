@@ -70,7 +70,13 @@ let shifted = false;
     const token = tab.locator('pre').nth(1).locator('span span').first();
     const tokenBox = await token.boundingBox();
     await tab.mouse.move(tokenBox.x + 4, tokenBox.y + tokenBox.height / 2);
-    await tab.waitForTimeout(450);
+    await tab.waitForTimeout(200);
+    // Ctrl+Right-click is the only opener now — the target frame only shows
+    // once the menu is actually open, not on plain hover.
+    await tab.keyboard.down('Control');
+    await tab.mouse.click(tokenBox.x + 4, tokenBox.y + tokenBox.height / 2, { button: 'right' });
+    await tab.keyboard.up('Control');
+    await tab.waitForTimeout(300);
 
     const frameLabel = await tab.locator('#__browser_agent_target_frame__').boundingBox();
     const preBox = await tab.locator('pre').nth(1).boundingBox();
@@ -78,7 +84,6 @@ let shifted = false;
       `frame ${Math.round(frameLabel.width)} vs pre ${Math.round(preBox.width)}`);
 
     const badge = tab.locator('#__browser_agent_add_badge__');
-    await badge.locator('[data-ba-role="add"]').click();
     await tab.waitForTimeout(250);
     await badge.locator('button', { hasText: 'Text value' }).click();
     await tab.waitForTimeout(500);

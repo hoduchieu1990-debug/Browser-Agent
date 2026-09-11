@@ -77,13 +77,11 @@ const PAGE = `<!doctype html><html><body style="margin:0;font-family:sans-serif"
 
     const badge = tab.locator('#__browser_agent_add_badge__');
     const openMenuOver = async (selector) => {
-      const box = await tab.locator(selector).first().boundingBox();
-      await tab.mouse.move(box.x + Math.min(30, box.width / 2), box.y + box.height / 2);
-      await tab.waitForTimeout(450);
-      if (!(await badge.isVisible())) return false;
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(200);
-      return true;
+      const target = tab.locator(selector).first();
+      await target.hover();
+      await target.click({ button: 'right', modifiers: ['Control'] });
+      await tab.waitForTimeout(300);
+      return badge.isVisible();
     };
 
     // ---- over the layout table, "Table data" must not be on offer ----

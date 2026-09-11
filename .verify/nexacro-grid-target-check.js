@@ -92,10 +92,10 @@ const PAGE = `<!doctype html>
     const cell = tab.locator(`[id="${GRID_ID}.body.gridrow_1.cell_1_0"]`);
     const box = await cell.boundingBox();
     await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await tab.waitForTimeout(400);
+    await tab.waitForTimeout(200);
     const badge = tab.locator('#__browser_agent_add_badge__');
-    await badge.locator('[data-ba-role="add"]').click();
-    await tab.waitForTimeout(250);
+    await cell.click({ button: 'right', modifiers: ['Control'] });
+    await tab.waitForTimeout(300);
     const tableOption = badge.locator('button', { hasText: 'Table data' });
     const offered = await tableOption.isVisible();
     assert(offered, 'expected "Table data" to be offered when hovering a Nexacro grid cell');

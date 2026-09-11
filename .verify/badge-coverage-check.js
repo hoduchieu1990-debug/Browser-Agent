@@ -56,19 +56,20 @@ const PAGE = `<!doctype html><html><body style="padding:20px;font-family:sans-se
 
     const badge = tab.locator('#__browser_agent_add_badge__');
 
-    // Opens the Add menu over one element and reports which options it offers.
+    // Opens the Add menu over one element and reports which options it
+    // offers. Ctrl+Right-click is the only opener now — it has to go through
+    // the selector-based click API, since page.mouse.click() takes no
+    // `modifiers` option and the handler checks event.ctrlKey.
     const optionsFor = async (selector) => {
       await tab.mouse.move(5, 5);
       await tab.waitForTimeout(120);
-      const box = await tab.locator(selector).boundingBox();
-      await tab.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await tab.hover(selector);
+      await tab.click(selector, { button: 'right', modifiers: ['Control'] });
       await tab.waitForTimeout(300);
 
       const visible = await badge.evaluate((el) => el.style.display !== 'none');
       if (!visible) return null;
 
-      await badge.locator('[data-ba-role="add"]').click();
-      await tab.waitForTimeout(200);
       const shown = await badge.evaluate((root) => {
         const menu = root.querySelector('[data-ba-role="menu"]');
         if (!menu || menu.style.display === 'none') return [];
