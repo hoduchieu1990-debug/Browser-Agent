@@ -49,6 +49,7 @@ const CHECKS = [
   'hover-cli-check.js',
   'image-target-priority-check.js',
   'short-hash-class-check.js',
+  'extension-reload-recover-check.js',
   'upload-check.js',
   'spa-highlight-check.js',
   'stale-page-check.js',

@@ -14,6 +14,7 @@ import { detectFramework } from './utils/framework';
 declare global {
   interface Window {
     __browserAgentAttached?: boolean;
+    __browserAgentListener?: (message: RuntimeMessage, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => boolean | void;
   }
 }
 
@@ -188,12 +189,28 @@ function setRecording(value: boolean, highlightElements: boolean): void {
   }
 }
 
-// The manifest injects this on page load and the background re-injects it when
-// recording starts; only the first run may register listeners.
-if (!window.__browserAgentAttached) {
+// The manifest injects this on page load and the background re-injects it
+// whenever recording starts or a step is about to replay — normally that's
+// just a same-generation re-injection into an already-attached page, which
+// must NOT register a second listener (every message would then fire
+// twice). But __browserAgentAttached is a plain flag on `window`, which
+// survives page-lifetime events that DON'T survive an extension reload: the
+// listener a pre-reload injection registered dies with that reload (Chrome
+// invalidates it), yet the flag it left behind still reads true, so a
+// freshly re-injected copy would see "already attached" and skip
+// registering its own — working — listener, leaving the page with no way
+// to hear SET_RECORDING at all until a real page reload wipes the flag.
+// hasListener asks the CURRENT (guaranteed-live, just-injected) chrome.runtime
+// binding whether it actually still holds the stored function reference —
+// true only when this is genuinely the same still-live generation.
+const staleAttachment =
+  window.__browserAgentAttached &&
+  (!window.__browserAgentListener || !chrome.runtime.onMessage.hasListener(window.__browserAgentListener));
+
+if (!window.__browserAgentAttached || staleAttachment) {
   window.__browserAgentAttached = true;
 
-  chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
+  const onMessage = (message: RuntimeMessage, _sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => {
     if (message.type === 'SET_RECORDING') setRecording(message.value, message.highlightElements);
     if (message.type === 'SHOW_TOAST') showToast(message.step, describeAction(message.action));
 
@@ -204,7 +221,9 @@ if (!window.__browserAgentAttached) {
       );
       return true; // async sendResponse
     }
-  });
+  };
+  window.__browserAgentListener = onMessage;
+  chrome.runtime.onMessage.addListener(onMessage);
 
   chrome.runtime.sendMessage({ type: 'GET_STATE' } satisfies RuntimeMessage, (state: RecorderState) => {
     if (state?.recording) setRecording(true, state.highlightElements);
