@@ -384,6 +384,12 @@ html.in-side-panel .popup {
   color: var(--destructive);
 }
 
+.actions-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .add-step-menu {
   position: relative;
 }

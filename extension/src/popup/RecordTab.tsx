@@ -144,28 +144,30 @@ export function RecordTab({
         <span>
           {actions.length} action{actions.length === 1 ? '' : 's'}
         </span>
-        <AddStepMenu onAdd={onAddAction} />
-        {confirmingReset ? (
-          <span className="reset-confirm">
-            Discard {actions.length}?
-            <button
-              className="reset-btn danger"
-              onClick={() => {
-                setConfirmingReset(false);
-                onReset();
-              }}
-            >
-              Yes
+        <div className="actions-toolbar-right">
+          <AddStepMenu onAdd={onAddAction} />
+          {confirmingReset ? (
+            <span className="reset-confirm">
+              Discard {actions.length}?
+              <button
+                className="reset-btn danger"
+                onClick={() => {
+                  setConfirmingReset(false);
+                  onReset();
+                }}
+              >
+                Yes
+              </button>
+              <button className="reset-btn" onClick={() => setConfirmingReset(false)}>
+                No
+              </button>
+            </span>
+          ) : (
+            <button className="reset-btn" disabled={actions.length === 0} onClick={() => setConfirmingReset(true)}>
+              ↺ Reset
             </button>
-            <button className="reset-btn" onClick={() => setConfirmingReset(false)}>
-              No
-            </button>
-          </span>
-        ) : (
-          <button className="reset-btn" disabled={actions.length === 0} onClick={() => setConfirmingReset(true)}>
-            ↺ Reset
-          </button>
-        )}
+          )}
+        </div>
       </div>
 
       {actions.length === 0 ? (
