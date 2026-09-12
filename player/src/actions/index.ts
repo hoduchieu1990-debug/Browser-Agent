@@ -9,6 +9,7 @@ import { extractTable } from './extract-table';
 import { extractJson } from './extract-json';
 import { extractText } from './extract-text';
 import { dismissPopup } from './dismiss-popup';
+import { hover } from './hover';
 import { screenshot } from './screenshot';
 import { scroll } from './scroll';
 import { batchInput } from './batch-input';
@@ -42,6 +43,7 @@ const registry = new Map<string, ActionHandler>([
   ['extractJson', extractJson],
   ['extractText', extractText],
   ['dismissPopup', dismissPopup],
+  ['hover', hover],
   ['screenshot', (page, action, ctx: RunContext) => screenshot(page, action, ctx.outputDir)],
   ['scroll', scroll],
   ['batchInput', batchInput],

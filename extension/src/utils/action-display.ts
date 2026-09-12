@@ -15,6 +15,7 @@ const ACTION_TYPE_ICONS: Record<string, string> = {
   extractTable: '📊',
   extractJson: '🧾',
   dismissPopup: '✖️',
+  hover: '👆',
   screenshot: '🖼️',
   scroll: '📜',
   batchInput: '⌨️',

@@ -23,6 +23,7 @@ export interface BadgeCallbacks {
   onAddText: (el: HTMLElement) => void;
   onAddImage: (el: HTMLElement) => void;
   onAddInput: (el: HTMLElement) => void;
+  onAddHover: (el: HTMLElement) => void;
   onAddBatch: (el: HTMLElement, kind: BatchKind) => void;
   /** Fires while the menu is open (or once it closes) — lets the caller mute the plain hover outline so it doesn't double up with this component's own frame. */
   onTargetChange?: (hasTarget: boolean) => void;
@@ -291,6 +292,7 @@ interface BadgeElements {
   textItem: HTMLButtonElement;
   imageItem: HTMLButtonElement;
   inputItem: HTMLButtonElement;
+  hoverItem: HTMLButtonElement;
   batchItems: Record<BatchKind, HTMLButtonElement>;
 }
 
@@ -329,7 +331,12 @@ function createBadge(): BadgeElements {
   imageItem.textContent = '🖼️  Image of this area';
   const inputItem = document.createElement('button');
   inputItem.textContent = '⌨️  Type text';
-  [tableItem, textItem, imageItem, inputItem].forEach(styleMenuItem);
+  const hoverItem = document.createElement('button');
+  // Some tooltip/popover menus only render their contents once something
+  // real triggers a hover — this records that trigger as its own step so
+  // replay can re-open it before whatever comes next tries to act on it.
+  hoverItem.textContent = '👆  Hover (opens a tooltip/menu)';
+  [tableItem, textItem, imageItem, inputItem, hoverItem].forEach(styleMenuItem);
 
   const batchKinds: BatchKind[] = ['input', 'click', 'search', 'extract'];
   const batchItems = Object.fromEntries(
@@ -346,6 +353,7 @@ function createBadge(): BadgeElements {
     textItem,
     imageItem,
     inputItem,
+    hoverItem,
     styleMenuDivider(),
     styleMenuLabel('Batch'),
     ...batchKinds.map((kind) => batchItems[kind]),
@@ -353,7 +361,7 @@ function createBadge(): BadgeElements {
   root.append(menu);
   document.documentElement.appendChild(root);
 
-  return { root, menu, tableItem, textItem, imageItem, inputItem, batchItems };
+  return { root, menu, tableItem, textItem, imageItem, inputItem, hoverItem, batchItems };
 }
 
 // Composed events (mousemove, click, contextmenu) are retargeted for any
@@ -378,10 +386,11 @@ export function attachExtractBadge({
   onAddText,
   onAddImage,
   onAddInput,
+  onAddHover,
   onAddBatch,
   onTargetChange,
 }: BadgeCallbacks): () => void {
-  const { root, menu, tableItem, textItem, imageItem, inputItem, batchItems } = createBadge();
+  const { root, menu, tableItem, textItem, imageItem, inputItem, hoverItem, batchItems } = createBadge();
   const frame = createTargetFrame();
 
   let currentTable: HTMLElement | null = null;
@@ -496,6 +505,11 @@ export function attachExtractBadge({
     choose(event, () => el && isTypeable(el) && onAddInput(el));
   };
 
+  const handleHover = (event: MouseEvent) => {
+    const el = defaultTarget();
+    choose(event, () => el && onAddHover(el));
+  };
+
   const handleBatch = (event: MouseEvent, kind: BatchKind) => {
     const el = currentBatch ?? currentText ?? currentTable;
     choose(event, () => el && onAddBatch(el, kind));
@@ -519,6 +533,7 @@ export function attachExtractBadge({
   textItem.addEventListener('click', handleText, true);
   imageItem.addEventListener('click', handleImage, true);
   inputItem.addEventListener('click', handleInput, true);
+  hoverItem.addEventListener('click', handleHover, true);
   document.addEventListener('contextmenu', handleContextMenu, true);
   document.addEventListener('keydown', handleKeydown, true);
   document.addEventListener('click', handleOutsideClick, true);

@@ -215,6 +215,23 @@ export async function executeStep(
       return {};
     }
 
+    // Dispatched events fire real mouseover/mouseenter LISTENERS, so this
+    // opens anything driven by JS (the common case, including Nexacro-style
+    // menus). It cannot set the browser's own :hover pseudo-class — that's
+    // internal cursor-position state no script can reach — so a menu that
+    // opens purely via CSS `:hover` (no JS) won't budge here; that case needs
+    // a real pointer, which only player/cli's Playwright-driven hover() has.
+    case 'hover': {
+      const el = await locateFor(action, WAIT_TIMEOUT_MS);
+      const rect = el.getBoundingClientRect();
+      const point = { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
+      const opts = { bubbles: true, cancelable: true, ...point };
+      el.dispatchEvent(new MouseEvent('mouseover', opts));
+      el.dispatchEvent(new MouseEvent('mouseenter', opts));
+      el.dispatchEvent(new MouseEvent('mousemove', opts));
+      return {};
+    }
+
     case 'scroll': {
       const positions = { top: 0, bottom: document.body.scrollHeight, center: document.body.scrollHeight / 2 };
       window.scrollTo(0, action.position ? positions[action.position] : (action.pixels ?? 0));

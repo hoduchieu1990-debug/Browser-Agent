@@ -71,6 +71,7 @@ export type WorkflowAction =
   | ExtractJsonAction
   | ExtractTextAction
   | DismissPopupAction
+  | HoverAction
   | ScreenshotAction
   | ScrollAction
   | BatchInputAction
@@ -104,6 +105,7 @@ export type ActionType =
   | 'extractJson'
   | 'extractText'
   | 'dismissPopup'
+  | 'hover'
   | 'screenshot'
   | 'scroll'
   | 'batchInput'
@@ -226,6 +228,15 @@ export interface DismissPopupAction extends BaseAction {
   type: 'dismissPopup';
   selectors?: string[];
   timeout?: number;
+}
+
+// --- Hover ---
+// Triggers a tooltip/menu/popover that only renders once something real
+// hovers the element — recorded as its own step so replay can re-open it
+// before a later step tries to act on whatever it reveals.
+export interface HoverAction extends BaseAction {
+  type: 'hover';
+  selector: string;
 }
 
 // --- Screenshot ---

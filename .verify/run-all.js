@@ -45,6 +45,8 @@ const CHECKS = [
   'db-plugin-cli-check.js',
   'mail-read-plugin-cli-check.js',
   'plugin-ui-check.js',
+  'hover-check.js',
+  'hover-cli-check.js',
   'upload-check.js',
   'spa-highlight-check.js',
   'stale-page-check.js',

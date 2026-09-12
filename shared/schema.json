@@ -95,6 +95,7 @@
               "extractJson",
               "extractText",
               "dismissPopup",
+              "hover",
               "screenshot",
               "scroll",
               "batchInput",

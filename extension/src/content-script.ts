@@ -117,6 +117,10 @@ function recordInput(el: HTMLElement): void {
   capture({ type: 'input', ...locate(el), value: '' }, el);
 }
 
+function recordHover(el: HTMLElement): void {
+  capture({ type: 'hover', ...locate(el) }, el);
+}
+
 function inferBatchInputType(el: HTMLElement): BatchInputType {
   if (el instanceof HTMLSelectElement) return 'select';
   if (el instanceof HTMLInputElement && el.type === 'file') return 'fileUpload';
@@ -161,6 +165,7 @@ function setRecording(value: boolean, highlightElements: boolean): void {
       onAddText: recordText,
       onAddImage: recordImage,
       onAddInput: recordInput,
+      onAddHover: recordHover,
       onAddBatch: recordBatch,
       // two outlines on screen at once is noise; the menu's is the precise one
       onTargetChange: (hasTarget) => highlighter?.setPaused(hasTarget),

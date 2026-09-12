@@ -23,6 +23,8 @@ extension/public/icons/
 .verify/db-plugin-tmp/
 .verify/mail-read-plugin-tmp/
 .verify/plugin-ui-profile/
+.verify/hover-profile/
+.verify/hover-cli-tmp/
 .verify/search-enter-profile/
 .verify/input-button-profile/
 .verify/search-button-no-blur-profile/

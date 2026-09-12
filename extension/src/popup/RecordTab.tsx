@@ -41,9 +41,15 @@ function isBatchAction(action: WorkflowAction): boolean {
 
 // Plain `input` steps (via Add → Type text, or typed on the page) get the
 // same expandable panel batch nodes do, just to edit the one field they have.
-// `click` gets one too, for the "optional" toggle below.
+// `click` and `hover` get one too, for the "optional" toggle below.
 function isConfigurable(action: WorkflowAction): boolean {
-  return isBatchAction(action) || isPluginAction(action) || action.type === 'input' || action.type === 'click';
+  return (
+    isBatchAction(action) ||
+    isPluginAction(action) ||
+    action.type === 'input' ||
+    action.type === 'click' ||
+    action.type === 'hover'
+  );
 }
 
 function isOptional(action: WorkflowAction): boolean {
@@ -246,7 +252,7 @@ export function RecordTab({
                     </label>
                   </div>
                 )}
-                {expanded && action.type === 'click' && (
+                {expanded && (action.type === 'click' || action.type === 'hover') && (
                   <div className="action-batch-config">
                     <label className="action-optional-toggle">
                       <input
@@ -254,7 +260,8 @@ export function RecordTab({
                         checked={isOptional(action)}
                         onChange={(e) => onUpdateAction(index, { onError: e.target.checked ? 'skip' : undefined })}
                       />
-                      Optional — click if present, skip if not (e.g. a popup that doesn't always appear)
+                      Optional — {action.type === 'hover' ? 'hover' : 'click'} if present, skip if not (e.g. a
+                      popup that doesn't always appear)
                     </label>
                   </div>
                 )}
