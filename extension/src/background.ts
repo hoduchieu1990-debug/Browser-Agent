@@ -842,6 +842,13 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       notifyActionsUpdated();
       return;
 
+    case 'ADD_ACTION':
+      actions.push({ ...message.action, id: `step-${++stepCounter}` } as WorkflowAction);
+      saveSession(actions);
+      invalidateReplayState();
+      notifyActionsUpdated();
+      return;
+
     case 'CLOSE_POPUP':
       // Pinned to the side, staying put is the whole point — and the id here
       // would be the browser window itself, so closing it would take the

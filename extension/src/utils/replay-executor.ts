@@ -300,6 +300,35 @@ export async function executeStep(
       };
     }
 
+    // apiJsonParse is not here — it reads an earlier step's output, which
+    // in-browser replay never threads into this per-step call (see
+    // action-display.ts's isCliOnlyAction for why); it falls to the default
+    // case below like the Mail/File/Database steps.
+    case 'apiGet': {
+      const url = new URL(action.url);
+      if (action.queryParams) {
+        for (const [key, value] of Object.entries(action.queryParams)) url.searchParams.set(key, value);
+      }
+      const response = await fetch(url, { headers: action.httpHeaders });
+      if (!response.ok) throw new Error(`GET ${url} failed: ${response.status} ${response.statusText}`);
+      const contentType = response.headers.get('content-type') ?? '';
+      const value = contentType.includes('application/json') ? await response.json() : await response.text();
+      return { output: { key: action.output, value } };
+    }
+
+    case 'apiPost': {
+      const asJson = action.json ?? true;
+      const response = await fetch(action.url, {
+        method: 'POST',
+        headers: { ...(asJson ? { 'Content-Type': 'application/json' } : {}), ...action.httpHeaders },
+        body: action.body,
+      });
+      if (!response.ok) throw new Error(`POST ${action.url} failed: ${response.status} ${response.statusText}`);
+      const contentType = response.headers.get('content-type') ?? '';
+      const value = contentType.includes('application/json') ? await response.json() : await response.text();
+      return { output: { key: action.output, value } };
+    }
+
     default:
       return { skipped: `${(action as WorkflowAction).type} is not supported during in-browser replay` };
   }

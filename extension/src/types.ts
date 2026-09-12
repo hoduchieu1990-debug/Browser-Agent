@@ -68,6 +68,10 @@ export type RuntimeMessage =
   | { type: 'GET_STATE' }
   | { type: 'REMOVE_ACTION'; index: number }
   | { type: 'UPDATE_ACTION'; index: number; patch: Record<string, unknown> }
+  // A manually-added step (Mail/File/Database/Api) rather than one captured
+  // by interacting with a page — `action` needs no id, background.ts assigns
+  // one the same way it does for a recorded step.
+  | { type: 'ADD_ACTION'; action: RecordedActionPayload }
   | { type: 'CLOSE_POPUP'; windowId: number }
   | { type: 'GET_SETTINGS' }
   | { type: 'SET_SETTINGS'; settings: RecorderSettings }

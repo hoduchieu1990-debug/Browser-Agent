@@ -1,10 +1,39 @@
 import { useEffect, useState } from 'react';
-import type { WorkflowAction } from '../types';
-import { actionSelectorText, actionValueText, actionTypeIcon, batchNodeLabel } from '../utils/action-display';
+import type { WorkflowAction, RecordedActionPayload } from '../types';
+import {
+  actionSelectorText,
+  actionValueText,
+  actionTypeIcon,
+  batchNodeLabel,
+  isCliOnlyAction,
+} from '../utils/action-display';
 import { BatchNodeConfig } from './BatchNodeConfig';
+import { PluginActionConfig } from './PluginActionConfig';
+import { AddStepMenu } from './AddStepMenu';
 import { ActionThumb } from './ActionThumb';
 
 const CONFIRM_TIMEOUT_MS = 4000;
+
+const PLUGIN_ACTION_TYPES = new Set([
+  'mailSend',
+  'mailRead',
+  'mailSearch',
+  'mailAttachment',
+  'fileReadExcel',
+  'fileWriteExcel',
+  'fileReadPdf',
+  'fileMove',
+  'dbQuery',
+  'dbExecute',
+  'dbExport',
+  'apiGet',
+  'apiPost',
+  'apiJsonParse',
+]);
+
+function isPluginAction(action: WorkflowAction): boolean {
+  return PLUGIN_ACTION_TYPES.has(action.type);
+}
 
 function isBatchAction(action: WorkflowAction): boolean {
   return action.type.startsWith('batch');
@@ -14,7 +43,7 @@ function isBatchAction(action: WorkflowAction): boolean {
 // same expandable panel batch nodes do, just to edit the one field they have.
 // `click` gets one too, for the "optional" toggle below.
 function isConfigurable(action: WorkflowAction): boolean {
-  return isBatchAction(action) || action.type === 'input' || action.type === 'click';
+  return isBatchAction(action) || isPluginAction(action) || action.type === 'input' || action.type === 'click';
 }
 
 function isOptional(action: WorkflowAction): boolean {
@@ -52,6 +81,7 @@ interface Props {
   onToggleRecording: () => void;
   onRemoveAction: (index: number) => void;
   onUpdateAction: (index: number, patch: Record<string, unknown>) => void;
+  onAddAction: (action: RecordedActionPayload) => void;
   onReset: () => void;
 }
 
@@ -64,6 +94,7 @@ export function RecordTab({
   onToggleRecording,
   onRemoveAction,
   onUpdateAction,
+  onAddAction,
   onReset,
 }: Props) {
   const [confirmingReset, setConfirmingReset] = useState(false);
@@ -113,6 +144,7 @@ export function RecordTab({
         <span>
           {actions.length} action{actions.length === 1 ? '' : 's'}
         </span>
+        <AddStepMenu onAdd={onAddAction} />
         {confirmingReset ? (
           <span className="reset-confirm">
             Discard {actions.length}?
@@ -168,6 +200,14 @@ export function RecordTab({
                           optional
                         </span>
                       )}
+                      {isCliOnlyAction(action.type) && (
+                        <span
+                          className="action-optional-badge"
+                          title="Runs via the CLI/scheduled export only — Preview in this popup skips it"
+                        >
+                          CLI only
+                        </span>
+                      )}
                     </div>
                     <div className="action-selector">{actionSelectorText(action)}</div>
                     {actionValueText(action) && <div className="action-value">{actionValueText(action)}</div>}
@@ -188,6 +228,9 @@ export function RecordTab({
                     datasetHeaders={datasetHeaders}
                     onUpdate={(patch) => onUpdateAction(index, patch)}
                   />
+                )}
+                {expanded && isPluginAction(action) && (
+                  <PluginActionConfig action={action} onUpdate={(patch) => onUpdateAction(index, patch)} />
                 )}
                 {expanded && action.type === 'input' && (
                   <div className="action-batch-config">

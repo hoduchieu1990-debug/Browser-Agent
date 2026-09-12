@@ -342,7 +342,8 @@ html.in-side-panel .popup {
   color: var(--muted-foreground);
 }
 
-.reset-btn {
+.reset-btn,
+.add-step-btn {
   padding: 5px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -354,7 +355,8 @@ html.in-side-panel .popup {
   cursor: pointer;
 }
 
-.reset-btn:hover:not(:disabled) {
+.reset-btn:hover:not(:disabled),
+.add-step-btn:hover {
   background: var(--accent);
   color: var(--accent-foreground);
 }
@@ -380,6 +382,73 @@ html.in-side-panel .popup {
 .reset-btn.danger:hover:not(:disabled) {
   background: var(--destructive-soft);
   color: var(--destructive);
+}
+
+.add-step-menu {
+  position: relative;
+}
+
+.add-step-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  max-width: 360px;
+  flex-wrap: wrap;
+}
+
+.add-step-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 80px;
+}
+
+.add-step-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 2px;
+}
+
+.add-step-item {
+  text-align: left;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground);
+  font: 500 12px var(--font-sans, inherit);
+  cursor: pointer;
+}
+
+.add-step-item:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.plugin-action-config label.full-width {
+  flex-basis: 100%;
+}
+
+.action-batch-config textarea {
+  font: 500 12px var(--font-sans, inherit);
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--foreground);
+  resize: vertical;
+  min-height: 40px;
 }
 
 .actions-list {

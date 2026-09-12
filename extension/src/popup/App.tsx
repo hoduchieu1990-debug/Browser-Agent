@@ -9,6 +9,7 @@ import type {
   SavedRecording,
   BatchDataset,
   BatchReplayState,
+  RecordedActionPayload,
 } from '../types';
 import { DEFAULT_SETTINGS, DEFAULT_EMAIL_SETTINGS } from '../types';
 import { Header } from './Header';
@@ -149,6 +150,10 @@ export function App() {
     chrome.runtime.sendMessage({ type: 'UPDATE_ACTION', index, patch } satisfies RuntimeMessage);
   };
 
+  const addAction = (action: RecordedActionPayload) => {
+    chrome.runtime.sendMessage({ type: 'ADD_ACTION', action } satisfies RuntimeMessage);
+  };
+
   const setDataset = (dataset: BatchDataset) => {
     chrome.runtime.sendMessage(
       { type: 'BATCH_SET_DATASET', ...dataset } satisfies RuntimeMessage,
@@ -249,6 +254,7 @@ export function App() {
               onToggleRecording={toggleRecording}
               onRemoveAction={removeAction}
               onUpdateAction={updateAction}
+              onAddAction={addAction}
               onReset={resetActions}
             />
           )}

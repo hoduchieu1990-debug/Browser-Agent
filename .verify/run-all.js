@@ -44,6 +44,7 @@ const CHECKS = [
   'mail-send-cli-check.js',
   'db-plugin-cli-check.js',
   'mail-read-plugin-cli-check.js',
+  'plugin-ui-check.js',
   'upload-check.js',
   'spa-highlight-check.js',
   'stale-page-check.js',
