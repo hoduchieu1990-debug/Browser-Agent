@@ -28,6 +28,7 @@ extension/public/icons/
 .verify/image-target-priority-profile/
 .verify/short-hash-class-profile/
 .verify/extension-reload-recover-profile/
+.verify/hover-hint-label-profile/
 .verify/search-enter-profile/
 .verify/input-button-profile/
 .verify/search-button-no-blur-profile/

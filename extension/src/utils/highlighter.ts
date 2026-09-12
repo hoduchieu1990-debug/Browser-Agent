@@ -31,6 +31,33 @@ function createOverlay(color: string): HTMLDivElement {
   return el;
 }
 
+const LABEL_ID = '__browser_agent_highlight_label__';
+
+// A one-line teaching hint riding along with the outline — reuses the exact
+// rect the outline already computed on this same mouseover, so it costs one
+// more small element positioned alongside it, not another pass over the DOM.
+function createLabel(color: string): HTMLDivElement {
+  document.getElementById(LABEL_ID)?.remove();
+
+  const el = document.createElement('div');
+  el.id = LABEL_ID;
+  markAsExtensionUi(el);
+  el.textContent = 'Ctrl+Right-click to add data';
+  el.style.position = 'fixed';
+  el.style.pointerEvents = 'none';
+  el.style.padding = '2px 7px';
+  el.style.borderRadius = '4px';
+  el.style.background = color;
+  el.style.color = '#fff';
+  el.style.font = '600 11px system-ui, "Segoe UI", sans-serif';
+  el.style.whiteSpace = 'nowrap';
+  el.style.zIndex = '2147483647';
+  el.style.display = 'none';
+  el.style.transition = 'none';
+  document.documentElement.appendChild(el);
+  return el;
+}
+
 function hexToRgba(hex: string, alpha: number): string {
   const n = parseInt(hex.replace('#', ''), 16);
   const r = (n >> 16) & 255;
@@ -52,6 +79,7 @@ export function attachHighlighter(
   color: string = DEFAULT_COLOR,
 ): HighlighterHandle {
   const overlay = createOverlay(color);
+  const label = createLabel(color);
   let current: HTMLElement | null = null;
   let paused = false;
 
@@ -62,10 +90,18 @@ export function attachHighlighter(
     overlay.style.left = `${rect.left}px`;
     overlay.style.width = `${rect.width}px`;
     overlay.style.height = `${rect.height}px`;
+
+    label.style.display = 'block';
+    label.style.left = `${Math.max(4, rect.left)}px`;
+    // Sits just above the box, unless that would push it off the top of the
+    // screen — then it drops just below instead, the same rule the extract
+    // badge's own "Selected" tag uses for the same reason.
+    label.style.top = rect.top < 22 ? `${rect.bottom + 4}px` : `${rect.top - 20}px`;
   };
 
   const hide = () => {
     overlay.style.display = 'none';
+    label.style.display = 'none';
     current = null;
   };
 
@@ -98,6 +134,7 @@ export function attachHighlighter(
       document.removeEventListener('mouseleave', hide, true);
       window.removeEventListener('scroll', handleScroll, true);
       overlay.remove();
+      label.remove();
     },
     setPaused: (value: boolean) => {
       paused = value;

@@ -50,6 +50,7 @@ const CHECKS = [
   'image-target-priority-check.js',
   'short-hash-class-check.js',
   'extension-reload-recover-check.js',
+  'hover-hint-label-check.js',
   'upload-check.js',
   'spa-highlight-check.js',
   'stale-page-check.js',
