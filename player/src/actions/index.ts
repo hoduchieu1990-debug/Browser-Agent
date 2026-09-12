@@ -15,6 +15,20 @@ import { batchInput } from './batch-input';
 import { batchClick } from './batch-click';
 import { batchSearch } from './batch-search';
 import { batchExtract } from './batch-extract';
+import { mailSend } from './mail-send';
+import { mailRead } from './mail-read';
+import { mailSearch } from './mail-search';
+import { mailAttachment } from './mail-attachment';
+import { fileReadExcel } from './file-read-excel';
+import { fileWriteExcel } from './file-write-excel';
+import { fileReadPdf } from './file-read-pdf';
+import { fileMove } from './file-move';
+import { dbQuery } from './db-query';
+import { dbExecute } from './db-execute';
+import { dbExport } from './db-export';
+import { apiGet } from './api-get';
+import { apiPost } from './api-post';
+import { apiJsonParse } from './api-json-parse';
 
 const registry = new Map<string, ActionHandler>([
   ['navigate', navigate],
@@ -34,6 +48,20 @@ const registry = new Map<string, ActionHandler>([
   ['batchClick', batchClick],
   ['batchSearch', batchSearch],
   ['batchExtract', batchExtract],
+  ['mailSend', mailSend],
+  ['mailRead', mailRead],
+  ['mailSearch', mailSearch],
+  ['mailAttachment', mailAttachment],
+  ['fileReadExcel', fileReadExcel],
+  ['fileWriteExcel', fileWriteExcel],
+  ['fileReadPdf', fileReadPdf],
+  ['fileMove', fileMove],
+  ['dbQuery', dbQuery],
+  ['dbExecute', dbExecute],
+  ['dbExport', dbExport],
+  ['apiGet', apiGet],
+  ['apiPost', apiPost],
+  ['apiJsonParse', apiJsonParse],
 ]);
 
 export function registerActionHandler(type: string, handler: ActionHandler): void {

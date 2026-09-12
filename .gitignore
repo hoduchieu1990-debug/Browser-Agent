@@ -17,6 +17,11 @@ extension/public/icons/
 .verify/badge-coverage-profile/
 .verify/badge-track-profile/
 .verify/cross-tab-leak-profile/
+.verify/file-plugin-tmp/
+.verify/api-plugin-tmp/
+.verify/mail-send-tmp/
+.verify/db-plugin-tmp/
+.verify/mail-read-plugin-tmp/
 .verify/search-enter-profile/
 .verify/input-button-profile/
 .verify/search-button-no-blur-profile/

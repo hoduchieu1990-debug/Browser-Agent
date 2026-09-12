@@ -100,10 +100,24 @@
               "batchInput",
               "batchClick",
               "batchSearch",
-              "batchExtract"
+              "batchExtract",
+              "mailSend",
+              "mailRead",
+              "mailSearch",
+              "mailAttachment",
+              "fileReadExcel",
+              "fileWriteExcel",
+              "fileReadPdf",
+              "fileMove",
+              "dbQuery",
+              "dbExecute",
+              "dbExport",
+              "apiGet",
+              "apiPost",
+              "apiJsonParse"
             ]
           },
-          "url": { "type": "string", "description": "For navigate action" },
+          "url": { "type": "string", "description": "navigate/apiGet/apiPost: target URL" },
           "selector": { "type": "string", "description": "CSS or XPath selector" },
           "selectors": {
             "type": "array",
@@ -122,7 +136,7 @@
             "description": "Scroll target position"
           },
           "pixels": { "type": "number", "description": "Scroll distance in pixels" },
-          "path": { "type": "string", "description": "Dotted path into extracted JSON" },
+          "path": { "type": "string", "description": "extractJson/apiJsonParse: dotted path into the parsed JSON" },
           "duration": { "type": "number", "description": "Wait duration in ms" },
           "timeout": { "type": "number", "description": "Max wait time in ms" },
           "headers": {
@@ -167,7 +181,87 @@
             "enum": ["text", "attribute", "value"],
             "description": "Batch Extract: what to read off the element"
           },
-          "attribute": { "type": "string", "description": "Attribute name, required when extractType is 'attribute'" }
+          "attribute": { "type": "string", "description": "Attribute name, required when extractType is 'attribute'" },
+
+          "host": { "type": "string", "description": "Mail: SMTP/IMAP host" },
+          "port": { "type": "number", "description": "Mail: SMTP/IMAP port" },
+          "secure": { "type": "boolean", "description": "Mail: use TLS" },
+          "user": { "type": "string", "description": "Mail: account username" },
+          "password": { "type": "string", "description": "Mail: account password" },
+          "to": { "type": "string", "description": "mailSend: recipient(s)" },
+          "cc": { "type": "string" },
+          "bcc": { "type": "string" },
+          "subject": { "type": "string" },
+          "body": { "type": "string", "description": "mailSend: message body" },
+          "html": { "type": "boolean", "description": "mailSend: whether body is HTML" },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["filePath"],
+              "properties": {
+                "filePath": { "type": "string" },
+                "filename": { "type": "string" }
+              }
+            },
+            "description": "mailSend: files to attach"
+          },
+          "mailbox": { "type": "string", "description": "mailRead/mailSearch: IMAP folder, defaults to INBOX" },
+          "criteria": { "enum": ["all", "unseen"], "description": "mailRead: which messages to fetch" },
+          "limit": { "type": "number", "description": "mailRead/mailSearch: max messages to return" },
+          "markSeen": { "type": "boolean", "description": "mailRead: mark matched messages as read" },
+          "from": { "type": "string", "description": "mailSearch: sender filter" },
+          "since": { "type": "string", "description": "mailSearch: ISO date lower bound" },
+          "unseen": { "type": "boolean", "description": "mailSearch: only unread messages" },
+          "source": { "type": "string", "description": "mailAttachment: variable holding the mailRead/mailSearch result" },
+          "saveDir": { "type": "string", "description": "mailAttachment: directory to save attachments into" },
+
+          "filePath": { "type": "string", "description": "File/Database: path to read, write, or export" },
+          "sheet": {
+            "anyOf": [{ "type": "string" }, { "type": "number" }],
+            "description": "fileReadExcel/fileWriteExcel: sheet name or index"
+          },
+          "headerRow": { "type": "boolean", "description": "fileReadExcel/fileWriteExcel: treat/write first row as column names" },
+          "data": { "type": "string", "description": "fileWriteExcel: variable holding the rows to write" },
+          "sourcePath": { "type": "string", "description": "fileMove: source path" },
+          "destPath": { "type": "string", "description": "fileMove: destination path" },
+          "overwrite": { "type": "boolean", "description": "fileMove: overwrite an existing file at destPath" },
+
+          "connection": {
+            "type": "object",
+            "required": ["server", "database", "user", "password"],
+            "properties": {
+              "server": { "type": "string" },
+              "database": { "type": "string" },
+              "user": { "type": "string" },
+              "password": { "type": "string" },
+              "port": { "type": "number" },
+              "encrypt": { "type": "boolean" },
+              "trustServerCertificate": { "type": "boolean" }
+            },
+            "description": "Database: SQL Server connection"
+          },
+          "query": { "type": "string", "description": "dbQuery/dbExport: SQL to run" },
+          "params": {
+            "type": "array",
+            "items": { "type": ["string", "number", "boolean", "null"] },
+            "description": "Database: positional bind parameters"
+          },
+          "statement": { "type": "string", "description": "dbExecute: SQL to run" },
+          "format": { "enum": ["csv", "excel", "json"], "description": "dbExport: output file format" },
+
+          "httpHeaders": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "apiGet/apiPost: request headers"
+          },
+          "queryParams": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "apiGet: URL query parameters"
+          },
+          "json": { "type": "boolean", "description": "apiPost: send body as application/json" },
+          "input": { "type": "string", "description": "apiJsonParse: variable holding the raw JSON string" }
         },
         "additionalProperties": false
       }
