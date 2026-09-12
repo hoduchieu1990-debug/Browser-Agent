@@ -16,6 +16,7 @@ extension/public/icons/
 .verify/report-real-preview-profile/
 .verify/badge-coverage-profile/
 .verify/badge-track-profile/
+.verify/cross-tab-leak-profile/
 .verify/search-enter-profile/
 .verify/input-button-profile/
 .verify/search-button-no-blur-profile/

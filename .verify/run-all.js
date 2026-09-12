@@ -6,6 +6,7 @@ const execFileAsync = promisify(execFile);
 
 const CHECKS = [
   'multi-window-check.js',
+  'cross-tab-leak-check.js',
   'navigate-fragment-check.js',
   'cross-page-capture-check.js',
   'pin-side-check.js',

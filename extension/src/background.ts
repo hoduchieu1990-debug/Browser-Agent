@@ -60,6 +60,13 @@ let replaying = false;
 const reportPreviewStates: Record<string, ReplayState> = {};
 const reportPreviewRunning = new Set<string>();
 let recordingHost: string | null = null;
+// The one tab actions are accepted from. Every open tab's content script
+// enables its own click listeners whenever `recording` is true (the manifest
+// injects it everywhere), so without this a click in an unrelated tab the
+// user merely switched to — no navigation, so no chance to notice — would
+// silently join the recording with no navigate step explaining how it got
+// there, producing a workflow that can never find that element on replay.
+let recordingTabId: number | null = null;
 let batchDataset: BatchDataset | null = null;
 let batchState: BatchReplayState | null = null;
 let batchRunning = false;
@@ -751,11 +758,14 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
       actions = [];
       stepCounter = 0;
       recordingHost = null;
+      recordingTabId = null;
       clearSession();
-      attachToActiveTab(settings.highlightElements).then((error) => {
+      attachToActiveTab(settings.highlightElements).then(async (error) => {
         if (error) {
           recording = false;
           log('attach failed', error);
+        } else {
+          recordingTabId = (await getActiveTab())?.id ?? null;
         }
         notifyRecordingState();
         sendResponse({ recording, actions, error });
@@ -764,6 +774,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
 
     case 'STOP_RECORDING':
       recording = false;
+      recordingTabId = null;
       notifyRecordingState();
       detachFromActiveTab();
       archiveCurrentRecording();
@@ -925,6 +936,7 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
     case 'RECORDED_ACTION': {
       if (!recording) return;
       const tabId = sender.tab?.id;
+      if (recordingTabId !== null && tabId !== recordingTabId) return; // a click in a tab that isn't part of this recording
       recordingHost ??= hostnameOf(sender.url); // sender.url needs no "tabs" permission
 
       // The click that aimed at this element was the same intention as the
@@ -994,8 +1006,14 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendRespo
 });
 
 // Re-attach after the page navigates — the fresh document has no listeners yet.
+// Only for the tab the user is actually looking at: without this check, any
+// other open tab reloading or redirecting in the background (an ad, a stale
+// tab left auto-refreshing) would inject a navigate step into the recording.
 chrome.webNavigation.onCommitted.addListener(async (details) => {
   if (!recording || details.frameId !== 0) return;
+  const tab = await getActiveTab();
+  if (tab?.id !== details.tabId) return;
+  recordingTabId = details.tabId; // covers a deliberate switch to a newly opened, now-focused tab
   pushAction({ id: `step-${++stepCounter}`, type: 'navigate', url: details.url }, details.tabId);
 });
 
