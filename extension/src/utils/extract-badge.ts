@@ -1,7 +1,7 @@
 import { findTableAncestor, findClickableAncestor } from './clickable-element';
 import { hasNonPositionalSelector } from './selector-utils';
 import { markAsExtensionUi, isExtensionUi } from './ui-marker';
-import { findNexacroComponent } from './nexacro';
+import { findNexacroComponent, findNexacroGrid } from './nexacro';
 
 const BADGE_ID = '__browser_agent_add_badge__';
 // A short price/status/cell fits well under the old 300, but a product
@@ -397,6 +397,14 @@ export function attachExtractBadge({
   let currentText: HTMLElement | null = null;
   let currentBatch: HTMLElement | null = null;
   let currentImage: HTMLElement | null = null;
+  // Set when the menu opens, compared against on every 'scroll' — some sites
+  // (confirmed on a real Nexacro app) fire window scroll events continuously
+  // as part of their own virtual-scroll/rendering machinery, with the real
+  // document position never actually moving (scrollX/Y unchanged). Closing
+  // on every one of those closed the menu within milliseconds of it ever
+  // opening; only a genuine change in scroll position means the menu's
+  // fixed-position coordinates have gone stale.
+  let scrollAtOpen = { x: 0, y: 0 };
   let menuOpen = false;
 
   // Image first: findImageTarget only ever matches an actual img/picture/
@@ -415,8 +423,14 @@ export function attachExtractBadge({
   // thread work to read as stutter. The page now gets a plain, effectively
   // free CSS outline on hover (highlighter.ts, mouseover-driven) instead,
   // and this only does any work at all when the menu is actually opening.
+  // findTableAncestor is a generic HTML heuristic (repeated sibling rows of
+  // uniform shape, or a <table>/role="grid") that a real Nexacro Grid's own
+  // DOM shape doesn't reliably satisfy — confirmed on a live Nexacro app,
+  // where aiming at a cell offered no "Table data" option at all even though
+  // extraction itself (locateTable, nexacroExtractGrid) already knows how to
+  // resolve any cell up to the Grid that owns it and read its bound dataset.
   const computeTargets = (target: Element | null) => ({
-    table: findTableAncestor(target),
+    table: findTableAncestor(target) ?? findNexacroGrid(target)?.element ?? null,
     text: findTextTarget(target),
     batch: findBatchTarget(target),
     image: findImageTarget(target),
@@ -446,15 +460,12 @@ export function attachExtractBadge({
     event.stopImmediatePropagation();
   };
 
-  // The only way the menu opens: a real context menu, not a button that has
-  // to be hunted down first. Nothing tracks the cursor between clicks.
-  const handleContextMenu = (event: MouseEvent) => {
-    const target = realTarget(event);
-    if (!event.ctrlKey || isExtensionUi(target)) return;
-
-    stop(event); // suppress the browser's own context menu
+  // Shared by both triggers below: computes what the menu is aimed at and
+  // shows it at the given point. Returns false (nothing shown) when nothing
+  // under the pointer qualifies for any capture kind.
+  const openMenuAt = (target: Element | null, x: number, y: number): boolean => {
     const targets = computeTargets(target);
-    if (!targets.table && !targets.text && !targets.batch && !targets.image) return;
+    if (!targets.table && !targets.text && !targets.batch && !targets.image) return false;
 
     currentTable = targets.table;
     currentText = targets.text;
@@ -469,15 +480,49 @@ export function attachExtractBadge({
     // text, or a plain control — so they're never hidden.
     menu.style.display = 'flex';
     root.style.display = 'block';
-    positionAt(event.clientX, event.clientY);
+    positionAt(x, y);
+    scrollAtOpen = { x: window.scrollX, y: window.scrollY };
 
     const el = defaultTarget();
     if (el) frame.show(el, 'Selected');
     onTargetChange?.(true);
+    return true;
+  };
+
+  // The normal path: a real context menu, not a button that has to be
+  // hunted down first. Nothing tracks the cursor between clicks.
+  const handleContextMenu = (event: MouseEvent) => {
+    const target = realTarget(event);
+    if (!event.ctrlKey || isExtensionUi(target)) return;
+
+    stop(event); // suppress the browser's own context menu unconditionally —
+    // even when the mousedown fallback below already opened the menu for
+    // this same physical click, this native menu still needs suppressing.
+    if (menuOpen) return;
+    openMenuAt(target, event.clientX, event.clientY);
+  };
+
+  // A fallback trigger for pages that block contextmenu outright: some
+  // sites (confirmed on a real Nexacro grid) call preventDefault() on
+  // mousedown for the right button specifically, which stops the browser
+  // from ever synthesizing a contextmenu event at all — no listener on any
+  // node can react to an event that never fires. mousedown itself always
+  // still fires and still reports ctrlKey/button correctly (preventDefault
+  // there only cancels default browser behavior like text selection, not
+  // other listeners, and not a future event), so this opens the menu right
+  // there instead of waiting for a contextmenu that may never come.
+  const handleMouseDown = (event: MouseEvent) => {
+    if (event.button !== 2 || !event.ctrlKey) return;
+    const target = realTarget(event);
+    if (isExtensionUi(target)) return;
+    openMenuAt(target, event.clientX, event.clientY);
   };
 
   const handleScroll = () => {
-    if (menuOpen) hide(); // the page moved under a menu pinned to viewport coordinates
+    if (!menuOpen) return;
+    // Real change only — see scrollAtOpen's own comment for why this can't
+    // just be "any scroll event at all closes the menu".
+    if (window.scrollX !== scrollAtOpen.x || window.scrollY !== scrollAtOpen.y) hide();
   };
 
   const choose = (event: MouseEvent, run: () => void) => {
@@ -540,16 +585,28 @@ export function attachExtractBadge({
   imageItem.addEventListener('click', handleImage, true);
   inputItem.addEventListener('click', handleInput, true);
   hoverItem.addEventListener('click', handleHover, true);
-  document.addEventListener('contextmenu', handleContextMenu, true);
-  document.addEventListener('keydown', handleKeydown, true);
-  document.addEventListener('click', handleOutsideClick, true);
+  // window, not document: some sites (confirmed on a real Nexacro app) install
+  // their own capture-phase contextmenu listener directly on window and call
+  // stopPropagation() there to silence the browser's native menu over their
+  // widgets — which also silences a listener on document, since capture
+  // order runs window before document. window still sees the event first
+  // (same-node listeners aren't affected by another listener's
+  // stopPropagation, only stopImmediatePropagation would do that), so
+  // Ctrl+Right-click keeps working on pages like this instead of never
+  // opening the menu at all. keydown/click move here too for the same
+  // reason; scroll already lived on window.
+  window.addEventListener('contextmenu', handleContextMenu, true);
+  window.addEventListener('mousedown', handleMouseDown, true);
+  window.addEventListener('keydown', handleKeydown, true);
+  window.addEventListener('click', handleOutsideClick, true);
   window.addEventListener('scroll', handleScroll, true);
 
   return () => {
     frame.remove();
-    document.removeEventListener('contextmenu', handleContextMenu, true);
-    document.removeEventListener('keydown', handleKeydown, true);
-    document.removeEventListener('click', handleOutsideClick, true);
+    window.removeEventListener('contextmenu', handleContextMenu, true);
+    window.removeEventListener('mousedown', handleMouseDown, true);
+    window.removeEventListener('keydown', handleKeydown, true);
+    window.removeEventListener('click', handleOutsideClick, true);
     window.removeEventListener('scroll', handleScroll, true);
     root.remove();
   };

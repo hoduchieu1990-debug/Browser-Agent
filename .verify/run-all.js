@@ -51,6 +51,7 @@ const CHECKS = [
   'short-hash-class-check.js',
   'extension-reload-recover-check.js',
   'hover-hint-label-check.js',
+  'hostile-page-menu-check.js',
   'upload-check.js',
   'spa-highlight-check.js',
   'stale-page-check.js',
