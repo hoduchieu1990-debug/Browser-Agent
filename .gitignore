@@ -30,6 +30,8 @@ extension/public/icons/
 .verify/extension-reload-recover-profile/
 .verify/hover-hint-label-profile/
 .verify/hostile-page-menu-profile/
+.verify/stale-generation-teardown-profile/
+.verify/dead-runtime-self-detach-profile/
 .verify/search-enter-profile/
 .verify/input-button-profile/
 .verify/search-button-no-blur-profile/

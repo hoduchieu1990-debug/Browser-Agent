@@ -93,23 +93,20 @@ const PAGE = `<!doctype html><html><body style="padding:40px"><button id="go">Go
       () => new Promise((resolve) => chrome.runtime.sendMessage({ type: 'GET_STATE' }, resolve)),
     );
     console.log('[actions after clicking with the trap planted]', JSON.stringify(afterClick.actions));
-    check(
-      'a real click on the trapped tab is actually captured (the fresh listener works)',
-      afterClick.actions.some((a) => a.type === 'click' && a.selector?.includes('go')),
-    );
-    // Not asserting "exactly one" here: planting the trap via executeScript
-    // (rather than a genuine extension reload, which this harness can't
-    // reliably trigger) leaves the ORIGINAL page-load listener genuinely
-    // still alive underneath the fake one — something only a real reload
-    // would actually kill — so this specific setup doubles up by
-    // construction. The regression that matters (no duplicate listener on
-    // an ordinary, non-stale re-Start) is checked for real below.
+    const trappedClicks = afterClick.actions.filter((a) => a.type === 'click' && a.selector?.includes('go'));
+    check('a real click on the trapped tab is actually captured (the fresh listener works)', trappedClicks.length > 0);
+    // Planting the trap via executeScript (rather than a genuine extension
+    // reload, which this harness can't reliably trigger) leaves the
+    // ORIGINAL page-load listener genuinely still alive underneath the fake
+    // one, so the click briefly reaches two live generations at once — but
+    // window.__browserAgentTeardown (content-script.ts's setRecording) means
+    // whichever one's setRecording(true, ...) runs second tears the first
+    // one's recorder/badge/highlighter down before adding its own, so only
+    // one ends up actually capturing anything.
+    check('exactly one, not doubled by the still-live original listener underneath', trappedClicks.length === 1);
 
     // ---- regression: pressing Start again with NO staleness must NOT double
-    // up — on a FRESH tab, since the trapped one above now permanently
-    // carries two genuinely-live listeners (the trap's own limitation: only
-    // a real reload kills the original one, and this harness can't trigger
-    // that reliably), which would contaminate this check if reused.
+    // up — on a fresh tab, to isolate it from the trapped one above.
     await popup.click('.record-btn.stop');
     await popup.waitForTimeout(300);
     const tab2 = await context.newPage();

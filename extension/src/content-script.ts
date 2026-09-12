@@ -15,6 +15,10 @@ declare global {
   interface Window {
     __browserAgentAttached?: boolean;
     __browserAgentListener?: (message: RuntimeMessage, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => boolean | void;
+    // The recorder/highlighter/badge from whichever generation of this
+    // script most recently turned recording on — see setRecording's own
+    // comment for why a stale generation's copies can't just be left alone.
+    __browserAgentTeardown?: () => void;
   }
 }
 
@@ -78,7 +82,30 @@ function tagFramework(action: RecordedActionPayload, el: Element): RecordedActio
   return framework ? { ...action, framework } : action;
 }
 
+// A reload while this generation was already attached kills chrome.runtime
+// out from under it with no event to react to — the first sign is always
+// whatever call happens to reach for it next throwing. Called from every
+// spot that's about to reach for chrome.runtime from a listener that might
+// belong to a now-dead generation, so tearing it down happens right away
+// instead of only ever relying on some FUTURE generation's own recovery
+// (see setRecording's own comment) — a page nobody interacts with again
+// after the reload still ends up clean instead of quietly dead.
+// __browserAgentAttached is cleared too, not just the local recorder/badge/
+// highlighter: hasListener() reflects whether THIS FUNCTION OBJECT is still
+// registered, which Chrome may still say yes to even once its closure can no
+// longer reach chrome.runtime — clearing the flag directly means the next
+// fresh injection re-registers unconditionally rather than depending on
+// that check alone.
+function selfDetachIfDead(): boolean {
+  if (chrome.runtime?.id) return false;
+  window.__browserAgentAttached = false;
+  setRecording(false, false);
+  return true;
+}
+
 function capture(action: RecordedActionPayload, el: Element): void {
+  if (selfDetachIfDead()) return;
+
   // screenshot steps already capture their own full image as the step's
   // actual output — a second, smaller copy of the same thing would be noise.
   const thumbnail = action.type !== 'screenshot' ? { rect: rectOf(el), dpr: window.devicePixelRatio || 1 } : {};
@@ -145,8 +172,25 @@ function recordBatch(el: HTMLElement, kind: BatchKind): void {
   capture(action, el);
 }
 
+// Reloading the extension while a tab was already recording leaves that
+// generation's recorder/highlighter/badge permanently attached: their
+// document/window listeners are plain DOM registrations, invisible to and
+// outliving the dead extension connection they were built with (nothing
+// ever calls their own detach() — the old script isn't torn down, just cut
+// off). A fresh injection's setRecording(true, ...) used to skip past that
+// silently since ITS OWN `recorder` starts out null regardless of what some
+// earlier generation is still doing — meaning the page could end up with
+// two full sets of listeners at once, the old one still firing on every
+// hover/right-click but calling into a chrome.runtime that no longer exists
+// ("Cannot read properties of undefined (reading 'sendMessage')"), while
+// its own badge silently updates a copy of the UI already removed from the
+// document. window.__browserAgentTeardown carries a reference to whichever
+// generation last turned recording on, so a fresh one can find and tear
+// down a stale leftover before adding its own.
 function setRecording(value: boolean, highlightElements: boolean): void {
   if (value && !recorder) {
+    window.__browserAgentTeardown?.();
+
     tableCount = 0;
     textCount = 0;
     imageCount = 0;
@@ -154,6 +198,7 @@ function setRecording(value: boolean, highlightElements: boolean): void {
     lastPageClick = null;
     document.addEventListener('click', notePageClick, true);
     recorder = attachListeners((action, el) => {
+      if (selfDetachIfDead()) return;
       chrome.runtime.sendMessage({
         type: 'RECORDED_ACTION',
         action: tagFramework(action, el),
@@ -171,6 +216,7 @@ function setRecording(value: boolean, highlightElements: boolean): void {
       // two outlines on screen at once is noise; the menu's is the precise one
       onTargetChange: (hasTarget) => highlighter?.setPaused(hasTarget),
     });
+    window.__browserAgentTeardown = () => setRecording(false, false);
   } else if (!value && recorder) {
     document.removeEventListener('click', notePageClick, true);
     lastPageClick = null;
@@ -179,6 +225,7 @@ function setRecording(value: boolean, highlightElements: boolean): void {
     detachBadge?.();
     detachBadge = null;
     clearToasts();
+    window.__browserAgentTeardown = undefined;
   }
 
   if (value && highlightElements && !highlighter) {
