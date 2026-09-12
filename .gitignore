@@ -25,6 +25,8 @@ extension/public/icons/
 .verify/plugin-ui-profile/
 .verify/hover-profile/
 .verify/hover-cli-tmp/
+.verify/image-target-priority-profile/
+.verify/short-hash-class-profile/
 .verify/search-enter-profile/
 .verify/input-button-profile/
 .verify/search-button-no-blur-profile/

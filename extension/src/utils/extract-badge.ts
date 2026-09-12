@@ -399,7 +399,13 @@ export function attachExtractBadge({
   let currentImage: HTMLElement | null = null;
   let menuOpen = false;
 
-  const defaultTarget = () => currentText ?? currentTable ?? currentBatch ?? currentImage;
+  // Image first: findImageTarget only ever matches an actual img/picture/
+  // canvas/video/audio or role="img" — a precise, unambiguous signal that
+  // should never be shadowed by findBatchTarget's up-to-6-level climb to the
+  // nearest clickable ancestor (a small icon sitting inside a clickable
+  // card/row, extremely common in real UIs, used to hand back the whole
+  // card instead of the icon).
+  const defaultTarget = () => currentImage ?? currentText ?? currentTable ?? currentBatch;
 
   // Only ever called once per Ctrl+Right-click, not on every mousemove —
   // this used to also run continuously while the pointer crossed the page

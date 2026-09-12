@@ -3,7 +3,14 @@ const MAX_PATH_DEPTH = 8;
 
 // Framework-generated identifiers change on every build or render, so a
 // selector built on them looks specific but breaks on the next visit.
-const GENERATED_TOKEN = /(^|[-_])(?:[0-9a-f]{6,}|[a-z0-9]{9,})($|[-_])|^(?:css|sc|jss|emotion|mui|ng|_ngcontent|ember)[-_]/i;
+// The third branch catches a shorter kind the length checks above miss:
+// CSS Modules' own `[hash:base64:N]` output (Create React App's default),
+// commonly emitted as a bare `_1pRnX`-style class with no recognizable
+// prefix at all. A leading digit is the tell — writing one by hand requires
+// escaping to stay valid CSS, so real authored classes essentially never
+// start with one, while a hash starts wherever the bytes land.
+const GENERATED_TOKEN =
+  /(^|[-_])(?:[0-9a-f]{6,}|[a-z0-9]{9,})($|[-_])|^(?:css|sc|jss|emotion|mui|ng|_ngcontent|ember)[-_]|(^|[-_])\d[a-zA-Z0-9]{2,6}($|[-_])/i;
 
 // Utility-first frameworks (Tailwind and friends) put styling in the class
 // list: `flex`, `mt-5`, `md:grid`, `[&>*+*]:mt-5`. They say nothing about which

@@ -47,6 +47,8 @@ const CHECKS = [
   'plugin-ui-check.js',
   'hover-check.js',
   'hover-cli-check.js',
+  'image-target-priority-check.js',
+  'short-hash-class-check.js',
   'upload-check.js',
   'spa-highlight-check.js',
   'stale-page-check.js',
