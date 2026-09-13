@@ -36,8 +36,22 @@ export function attachListeners(onAction: (action: RecordedActionPayload, el: El
   let lastRecordedEl: Element | null = null;
   let lastRecordedValue: string | null = null;
 
+  // A Nexacro Grid cell combo's inline editor (id ...cellcomboN.comboedit:input)
+  // fires its own input/change the instant the cell is clicked open — before
+  // the user has picked anything — echoing whatever text was already
+  // displayed there, not something they typed. Confirmed live: recording it
+  // as a real `input` step, then replaying it by setting .value directly
+  // (not a real click), made Nexacro close the dropdown before the actual
+  // choice — the click on the popup's option right after it — ever got a
+  // chance to run, so replay failed with "element not found" on a popup that
+  // real user interaction would have kept open. The click that opens the
+  // cell and the click that picks the option are what actually matter; this
+  // one in between is a side effect of the first, not its own user action.
+  const isNexacroComboEditEcho = (el: Element): boolean => /\.comboedit:input$/.test(el.id);
+
   const recordFieldValue = (target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): void => {
     if (target instanceof HTMLInputElement && target.type === 'file') return; // handled on click, above
+    if (isNexacroComboEditEcho(target)) return;
 
     // A checkbox/radio's .value is almost always a static attribute ("on",
     // an option id, ...), never the checked state — recording it here would
