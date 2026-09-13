@@ -15,6 +15,19 @@ export interface Workflow {
   exportFormats?: ExportFormat[];
   /** Label only — the real rows are attached at run time (extension file picker, CLI --data). */
   dataSource?: { type: 'excel'; fileName: string };
+  /**
+   * Present only when `actions` contains a "nexacro:<id>" selector — a plain
+   * CSS query can't drive those (there's no real DOM control to query; the
+   * value/click lives on window.nexacro's own object tree in the page's own
+   * JS). Embedded here, not left as an external doc, so a single exported
+   * .json is everything another program needs to reimplement replay from
+   * scratch without this repo's own source or its CLI.
+   */
+  nexacroReplayGuide?: {
+    readme: string;
+    /** Ready to inject via page.evaluate()/execute_script() as-is. */
+    bridgeScript: string;
+  };
 }
 
 export interface WorkflowMetadata {

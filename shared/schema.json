@@ -287,6 +287,15 @@
         "fileName": { "type": "string" }
       },
       "description": "Label only — the actual dataset is attached at run time"
+    },
+    "nexacroReplayGuide": {
+      "type": "object",
+      "required": ["readme", "bridgeScript"],
+      "properties": {
+        "readme": { "type": "string" },
+        "bridgeScript": { "type": "string" }
+      },
+      "description": "Present only when actions contains a nexacro:<id> selector — everything another program needs to replay those steps without this project's own source or CLI"
     }
   },
   "additionalProperties": false
