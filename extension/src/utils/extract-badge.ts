@@ -86,7 +86,14 @@ function findImageTarget(el: Element | null): HTMLElement | null {
   if (!(el instanceof HTMLElement)) return null;
   if (isExtensionUi(el)) return null;
   if (IMAGE_TAGS.has(el.tagName)) return el;
-  return el.getAttribute('role') === 'img' ? el : null;
+  if (el.getAttribute('role') === 'img') return el;
+  // A bare div with its picture set via CSS background-image, not an <img>
+  // tag — confirmed on a live Nexacro app, where nearly every icon/logo/
+  // photo on the page renders exactly this way (Static components). url(...)
+  // specifically, not a gradient function — also a valid background-image
+  // value, but not a photo worth screenshotting.
+  if (/^url\(/.test(getComputedStyle(el).backgroundImage)) return el;
+  return null;
 }
 
 // Batch Input/Click/Search target form controls and buttons, most of which

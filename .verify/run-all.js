@@ -52,6 +52,7 @@ const CHECKS = [
   'extension-reload-recover-check.js',
   'hover-hint-label-check.js',
   'hostile-page-menu-check.js',
+  'background-image-target-check.js',
   'stale-generation-teardown-check.js',
   'dead-runtime-self-detach-check.js',
   'upload-check.js',
