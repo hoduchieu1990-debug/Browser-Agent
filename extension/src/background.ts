@@ -238,11 +238,10 @@ function invalidateReplayState(): void {
 // limit, tab mid-navigation, ...) just means that one step has no preview —
 // not worth surfacing as an error.
 function captureThumbnailFor(actionId: string, rect: ThumbnailRect, dpr: number, tabId: number): void {
-  chrome.tabs
-    .get(tabId)
-    .then((tab) => {
+  Promise.all([chrome.tabs.get(tabId), chrome.tabs.getZoom(tabId).catch(() => 1)])
+    .then(([tab, zoom]) => {
       if (tab.windowId === undefined) return null;
-      return captureThumbnail(tab.windowId, rect, dpr);
+      return captureThumbnail(tab.windowId, rect, dpr, zoom);
     })
     .then((dataUrl) => {
       if (!dataUrl) return;
@@ -522,7 +521,8 @@ async function captureForStep(
   windowId: number,
   inBackground: boolean,
 ): Promise<string> {
-  const viaTab = () => captureElement(windowId, request.rect, request.dpr);
+  const zoom = await chrome.tabs.getZoom(tabId).catch(() => 1);
+  const viaTab = () => captureElement(windowId, request.rect, request.dpr, zoom);
   const viaDebugger = () => captureElementViaDebugger(tabId, request.pageRect);
   // An element taller or wider than the screen cannot be cropped out of a
   // photo of the screen — whatever lies beyond the edge was never in it. The

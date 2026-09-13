@@ -49,6 +49,13 @@ export interface StepResult {
 }
 
 function query(selector: string): HTMLElement | null {
+  // A nexacro:<id> selector isn't valid CSS at all (querySelector throws on
+  // the bare colon) — every other case that needs a real DOM node for one
+  // (screenshot chief among them: cropping a photo needs an actual rendered
+  // element's rect, not the component API a click/set_value goes through
+  // instead) can still get one, since the id IS the component's real DOM
+  // element id, set verbatim by nexacro-bridge.ts's own marking pass.
+  if (isNexacroSelector(selector)) return document.getElementById(nexacroComponentId(selector));
   if (selector.startsWith('//') || selector.startsWith('xpath=')) {
     const expr = selector.replace(/^xpath=/, '');
     const result = document.evaluate(expr, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
@@ -95,6 +102,40 @@ function locateFor(
   timeout = INTERACT_TIMEOUT_MS,
 ): Promise<HTMLElement> {
   return waitForElement(action.selector, action.selectorFallbacks ?? [], timeout);
+}
+
+// A screenshot target's own layout can still be moving right after
+// scrollIntoView — confirmed on a real Nexacro app, where a login card kept
+// sliding horizontally for over 2 seconds after the page loaded (its own
+// component tree was still constructing/repositioning things). Capturing
+// against a fixed short delay grabbed it mid-slide, so the crop no longer
+// matched where the card ended up. There is no framework-agnostic "layout
+// settled" event to wait for instead, so poll the rect until it stops
+// changing (or give up after a bound and use whatever was last measured —
+// still better than the very first, almost-certainly-wrong reading).
+const RECT_STABLE_MS = 300; // no change across this long counts as settled
+const RECT_STABLE_TIMEOUT_MS = 5000;
+
+function sameRect(a: DOMRect, b: DOMRect): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
+async function waitForStableRect(el: Element): Promise<DOMRect> {
+  const deadline = Date.now() + RECT_STABLE_TIMEOUT_MS;
+  let last = el.getBoundingClientRect();
+  let lastChangedAt = Date.now();
+
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    const current = el.getBoundingClientRect();
+    if (!sameRect(current, last)) {
+      last = current;
+      lastChangedAt = Date.now();
+    } else if (Date.now() - lastChangedAt >= RECT_STABLE_MS) {
+      return current;
+    }
+  }
+  return last;
 }
 
 async function runNexacroOrThrow(
@@ -295,9 +336,7 @@ export async function executeStep(
         WAIT_TIMEOUT_MS,
       );
       el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
-      await new Promise((resolve) => setTimeout(resolve, 150)); // let the scroll settle before the capture
-
-      const rect = el.getBoundingClientRect();
+      const rect = await waitForStableRect(el);
       return {
         capture: {
           key: action.output,

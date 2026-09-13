@@ -57,14 +57,29 @@ export async function captureElementViaDebugger(tabId: number, pageRect: Capture
 const THUMBNAIL_MAX_DIMENSION = 200;
 const THUMBNAIL_PADDING_PX = 12; // a little breathing room, not the whole page
 
-export async function captureThumbnail(windowId: number, rect: CaptureRect, dpr: number): Promise<string> {
+// getBoundingClientRect (where `rect` comes from) is always in the page's own
+// CSS pixels, unaffected by the browser's page zoom — but captureVisibleTab
+// photographs what is actually on screen, which zoom does change. At
+// anything but 100% zoom, multiplying by dpr alone lands the crop somewhere
+// else entirely, off by more the farther the element sits from the top-left
+// corner (confirmed on a real Nexacro app: a login card offset from the
+// origin came back showing unrelated content to its left and cut off on its
+// own right/bottom edge). captureElementViaDebugger already corrects for
+// this the same way; these two callers just never had a zoom to ask about.
+function toDevicePixels(rect: CaptureRect, dpr: number, zoom: number): CaptureRect {
+  const scale = dpr * zoom;
+  return { x: rect.x * scale, y: rect.y * scale, width: rect.width * scale, height: rect.height * scale };
+}
+
+export async function captureThumbnail(windowId: number, rect: CaptureRect, dpr: number, zoom = 1): Promise<string> {
   const fullDataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
   const bitmap = await createImageBitmap(await (await fetch(fullDataUrl)).blob());
+  const scaled = toDevicePixels(rect, dpr, zoom);
 
-  const srcX = Math.max(0, Math.round((rect.x - THUMBNAIL_PADDING_PX) * dpr));
-  const srcY = Math.max(0, Math.round((rect.y - THUMBNAIL_PADDING_PX) * dpr));
-  const srcW = Math.max(1, Math.min(bitmap.width - srcX, Math.round((rect.width + THUMBNAIL_PADDING_PX * 2) * dpr)));
-  const srcH = Math.max(1, Math.min(bitmap.height - srcY, Math.round((rect.height + THUMBNAIL_PADDING_PX * 2) * dpr)));
+  const srcX = Math.max(0, Math.round(scaled.x - THUMBNAIL_PADDING_PX * dpr * zoom));
+  const srcY = Math.max(0, Math.round(scaled.y - THUMBNAIL_PADDING_PX * dpr * zoom));
+  const srcW = Math.max(1, Math.min(bitmap.width - srcX, Math.round(scaled.width + THUMBNAIL_PADDING_PX * 2 * dpr * zoom)));
+  const srcH = Math.max(1, Math.min(bitmap.height - srcY, Math.round(scaled.height + THUMBNAIL_PADDING_PX * 2 * dpr * zoom)));
 
   const scale = Math.min(1, THUMBNAIL_MAX_DIMENSION / Math.max(srcW, srcH));
   const outW = Math.max(1, Math.round(srcW * scale));
@@ -83,17 +98,18 @@ export async function captureThumbnail(windowId: number, rect: CaptureRect, dpr:
 
 // Chrome can only screenshot the whole visible tab, so crop the element out of
 // it here — the service worker has OffscreenCanvas but no DOM to do it in.
-export async function captureElement(windowId: number, rect: CaptureRect, dpr: number): Promise<string> {
+export async function captureElement(windowId: number, rect: CaptureRect, dpr: number, zoom = 1): Promise<string> {
   const fullDataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
   const bitmap = await createImageBitmap(await (await fetch(fullDataUrl)).blob());
+  const scaled = toDevicePixels(rect, dpr, zoom);
 
-  const width = Math.max(1, Math.round(rect.width * dpr));
-  const height = Math.max(1, Math.round(rect.height * dpr));
+  const width = Math.max(1, Math.round(scaled.width));
+  const height = Math.max(1, Math.round(scaled.height));
   const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Could not create a canvas to crop the screenshot');
 
-  ctx.drawImage(bitmap, Math.round(rect.x * dpr), Math.round(rect.y * dpr), width, height, 0, 0, width, height);
+  ctx.drawImage(bitmap, Math.round(scaled.x), Math.round(scaled.y), width, height, 0, 0, width, height);
   bitmap.close();
 
   const blob = await canvas.convertToBlob({ type: 'image/png' });

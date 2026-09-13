@@ -464,6 +464,11 @@ export function attachExtractBadge({
 
   const hasAnyTarget = (t: ReturnType<typeof computeTargets>) => !!(t.table || t.text || t.batch || t.image);
 
+  const areaOf = (el: Element): number => {
+    const r = el.getBoundingClientRect();
+    return r.width * r.height;
+  };
+
   // The exact element under the pointer can be a purely decorative,
   // pointer-events:auto overlay with nothing of its own to capture, sitting
   // on top of a real control at the very same screen position — confirmed on
@@ -473,11 +478,32 @@ export function attachExtractBadge({
   // the full stack at that point, topmost first, so walking past the first
   // miss finds the real control instead of reporting "nothing here" just
   // because the very top layer happens to be decorative.
+  //
+  // Only table/image/batch count here, never text: findTextTarget accepts
+  // anything with SOME descendant text anywhere inside it, which is exactly
+  // right for the element the user actually pointed at (that's what they
+  // meant to capture) but wrong for an ancestor merely turned up by this
+  // walk — confirmed live, where a big wrapping container with an unrelated
+  // caption buried somewhere inside it kept getting offered as "the text
+  // here" for a click that landed on empty space nowhere near that caption.
+  const hasAnyPreciseTarget = (t: ReturnType<typeof computeTargets>) => !!(t.table || t.batch || t.image);
+
+  // A real control hiding under a decorative panel is never bigger than the
+  // panel drawn around it — an "is it contained within the original miss"
+  // check was tried instead and reverted: a top-level ancestor trivially
+  // "contains" everything under it on the page, so it let this walk climb
+  // all the way up to a full-screen wrapper and offer to screenshot the
+  // entire page (which then replayed back blank, since that wrapper paints
+  // nothing itself — all its content is positioned children elsewhere).
+  // Rejecting anything larger than the original miss keeps the login-field
+  // fix without inviting that one in.
   const resolveTarget = (target: Element | null, x: number, y: number): Element | null => {
     if (target && hasAnyTarget(computeTargets(target))) return target;
+    const maxArea = target ? areaOf(target) : Infinity;
     for (const el of document.elementsFromPoint(x, y)) {
       if (el === target || isExtensionUi(el)) continue;
-      if (hasAnyTarget(computeTargets(el))) return el;
+      if (areaOf(el) > maxArea) continue;
+      if (hasAnyPreciseTarget(computeTargets(el))) return el;
     }
     return target;
   };
@@ -522,8 +548,12 @@ export function attachExtractBadge({
     tableItem.style.display = currentTable ? 'flex' : 'none';
     textItem.style.display = currentText ? 'flex' : 'none';
     inputItem.style.display = isTypeable(currentBatch) ? 'flex' : 'none';
-    // Batch nodes can be recorded on anything the menu is aimed at — table,
-    // text, or a plain control — so they're never hidden.
+    // "Image of this area" means exactly that — the area drawn on screen,
+    // whatever defaultTarget() below currently outlines, not necessarily a
+    // real <img>/background-image — so like Batch, it's never hidden. Hiding
+    // it whenever currentImage was empty was tried and reverted: the user's
+    // own real use case is screenshotting a plain field with nothing that
+    // findImageTarget would ever recognize as "an image" on its own.
     menu.style.display = 'flex';
     root.style.display = 'block';
     positionAt(x, y);
