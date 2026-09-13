@@ -139,6 +139,18 @@ async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
   return fallback;
 }
 
+// chrome.tabs.sendMessage without a frameId only reaches the top frame — a
+// real Nexacro app renders some of its internal "windows" as actual nested
+// iframes (confirmed live: content-script.js runs in dozens of them, since
+// executeScript above uses allFrames), so without this, Ctrl+Right-click
+// silently does nothing anywhere inside one of those frames: the listeners
+// were simply never attached there.
+async function sendToAllFrames(tabId: number, message: RuntimeMessage): Promise<void> {
+  const frames = await chrome.webNavigation.getAllFrames({ tabId }).catch(() => null);
+  const frameIds = (frames ?? []).map((f) => f.frameId).filter((id) => id !== 0);
+  await Promise.all(frameIds.map((frameId) => chrome.tabs.sendMessage(tabId, message, { frameId }).catch(() => {})));
+}
+
 // A page loaded before this extension was installed/reloaded has no content
 // script, so tabs.sendMessage would fail. Injecting on demand makes Start work
 // without asking the user to refresh first.
@@ -157,15 +169,13 @@ async function attachToActiveTab(highlightElements: boolean): Promise<string | n
     return `Cannot record this page: ${(error as Error).message}`;
   }
 
+  const message = { type: 'SET_RECORDING', value: true, highlightElements } satisfies RuntimeMessage;
   try {
-    await chrome.tabs.sendMessage(tab.id, {
-      type: 'SET_RECORDING',
-      value: true,
-      highlightElements,
-    } satisfies RuntimeMessage);
+    await chrome.tabs.sendMessage(tab.id, message);
   } catch (error) {
     return `Page did not respond: ${(error as Error).message}`;
   }
+  await sendToAllFrames(tab.id, message);
 
   return null;
 }
@@ -173,9 +183,9 @@ async function attachToActiveTab(highlightElements: boolean): Promise<string | n
 async function detachFromActiveTab(): Promise<void> {
   const tab = await getActiveTab();
   if (!tab?.id) return;
-  chrome.tabs
-    .sendMessage(tab.id, { type: 'SET_RECORDING', value: false, highlightElements: false } satisfies RuntimeMessage)
-    .catch(() => {}); // page may already be gone — nothing to turn off
+  const message = { type: 'SET_RECORDING', value: false, highlightElements: false } satisfies RuntimeMessage;
+  chrome.tabs.sendMessage(tab.id, message).catch(() => {}); // page may already be gone — nothing to turn off
+  await sendToAllFrames(tab.id, message);
 }
 
 // Every capture names the variable it fills, and those names have to stay

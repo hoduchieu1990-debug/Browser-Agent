@@ -244,7 +244,11 @@ function createTargetFrame(): TargetFrame {
   const box = document.createElement('div');
   box.id = FRAME_ID;
   markAsExtensionUi(box);
-  box.style.position = 'fixed';
+  // !important: confirmed on a real Nexacro app, which applies a global
+  // `div { position: absolute }` rule (its own widgets are all absolutely-
+  // positioned divs) — without this, that rule wins over the plain inline
+  // style and the box stops behaving as position:fixed at all.
+  box.style.setProperty('position', 'fixed', 'important');
   box.style.pointerEvents = 'none';
   box.style.boxSizing = 'border-box';
   box.style.border = '2px solid #4f46e5';
@@ -313,7 +317,12 @@ function createBadge(): BadgeElements {
   const root = document.createElement('div');
   root.id = BADGE_ID;
   markAsExtensionUi(root);
-  root.style.position = 'fixed';
+  // !important: same reason as the target frame's box above — a real
+  // Nexacro app forces every div to position:absolute globally. Without
+  // this, `menu` below (a normal in-flow child, no top/left of its own) gets
+  // silently pulled out of flow, and root — sized only by its in-flow
+  // content — collapses to 0x0 with nothing left to show the menu inside.
+  root.style.setProperty('position', 'fixed', 'important');
   root.style.zIndex = '2147483647';
   root.style.display = 'none';
   root.style.pointerEvents = 'auto';
@@ -321,6 +330,9 @@ function createBadge(): BadgeElements {
 
   const menu = document.createElement('div');
   menu.dataset.baRole = 'menu';
+  // Same rule would otherwise make this position:absolute too — pinning it
+  // back to a normal in-flow box is what lets root size itself around it.
+  menu.style.setProperty('position', 'static', 'important');
   menu.style.display = 'none';
   menu.style.flexDirection = 'column';
   menu.style.minWidth = '178px';
@@ -450,6 +462,26 @@ export function attachExtractBadge({
     image: findImageTarget(target),
   });
 
+  const hasAnyTarget = (t: ReturnType<typeof computeTargets>) => !!(t.table || t.text || t.batch || t.image);
+
+  // The exact element under the pointer can be a purely decorative,
+  // pointer-events:auto overlay with nothing of its own to capture, sitting
+  // on top of a real control at the very same screen position — confirmed on
+  // a real Nexacro app, where a background "card" panel behind a login form
+  // (empty, no text/image, 330x333px) intercepted every click meant for the
+  // email/password fields drawn at that same spot. elementsFromPoint returns
+  // the full stack at that point, topmost first, so walking past the first
+  // miss finds the real control instead of reporting "nothing here" just
+  // because the very top layer happens to be decorative.
+  const resolveTarget = (target: Element | null, x: number, y: number): Element | null => {
+    if (target && hasAnyTarget(computeTargets(target))) return target;
+    for (const el of document.elementsFromPoint(x, y)) {
+      if (el === target || isExtensionUi(el)) continue;
+      if (hasAnyTarget(computeTargets(el))) return el;
+    }
+    return target;
+  };
+
   const positionAt = (x: number, y: number) => {
     const width = root.offsetWidth || MENU_FALLBACK_WIDTH_PX;
     const height = root.offsetHeight || MENU_FALLBACK_HEIGHT_PX;
@@ -478,8 +510,8 @@ export function attachExtractBadge({
   // shows it at the given point. Returns false (nothing shown) when nothing
   // under the pointer qualifies for any capture kind.
   const openMenuAt = (target: Element | null, x: number, y: number): boolean => {
-    const targets = computeTargets(target);
-    if (!targets.table && !targets.text && !targets.batch && !targets.image) return false;
+    const targets = computeTargets(resolveTarget(target, x, y));
+    if (!hasAnyTarget(targets)) return false;
 
     currentTable = targets.table;
     currentText = targets.text;
@@ -506,8 +538,17 @@ export function attachExtractBadge({
   // The normal path: a real context menu, not a button that has to be
   // hunted down first. Nothing tracks the cursor between clicks.
   const handleContextMenu = (event: MouseEvent) => {
+    if (!event.ctrlKey) return;
     const target = realTarget(event);
-    if (!event.ctrlKey || isExtensionUi(target)) return;
+    // stop() has to run before the isExtensionUi check below, not after:
+    // handleMouseDown's own fallback (below) already opens the menu right
+    // where the cursor is, so by the time this contextmenu event follows on
+    // the same click, the cursor can already be sitting on top of that very
+    // menu — making its own real target our own UI. Bailing out before
+    // suppressing would leave the browser's native menu free to pop up over
+    // the one we just opened, which is exactly what happened here.
+    stop(event); // suppress the browser's own context menu unconditionally
+    if (isExtensionUi(target)) return;
     // Nexacro renders its own mouse cursor as a real, pointer-events:auto
     // DOM element that tracks the pointer (confirmed live, near a text
     // field) — the browser's hit-testing lands on it first, same as a real
@@ -516,17 +557,7 @@ export function attachExtractBadge({
     // re-resolving via elementFromPoint was tried and rejected: it lands on
     // some other unrelated container instead, and a wrong-but-plausible
     // target silently captured is worse than the menu not opening at all.
-    // stop() still runs — letting the page's own handler react to a click
-    // aimed at its cursor overlay is exactly what led to the crash loop
-    // handleMouseDown's own comment below describes.
-    if (isNexacroVirtualCursor(target)) {
-      stop(event);
-      return;
-    }
-
-    stop(event); // suppress the browser's own context menu unconditionally —
-    // even when the mousedown fallback below already opened the menu for
-    // this same physical click, this native menu still needs suppressing.
+    if (isNexacroVirtualCursor(target)) return;
     if (menuOpen) return;
     openMenuAt(target, event.clientX, event.clientY);
   };
