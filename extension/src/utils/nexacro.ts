@@ -141,3 +141,15 @@ export function isNexacroSelector(selector: string): boolean {
 export function nexacroComponentId(selector: string): string {
   return selector.slice(NEXACRO_SELECTOR_PREFIX.length);
 }
+
+// Nexacro renders its own mouse cursor as a real DOM element that tracks the
+// pointer — confirmed on a live app, a 150x150 pointer-events:auto div
+// sitting over whatever is under the cursor near a text field, presumably
+// so it can relay the click into its own component tree before the real
+// target gets it. The browser's own hit-testing lands on it first, same as
+// a real user's click would, so without this a click meant for whatever is
+// underneath instead captures "the mouse cursor icon" — never something
+// meaningful to record.
+export function isNexacroVirtualCursor(el: Element | null): boolean {
+  return !!el?.id?.includes('__virtual_mouse');
+}

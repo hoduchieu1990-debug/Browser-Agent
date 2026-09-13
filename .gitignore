@@ -31,6 +31,7 @@ extension/public/icons/
 .verify/hover-hint-label-profile/
 .verify/hostile-page-menu-profile/
 .verify/background-image-target-profile/
+.verify/nexacro-textfield-interference-profile/
 .verify/stale-generation-teardown-profile/
 .verify/dead-runtime-self-detach-profile/
 .verify/search-enter-profile/

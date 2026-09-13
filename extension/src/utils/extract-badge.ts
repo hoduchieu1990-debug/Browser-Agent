@@ -1,7 +1,7 @@
 import { findTableAncestor, findClickableAncestor } from './clickable-element';
 import { hasNonPositionalSelector } from './selector-utils';
 import { markAsExtensionUi, isExtensionUi } from './ui-marker';
-import { findNexacroComponent, findNexacroGrid } from './nexacro';
+import { findNexacroComponent, findNexacroGrid, isNexacroVirtualCursor } from './nexacro';
 
 const BADGE_ID = '__browser_agent_add_badge__';
 // A short price/status/cell fits well under the old 300, but a product
@@ -386,6 +386,13 @@ function realTarget(event: Event): Element | null {
   return (path[0] as Element | undefined) ?? (event.target as Element | null);
 }
 
+// Nexacro's virtual mouse cursor sits over whatever the pointer is actually
+// on (confirmed on a live app: a 150x150 pointer-events:auto div near a text
+// field), so the browser's own hit-testing lands on it first — same as a
+// real click would. Hiding it from hit-testing for one elementFromPoint call
+// finds what's actually underneath, the same trick used to click through
+// any overlay; restoring pointer-events right after leaves the page exactly
+// as it found it.
 // Rides along with the pointer during recording and offers to capture whatever
 // is under it, so extracting data never requires leaving the page.
 export function attachExtractBadge({
@@ -501,6 +508,21 @@ export function attachExtractBadge({
   const handleContextMenu = (event: MouseEvent) => {
     const target = realTarget(event);
     if (!event.ctrlKey || isExtensionUi(target)) return;
+    // Nexacro renders its own mouse cursor as a real, pointer-events:auto
+    // DOM element that tracks the pointer (confirmed live, near a text
+    // field) — the browser's hit-testing lands on it first, same as a real
+    // click would, so without this a click meant for whatever is
+    // underneath instead captures "the mouse cursor icon". Hiding it and
+    // re-resolving via elementFromPoint was tried and rejected: it lands on
+    // some other unrelated container instead, and a wrong-but-plausible
+    // target silently captured is worse than the menu not opening at all.
+    // stop() still runs — letting the page's own handler react to a click
+    // aimed at its cursor overlay is exactly what led to the crash loop
+    // handleMouseDown's own comment below describes.
+    if (isNexacroVirtualCursor(target)) {
+      stop(event);
+      return;
+    }
 
     stop(event); // suppress the browser's own context menu unconditionally —
     // even when the mousedown fallback below already opened the menu for
@@ -518,10 +540,26 @@ export function attachExtractBadge({
   // there only cancels default browser behavior like text selection, not
   // other listeners, and not a future event), so this opens the menu right
   // there instead of waiting for a contextmenu that may never come.
+  //
+  // stop() runs before the target is even checked (aside from our own UI):
+  // confirmed on a real Nexacro TextField, right-clicking it while Ctrl is
+  // held (unavoidable — that's the gesture) let the page's OWN mousedown
+  // handler also fire — usually to focus/relay into whatever component is
+  // really under the cursor, cursor-overlay included — after which Ctrl's
+  // own OS-level key-repeat got routed into that field's onkeydown handler
+  // on every repeat, which crashed on a bare modifier key, over and over,
+  // for as long as the button stayed held. Stopping propagation here (this
+  // listener sits on window, ahead of everything else in capture order)
+  // keeps the page's own handler from ever seeing this click at all — this
+  // has to happen even when the target turns out to be unusable (the
+  // cursor overlay), since the page's own reaction is what starts the
+  // crash chain, not whatever we do with the target afterward.
   const handleMouseDown = (event: MouseEvent) => {
     if (event.button !== 2 || !event.ctrlKey) return;
     const target = realTarget(event);
     if (isExtensionUi(target)) return;
+    stop(event);
+    if (isNexacroVirtualCursor(target)) return;
     openMenuAt(target, event.clientX, event.clientY);
   };
 

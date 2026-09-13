@@ -53,6 +53,7 @@ const CHECKS = [
   'hover-hint-label-check.js',
   'hostile-page-menu-check.js',
   'background-image-target-check.js',
+  'nexacro-textfield-interference-check.js',
   'stale-generation-teardown-check.js',
   'dead-runtime-self-detach-check.js',
   'upload-check.js',
