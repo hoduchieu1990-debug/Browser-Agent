@@ -18,7 +18,11 @@ function createOverlay(color: string): HTMLDivElement {
   const el = document.createElement('div');
   el.id = OVERLAY_ID;
   markAsExtensionUi(el);
-  el.style.position = 'fixed';
+  // !important: a real Nexacro app forces every div to position:absolute
+  // globally (its own widgets are all absolutely-positioned divs) — without
+  // this, that rule wins over the plain inline style and the outline stops
+  // tracking the viewport like position:fixed is supposed to.
+  el.style.setProperty('position', 'fixed', 'important');
   el.style.pointerEvents = 'none';
   el.style.boxSizing = 'border-box';
   el.style.border = `2px solid ${color}`;
@@ -43,7 +47,7 @@ function createLabel(color: string): HTMLDivElement {
   el.id = LABEL_ID;
   markAsExtensionUi(el);
   el.textContent = 'Ctrl+Right-click to add data';
-  el.style.position = 'fixed';
+  el.style.setProperty('position', 'fixed', 'important'); // see createOverlay's own comment above
   el.style.pointerEvents = 'none';
   el.style.padding = '2px 7px';
   el.style.borderRadius = '4px';

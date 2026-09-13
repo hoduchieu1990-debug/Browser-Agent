@@ -191,8 +191,13 @@ const BATCH_LABELS: Record<BatchKind, string> = {
   extract: '📤  Extract',
 };
 
+// !important: same reason as the badge root/menu (createBadge) — a real
+// Nexacro app forces every div to position:absolute globally. Without this,
+// these two plain divs get pulled out of the menu's flex flow and pile up
+// at its top-left corner instead of sitting in place between the buttons.
 function styleMenuDivider(): HTMLDivElement {
   const divider = document.createElement('div');
+  divider.style.setProperty('position', 'static', 'important');
   divider.style.margin = '4px 0';
   divider.style.borderTop = '1px solid #e5e9f0';
   return divider;
@@ -200,6 +205,7 @@ function styleMenuDivider(): HTMLDivElement {
 
 function styleMenuLabel(text: string): HTMLDivElement {
   const label = document.createElement('div');
+  label.style.setProperty('position', 'static', 'important');
   label.textContent = text;
   label.style.padding = '4px 12px 2px';
   label.style.font = '600 10px system-ui, "Segoe UI", sans-serif';
@@ -537,6 +543,17 @@ export function attachExtractBadge({
   // under the pointer qualifies for any capture kind.
   const openMenuAt = (target: Element | null, x: number, y: number): boolean => {
     const targets = computeTargets(resolveTarget(target, x, y));
+    if (!hasAnyTarget(targets) && target instanceof HTMLElement) {
+      // Nothing precise matched anywhere under the pointer — the user's own
+      // explicit ask is that Add still works here regardless, screenshotting
+      // whatever is on screen. findClickableAncestor is the same resolution
+      // the hover highlight already uses and always returns something for a
+      // real element, so this makes "Add works" and "the hover outline
+      // shows" the same guarantee instead of a purely decorative Nexacro
+      // panel (no text, no background-image, not interactive) offering
+      // nothing at all.
+      targets.image = findClickableAncestor(target);
+    }
     if (!hasAnyTarget(targets)) return false;
 
     currentTable = targets.table;

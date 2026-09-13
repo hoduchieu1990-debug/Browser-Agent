@@ -64,14 +64,17 @@ const PAGE = `<!doctype html><html><body style="padding:40px">
     };
 
     check('a div with a real background-image (url()) offers "Image of this area"', await offersImage('#logo'));
-    check(
-      'a div with a gradient background does NOT offer it (not a photo to screenshot)',
-      !(await offersImage('#gradient')),
-    );
-    // A plain bordered div with no text/image/interactivity offers nothing
-    // at all, matching the pre-existing menu-never-opens behavior — this
-    // isn't a new capability, just confirming the gradient case above isn't
-    // accidentally matching via some other target kind instead.
+    // A gradient isn't a photo findImageTarget would recognize on its own,
+    // but the menu still has to offer *something* here — confirmed live on
+    // a real Nexacro app, where a purely decorative panel (no text, no
+    // background-image, not interactive) was still a real, visible thing
+    // the user wanted to screenshot. "Image of this area" falling back to
+    // whatever the hover highlight already outlines (findClickableAncestor,
+    // which always returns something for a real element) is what makes
+    // "Add works here" match "the hover outline shows here" everywhere,
+    // not just for elements findImageTarget happens to recognize.
+    check('a div with a gradient background still offers it (a generic screenshot fallback)', await offersImage('#gradient'));
+    check('a plain bordered div with nothing else still offers it too', await offersImage('#plain'));
   } finally {
     await context.close();
     server.close();
